@@ -16,12 +16,15 @@ const currentSections = currentView.sections;
 const registry = JSON.parse(fs.readFileSync(REGISTRY_FILE, 'utf8'));
 const deviceRegistry = JSON.parse(fs.readFileSync(DEVICE_REGISTRY_FILE, 'utf8'));
 
-// These individual bulbs are already grouped into light.ceiling_fan;
+// These individual bulbs are already grouped into light.living_room_ceiling_fan;
 // show only the group on the dashboard.
 const EXCLUDED_LIGHTS = [
   'light.third_reality_inc_3rcb01057z',
   'light.third_reality_inc_3rcb01057z_2',
-  'light.third_reality_inc_3rcb01057z_3'
+  'light.third_reality_inc_3rcb01057z_3',
+  'light.third_reality_inc_3rcb01057z_4',
+  'light.third_reality_inc_3rcb01057z_5',
+  'light.third_reality_inc_3rcb01057z_6'
 ];
 
 const lights = registry.data.entities
