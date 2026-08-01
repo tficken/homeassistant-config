@@ -1,0 +1,107 @@
+all_lights_off:
+  alias: All lights off
+  sequence:
+    - action: light.turn_off
+      target:
+        entity_id: all
+      data:
+        transition: 2
+  mode: single
+  icon: mdi:lightbulb-off
+
+goodnight:
+  alias: Goodnight
+  sequence:
+    - action: light.turn_off
+      target:
+        entity_id: all
+      data:
+        transition: 3
+    - action: media_player.media_stop
+      target:
+        entity_id: all
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: Goodnight
+        message: All lights and media are off.
+  mode: single
+  icon: mdi:weather-night
+
+restart_ha:
+  alias: Restart Home Assistant
+  sequence:
+    - action: homeassistant.restart
+  mode: single
+  icon: mdi:restart
+
+movie_mode:
+  alias: Movie mode
+  sequence:
+    - action: light.turn_off
+      target:
+        area_id: travis_office
+      data:
+        transition: 3
+    - action: media_player.media_pause
+      target:
+        entity_id:
+          - media_player.living_room_fire_tv_living_room
+          - media_player.travis_office_office_fire_tv
+  mode: single
+  icon: mdi:movie-open
+
+focus_mode:
+  alias: Focus mode
+  sequence:
+    - action: light.turn_on
+      target:
+        area_id: travis_office
+      data:
+        brightness_pct: 100
+        transition: 2
+  mode: single
+  icon: mdi:desk-lamp-on
+
+relax_mode:
+  alias: Relax mode
+  sequence:
+    - action: light.turn_on
+      target:
+        area_id: travis_office
+      data:
+        brightness_pct: 30
+        transition: 3
+  mode: single
+  icon: mdi:sofa
+
+travis_office_lights_on:
+  alias: Travis Office lights on
+  sequence:
+    - action: light.turn_on
+      target:
+        area_id: travis_office
+      data:
+        brightness_pct: 100
+        transition: 2
+  mode: single
+  icon: mdi:lightbulb-on
+
+travis_office_lights_off:
+  alias: Travis Office lights off
+  sequence:
+    - action: light.turn_off
+      target:
+        area_id: travis_office
+      data:
+        transition: 2
+  mode: single
+  icon: mdi:lightbulb-off
+
+pause_all_media:
+  alias: Pause all media
+  sequence:
+    - action: media_player.media_pause
+      target:
+        entity_id: all
+  mode: single
+  icon: mdi:pause
