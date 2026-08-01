@@ -105,3 +105,25 @@ pause_all_media:
         entity_id: all
   mode: single
   icon: mdi:pause
+
+living_room_lights_on:
+  alias: Living room lights on
+  sequence:
+    - action: light.turn_on
+      target:
+        entity_id: light.living_room_ceiling_fan
+      data:
+        brightness_pct: 100
+  mode: single
+  icon: mdi:lightbulb-on
+
+living_room_lights_off:
+  alias: Living room lights off
+  sequence:
+    - action: light.turn_off
+      target:
+        entity_id: light.living_room_ceiling_fan
+      data:
+        transition: 2
+  mode: single
+  icon: mdi:lightbulb-off
