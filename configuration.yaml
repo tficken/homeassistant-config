@@ -1,0 +1,79 @@
+
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+# Limit DB growth and SD-card wear
+recorder:
+  purge_keep_days: 30
+  exclude:
+    domains:
+      - updater
+      - sun
+      - weather
+    entity_globs:
+      - sensor.home_assistant_core_*
+      - sensor.home_assistant_host_*
+      - sensor.home_assistant_supervisor_*
+      - sensor.*_cpu_percent
+      - sensor.*_memory_percent
+      - sensor.*_wifi_signal
+      - binary_sensor.p1s_*_firmware
+      - binary_sensor.p1s_*_developer_lan_mode
+      - binary_sensor.p1s_*_mqtt_encryption
+      - binary_sensor.p1s_*_hybrid_mqtt_control_blocked
+      - sensor.exos_router_data_*
+      - sensor.exos_router_packet_*
+      - sensor.exos_router_port_*
+      - sensor.p1s_*_nozzle_temperature
+      - sensor.p1s_*_bed_temperature
+      - sensor.p1s_*_fan_*
+      - sensor.p1s_*_speed
+      - image.p1s_*_*
+      - camera.p1s_*_camera
+
+# SD-card disk usage sensor for the PI section
+command_line:
+  - sensor:
+      name: "HA disk usage"
+      unique_id: ha_disk_usage
+      command: "df -h /config | awk 'NR==2 {print $5}' | sed 's/%//'"
+      unit_of_measurement: "%"
+      value_template: "{{ value | int(0) }}"
+      scan_interval: 300
+
+# Reduce noisy integration logs while keeping errors visible
+logger:
+  default: info
+  logs:
+    custom_components.bambu_lab.pybambu: critical
+    pylitterbot.transport: warning
+    homeassistant.components.bluetooth: warning
+
+input_boolean:
+  voice_mute:
+    name: Voice mute
+    icon: mdi:microphone-off
+    initial: false
+
+# Remove backups older than 14 days via the Supervisor API.
+# The backup.remove service used by the previous automation does not exist.
+shell_command:
+  cleanup_old_backups: "python3 /config/scripts/cleanup_old_backups.py"
+
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+light:
+  - platform: group
+    name: Living room ceiling fan
+    unique_id: living_room_ceiling_fan
+    entities:
+      - light.third_reality_inc_3rcb01057z_4
+      - light.third_reality_inc_3rcb01057z_5
+      - light.third_reality_inc_3rcb01057z_6
+
