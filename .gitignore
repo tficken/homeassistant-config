@@ -1,0 +1,9 @@
+.cloud/
+.storage/
+.cache/
+deps/
+home-assistant_v2.db*
+zigbee.db*
+*.log
+*.log.fault
+ backups/
