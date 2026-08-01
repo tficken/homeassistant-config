@@ -130,7 +130,7 @@
                 },
                 {
                   "type": "tile",
-                  "entity": "light.p1s_01p00a412300832_chamber_light",
+                  "entity": "light.living_room_ceiling_fan",
                   "grid_options": {
                     "columns": 6,
                     "rows": "auto"
@@ -146,7 +146,47 @@
                 },
                 {
                   "type": "tile",
-                  "entity": "light.living_room_ceiling_fan",
+                  "entity": "light.travis_office_ceiling_fan_light_1",
+                  "grid_options": {
+                    "columns": 6,
+                    "rows": "auto"
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "light.travis_office_ceiling_fan_light_2",
+                  "grid_options": {
+                    "columns": 6,
+                    "rows": "auto"
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "light.travis_office_ceiling_fan_light_3",
+                  "grid_options": {
+                    "columns": 6,
+                    "rows": "auto"
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "light.living_room_third_reality_inc_3rcb01057z",
+                  "grid_options": {
+                    "columns": 6,
+                    "rows": "auto"
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "light.living_room_third_reality_inc_3rcb01057z_2",
+                  "grid_options": {
+                    "columns": 6,
+                    "rows": "auto"
+                  }
+                },
+                {
+                  "type": "tile",
+                  "entity": "light.living_room_third_reality_inc_3rcb01057z_3",
                   "grid_options": {
                     "columns": 6,
                     "rows": "auto"
