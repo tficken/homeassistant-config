@@ -140,10 +140,6 @@
         title: "P1S print finished"
         message: "P1S print status changed to {{ trigger.to_state.state }}."
         notification_id: bambu_p1s_print_finished
-    - action: notify.mobile_app_traviss_iphone
-      data:
-        title: "P1S print finished"
-        message: "P1S print status changed to {{ trigger.to_state.state }}."
   mode: single
 
 - id: bambu_p1s_print_error
@@ -168,10 +164,6 @@
         title: "P1S print error"
         message: "P1S reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
         notification_id: bambu_p1s_print_error
-    - action: notify.mobile_app_traviss_iphone
-      data:
-        title: "P1S print error"
-        message: "P1S reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
   mode: single
 
 - id: bambu_p1s_uno_print_finished
@@ -193,10 +185,6 @@
         title: "P1S UNO print finished"
         message: "P1S UNO print status changed to {{ trigger.to_state.state }}."
         notification_id: bambu_p1s_uno_print_finished
-    - action: notify.mobile_app_traviss_iphone
-      data:
-        title: "P1S UNO print finished"
-        message: "P1S UNO print status changed to {{ trigger.to_state.state }}."
   mode: single
 
 - id: bambu_p1s_uno_print_error
@@ -221,8 +209,4 @@
         title: "P1S UNO print error"
         message: "P1S UNO reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
         notification_id: bambu_p1s_uno_print_error
-    - action: notify.mobile_app_traviss_iphone
-      data:
-        title: "P1S UNO print error"
-        message: "P1S UNO reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
   mode: single
