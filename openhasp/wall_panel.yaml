@@ -1,0 +1,83 @@
+wall_panel:
+  objects:
+    # Page navigation overlay (page 0)
+    - obj: "p0b2"
+      properties:
+        bg_color: '{{ "#546E7A" if state_attr("openhasp.wall_panel", "page") == 1 else "#37474F" }}'
+      event:
+        "down":
+          - service: openhasp.change_page
+            target:
+              entity_id: openhasp.wall_panel
+            data:
+              page: 1
+
+    - obj: "p0b3"
+      properties:
+        bg_color: '{{ "#546E7A" if state_attr("openhasp.wall_panel", "page") == 2 else "#455A64" }}'
+      event:
+        "down":
+          - service: openhasp.change_page
+            target:
+              entity_id: openhasp.wall_panel
+            data:
+              page: 2
+
+    # Weather page (page 1)
+    - obj: "p1b3"
+      properties:
+        text: >-
+          {% set t = state_attr('weather.forecast_home', 'temperature') %}
+          {% set c = states('weather.forecast_home') | replace('_', ' ') | title %}
+          {{ '%d°' | format(t | int) if t not in [None, 'unknown', 'unavailable'] else '--°' }} {{ c }}
+
+    - obj: "p1b4"
+      properties:
+        text: >-
+          {% set h = state_attr('weather.forecast_home', 'humidity') %}
+          {% set w = state_attr('weather.forecast_home', 'wind_speed') %}
+          Humidity {{ h }}%   Wind {{ w }}
+
+    # Lights page (page 2) - Living Room
+    - obj: "p2b3"
+      properties:
+        val: '{{ 1 if is_state("light.living_room_ceiling_fan", "on") else 0 }}'
+        text: >-
+          {{ "Living Room\nOn" if is_state("light.living_room_ceiling_fan", "on") else "Living Room\nOff" }}
+        bg_color: '{{ "#4CAF50" if is_state("light.living_room_ceiling_fan", "on") else "#607D8B" }}'
+      event:
+        "up":
+          - service: homeassistant.toggle
+            entity_id: light.living_room_ceiling_fan
+
+    - obj: "p2b5"
+      properties:
+        val: '{{ state_attr("light.living_room_ceiling_fan", "brightness") | int(default=0) }}'
+      event:
+        "up":
+          - service: light.turn_on
+            data:
+              entity_id: light.living_room_ceiling_fan
+              brightness: "{{ val }}"
+
+    # Lights page (page 2) - Office
+    - obj: "p2b4"
+      properties:
+        val: '{{ 1 if is_state("light.ceiling_fan", "on") else 0 }}'
+        text: >-
+          {{ "Office\nOn" if is_state("light.ceiling_fan", "on") else "Office\nOff" }}
+        bg_color: '{{ "#4CAF50" if is_state("light.ceiling_fan", "on") else "#607D8B" }}'
+      event:
+        "up":
+          - service: homeassistant.toggle
+            entity_id: light.ceiling_fan
+
+    - obj: "p2b6"
+      properties:
+        val: '{{ state_attr("light.ceiling_fan", "brightness") | int(default=0) }}'
+      event:
+        "up":
+          - service: light.turn_on
+            data:
+              entity_id: light.ceiling_fan
+              brightness: "{{ val }}"
