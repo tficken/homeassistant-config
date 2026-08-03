@@ -62,15 +62,12 @@ Two pages, 800×480 landscape.
 
 #### Page 1 — Lighting Groups
 
-- Grid of toggle buttons/sliders for room light groups:
+- Grid of toggle buttons/sliders for the light groups that currently exist in Home Assistant:
   - Living Room → `light.living_room_ceiling_fan`
   - Travis Office → `light.ceiling_fan`
-  - Kitchen → (map from registry)
-  - Bedroom → (map from registry)
-  - Basement → (map from registry)
-  - Basement office → (map from registry)
-- Each tile shows state and toggles the group; dimmable groups also get a brightness slider.
+- Each tile shows state and toggles the group; both groups are dimmable, so each also gets a brightness slider.
 - Bottom navigation button back to Page 0.
+- Additional rooms (Kitchen, Bedroom, Basement, Basement office) can be added to this page once lights are added to those areas.
 
 ### 5. Always-on / backlight automation
 
