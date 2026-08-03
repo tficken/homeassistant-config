@@ -1,0 +1,228 @@
+- id: '1784005048682'
+  alias: backyard night motion
+  description: ''
+  triggers:
+  - trigger: event.received
+    target:
+      entity_id: event.downstairs_motion
+    options:
+      event_type:
+      - motion
+  conditions:
+  - condition: sun
+    after: sunset
+    before: sunrise
+  actions:
+  - action: siren.turn_on
+    metadata: {}
+    target:
+      entity_id: siren.downstairs_siren_2
+    data: {}
+  mode: single
+
+- id: cleanup_old_backups
+  alias: Cleanup old backups
+  description: Delete backups older than 14 days via Supervisor API
+  triggers:
+    - trigger: time
+      at: "04:00:00"
+  conditions: []
+  actions:
+    - action: shell_command.cleanup_old_backups
+  mode: single
+
+- id: weekly_backup
+  alias: Weekly full backup
+  description: Create a full backup every Sunday at 03:00
+  triggers:
+    - trigger: time
+      at: "03:00:00"
+  conditions:
+    - condition: template
+      value_template: "{{ now().weekday() == 6 }}"
+  actions:
+    - action: shell_command.create_weekly_backup
+  mode: single
+
+- id: disk_space_alert
+  alias: Disk space alert
+  description: Notify when HA disk usage exceeds 85%
+  triggers:
+    - trigger: numeric_state
+      entity_id: sensor.ha_disk_usage
+      above: 85
+  conditions: []
+  actions:
+    - action: persistent_notification.create
+      data:
+        title: Disk space warning
+        message: "Home Assistant disk usage is at {{ states('sensor.ha_disk_usage') }}%."
+        notification_id: disk_space_alert
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: Disk space warning
+        message: "Home Assistant disk usage is at {{ states('sensor.ha_disk_usage') }}%."
+  mode: single
+
+- id: low_battery_alert
+  alias: Low battery alert
+  description: Notify when any device battery drops below 20%
+  triggers:
+    - trigger: time
+      at: "09:00:00"
+    - trigger: numeric_state
+      entity_id:
+        - sensor.front_door_battery
+        - sensor.downstairs_battery
+        - sensor.hobeian_zg_204zx_battery
+        - sensor.hobeian_zg_204zx_battery_2
+        - sensor.traviss_iphone_battery_level
+      below: 20
+  conditions:
+    - condition: template
+      value_template: >
+        {% set batteries = [
+          ("Front Door", states('sensor.front_door_battery') | float(100)),
+          ("Downstairs Camera", states('sensor.downstairs_battery') | float(100)),
+          ("Basement Sensor", states('sensor.hobeian_zg_204zx_battery') | float(100)),
+          ("Bedroom Sensor", states('sensor.hobeian_zg_204zx_battery_2') | float(100)),
+          ("Travis's iPhone", states('sensor.traviss_iphone_battery_level') | float(100))
+        ] %}
+        {{ batteries | selectattr('1', '<', 20) | list | length > 0 }}
+  actions:
+    - action: persistent_notification.create
+      data:
+        title: Low battery warning
+        message: >
+          {% set low = [
+            ("Front Door", states('sensor.front_door_battery') | float(100)),
+            ("Downstairs Camera", states('sensor.downstairs_battery') | float(100)),
+            ("Basement Sensor", states('sensor.hobeian_zg_204zx_battery') | float(100)),
+            ("Bedroom Sensor", states('sensor.hobeian_zg_204zx_battery_2') | float(100)),
+            ("Travis's iPhone", states('sensor.traviss_iphone_battery_level') | float(100))
+          ] %}
+          {% for name, level in low | selectattr('1', '<', 20) %}
+          - {{ name }}: {{ level | round(0) }}%
+          {% endfor %}
+        notification_id: low_battery_alert
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: Low battery warning
+        message: >
+          {% set low = [
+            ("Front Door", states('sensor.front_door_battery') | float(100)),
+            ("Downstairs Camera", states('sensor.downstairs_battery') | float(100)),
+            ("Basement Sensor", states('sensor.hobeian_zg_204zx_battery') | float(100)),
+            ("Bedroom Sensor", states('sensor.hobeian_zg_204zx_battery_2') | float(100)),
+            ("Travis's iPhone", states('sensor.traviss_iphone_battery_level') | float(100))
+          ] %}
+          {% set low_names = low | selectattr('1', '<', 20) | map(attribute='0') | list %}
+          {{ low_names | join(', ') }} batter{% if low_names | length > 1 %}ies are{% else %}y is{% endif %} low.
+  mode: single
+
+
+- id: bambu_p1s_print_finished
+  alias: Bambu P1S print finished
+  description: Notify when the P1S print status moves from printing to finished/idle
+  triggers:
+    - trigger: state
+      entity_id: sensor.p1s_01p00a412300832_print_status
+  conditions:
+    - condition: template
+      value_template: >
+        {{ trigger.from_state is not none and
+           trigger.to_state is not none and
+           (trigger.from_state.state | lower) in ['running', 'printing', 'pause', 'paused'] and
+           (trigger.to_state.state | lower) in ['finish', 'finished', 'completed', 'idle', 'success'] }}
+  actions:
+    - action: persistent_notification.create
+      data:
+        title: "P1S print finished"
+        message: "P1S print status changed to {{ trigger.to_state.state }}."
+        notification_id: bambu_p1s_print_finished
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: "P1S print finished"
+        message: "P1S print status changed to {{ trigger.to_state.state }}."
+  mode: single
+
+- id: bambu_p1s_print_error
+  alias: Bambu P1S print error
+  description: Notify when the P1S reports a print or HMS error
+  triggers:
+    - trigger: state
+      entity_id:
+        - sensor.p1s_01p00a412300832_print_status
+        - binary_sensor.p1s_01p00a412300832_print_error
+        - binary_sensor.p1s_01p00a412300832_hms_errors
+  conditions:
+    - condition: template
+      value_template: >
+        {{ trigger.to_state is not none and
+           ((trigger.to_state.state | lower) in ['failed', 'error', 'fault'] or
+            (trigger.to_state.state | lower) == 'on' and
+            trigger.entity_id.startswith('binary_sensor.')) }}
+  actions:
+    - action: persistent_notification.create
+      data:
+        title: "P1S print error"
+        message: "P1S reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
+        notification_id: bambu_p1s_print_error
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: "P1S print error"
+        message: "P1S reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
+  mode: single
+
+- id: bambu_p1s_uno_print_finished
+  alias: Bambu P1S UNO print finished
+  description: Notify when the P1S UNO print status moves from printing to finished/idle
+  triggers:
+    - trigger: state
+      entity_id: sensor.travis_office_p1s_uno_print_status
+  conditions:
+    - condition: template
+      value_template: >
+        {{ trigger.from_state is not none and
+           trigger.to_state is not none and
+           (trigger.from_state.state | lower) in ['running', 'printing', 'pause', 'paused'] and
+           (trigger.to_state.state | lower) in ['finish', 'finished', 'completed', 'idle', 'success'] }}
+  actions:
+    - action: persistent_notification.create
+      data:
+        title: "P1S UNO print finished"
+        message: "P1S UNO print status changed to {{ trigger.to_state.state }}."
+        notification_id: bambu_p1s_uno_print_finished
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: "P1S UNO print finished"
+        message: "P1S UNO print status changed to {{ trigger.to_state.state }}."
+  mode: single
+
+- id: bambu_p1s_uno_print_error
+  alias: Bambu P1S UNO print error
+  description: Notify when the P1S UNO reports a print or HMS error
+  triggers:
+    - trigger: state
+      entity_id:
+        - sensor.travis_office_p1s_uno_print_status
+        - binary_sensor.travis_office_p1s_uno_print_error
+        - binary_sensor.travis_office_p1s_uno_hms_errors
+  conditions:
+    - condition: template
+      value_template: >
+        {{ trigger.to_state is not none and
+           ((trigger.to_state.state | lower) in ['failed', 'error', 'fault'] or
+            (trigger.to_state.state | lower) == 'on' and
+            trigger.entity_id.startswith('binary_sensor.')) }}
+  actions:
+    - action: persistent_notification.create
+      data:
+        title: "P1S UNO print error"
+        message: "P1S UNO reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
+        notification_id: bambu_p1s_uno_print_error
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: "P1S UNO print error"
+        message: "P1S UNO reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
+  mode: single

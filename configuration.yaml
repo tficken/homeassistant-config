@@ -63,6 +63,7 @@ input_boolean:
 # The backup.remove service used by the previous automation does not exist.
 shell_command:
   cleanup_old_backups: "python3 /config/scripts/cleanup_old_backups.py"
+  create_weekly_backup: "python3 /config/scripts/create_weekly_backup.py"
 
 automation: !include automations.yaml
 script: !include scripts.yaml
