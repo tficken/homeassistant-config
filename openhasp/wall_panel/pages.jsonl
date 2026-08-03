@@ -1,0 +1,14 @@
+{"page":0,"id":1,"obj":"obj","x":0,"y":440,"w":800,"h":40,"bg_color":"#263238","click":0}
+{"page":0,"id":2,"obj":"btn","x":0,"y":440,"w":400,"h":40,"text":"Weather","bg_color":"#37474F","text_color":"#FFFFFF","radius":0}
+{"page":0,"id":3,"obj":"btn","x":400,"y":440,"w":400,"h":40,"text":"Lights","bg_color":"#455A64","text_color":"#FFFFFF","radius":0}
+{"page":1,"id":1,"obj":"obj","x":0,"y":0,"w":800,"h":440,"bg_color":"#263238","click":0}
+{"page":1,"id":2,"obj":"label","x":0,"y":0,"w":800,"h":40,"text":"Weather","align":1,"bg_color":"#37474F","text_color":"#FFFFFF","text_font":24}
+{"page":1,"id":3,"obj":"label","x":10,"y":50,"w":780,"h":70,"text":"--° --","align":1,"text_font":32,"text_color":"#FFFFFF"}
+{"page":1,"id":4,"obj":"label","x":10,"y":125,"w":780,"h":35,"text":"--","align":1,"text_font":18,"text_color":"#B0BEC5"}
+{"page":1,"id":5,"obj":"img","x":0,"y":170,"w":800,"h":270,"src":"https://mapservices.weather.noaa.gov/eventdriven/rest/services/radar/radar_base_reflectivity/MapServer/export?bbox=-130,20,-60,50&bboxSR=4326&size=800,480&format=png32&f=image"}
+{"page":2,"id":1,"obj":"obj","x":0,"y":0,"w":800,"h":440,"bg_color":"#263238","click":0}
+{"page":2,"id":2,"obj":"label","x":0,"y":0,"w":800,"h":40,"text":"Lights","align":1,"bg_color":"#37474F","text_color":"#FFFFFF","text_font":24}
+{"page":2,"id":3,"obj":"btn","x":20,"y":60,"w":360,"h":90,"toggle":true,"text":"Living Room","text_font":18,"mode":"break","align":1,"radius":5}
+{"page":2,"id":4,"obj":"btn","x":420,"y":60,"w":360,"h":90,"toggle":true,"text":"Office","text_font":18,"mode":"break","align":1,"radius":5}
+{"page":2,"id":5,"obj":"slider","x":20,"y":160,"w":360,"h":30,"min":0,"max":255,"val":128}
+{"page":2,"id":6,"obj":"slider","x":420,"y":160,"w":360,"h":30,"min":0,"max":255,"val":128}
