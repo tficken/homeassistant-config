@@ -33,7 +33,7 @@ Turn the 7" GrowCube / CrowPanel-style ESP32-S3 capacitive touch display into a 
 
 - Flash the latest openHASP nightly from https://nightly.openhasp.com/ over USB-C.
 - Initial board profile: **Sunton ESP32-8048S070C**.
-- On first boot, join the panel to the home Wi-Fi via the openHAPS captive portal.
+- On first boot, join the panel to the home Wi-Fi via the openHASP captive portal.
 - Set MQTT broker to the HA host (`homeassistant.local` or its IP) and topic prefix `hasp/wall_panel`.
 - Set `idle_off` so the screen never sleeps.
 
