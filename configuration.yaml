@@ -82,3 +82,12 @@ light:
       - light.third_reality_inc_3rcb01057z_5
       - light.third_reality_inc_3rcb01057z_6
 
+lovelace:
+  dashboards:
+    ipad-wall-panel:
+      mode: yaml
+      title: iPad Wall Panel
+      icon: mdi:tablet-dashboard
+      show_in_sidebar: true
+      require_admin: false
+      filename: ipad-wall-panel.yaml
