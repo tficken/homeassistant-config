@@ -1,0 +1,563 @@
+views:
+  - type: sections
+    title: Home
+    icon: mdi:home
+    path: home
+    max_columns: 3
+    theme: Google Dark Theme
+    show_icon_and_title: false
+    header:
+      type: header
+      badges:
+        - type: entity
+          entity: person.woteg
+          show_name: false
+        - type: entity
+          entity: device_tracker.traviss_iphone
+          show_name: false
+        - type: entity
+          entity: weather.forecast_home
+          show_name: false
+      card:
+        type: markdown
+        content: "# Home"
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Home
+            heading_style: title
+            icon: mdi:home
+          - type: markdown
+            content: |
+              # {{ now().strftime("%I:%M %p") }}
+              ## {{ now().strftime("%A, %B %d") }}
+            grid_options:
+              columns: 12
+              rows: auto
+          - type: weather-forecast
+            entity: weather.forecast_home
+            show_current: true
+            show_forecast: true
+            forecast_type: daily
+            secondary_info_attribute: humidity
+            grid_options:
+              columns: 6
+              rows: 4
+          - type: tile
+            entity: person.woteg
+            name: Woteg
+            grid_options:
+              columns: 3
+              rows: auto
+          - type: tile
+            entity: device_tracker.traviss_iphone
+            name: Travis's iPhone
+            grid_options:
+              columns: 3
+              rows: auto
+        column_span: 2
+      - type: grid
+        cards:
+          - type: heading
+            heading: Scenes
+            heading_style: title
+            icon: mdi:palette-swatch
+          - type: tile
+            entity: scene.all_lights_off
+            name: All Off
+            icon: mdi:lightbulb-off
+            grid_options:
+              columns: 4
+              rows: auto
+          - type: tile
+            entity: scene.living_room_lights_on
+            name: Living Room On
+            icon: mdi:sofa
+            grid_options:
+              columns: 4
+              rows: auto
+          - type: tile
+            entity: scene.relax_mode
+            name: Relax
+            icon: mdi:spa
+            grid_options:
+              columns: 4
+              rows: auto
+          - type: tile
+            entity: scene.movie_mode
+            name: Movie
+            icon: mdi:movie-open
+            grid_options:
+              columns: 4
+              rows: auto
+          - type: tile
+            entity: script.goodnight
+            name: Goodnight
+            icon: mdi:weather-night
+            grid_options:
+              columns: 4
+              rows: auto
+          - type: tile
+            entity: script.focus_mode
+            name: Focus
+            icon: mdi:head-cog
+            grid_options:
+              columns: 4
+              rows: auto
+        column_span: 2
+      - type: grid
+        cards:
+          - type: heading
+            heading: Quick Controls
+            heading_style: title
+            icon: mdi:remote
+          - type: custom:mushroom-light-card
+            entity: light.ceiling_fan
+            name: Ceiling Fan
+            icon: mdi:ceiling-fan
+            use_light_color: true
+            show_brightness_control: true
+            show_color_temp_control: true
+            collapsible_controls: true
+            grid_options:
+              columns: 6
+              rows: auto
+          - type: custom:mushroom-light-card
+            entity: light.living_room_ceiling_fan
+            name: Living Room Ceiling Fan
+            icon: mdi:ceiling-fan
+            use_light_color: true
+            show_brightness_control: true
+            show_color_temp_control: true
+            collapsible_controls: true
+            grid_options:
+              columns: 6
+              rows: auto
+          - type: tile
+            entity: media_player.living_room_fire_tv_living_room
+            name: Living Room Fire TV
+            grid_options:
+              columns: 6
+              rows: auto
+        column_span: 2
+      - type: grid
+        cards:
+          - type: heading
+            heading: Cameras
+            heading_style: title
+            icon: mdi:camera
+          - type: picture-entity
+            entity: camera.front_door_live_view
+            camera_view: live
+            grid_options:
+              columns: 6
+              rows: 4
+          - type: picture-entity
+            entity: camera.downstairs_live_view
+            camera_view: live
+            grid_options:
+              columns: 6
+              rows: 4
+        column_span: 2
+  - type: sections
+    title: Lights
+    icon: mdi:lightbulb
+    path: lights
+    max_columns: 3
+    theme: Google Dark Theme
+    show_icon_and_title: false
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Living Room
+            heading_style: title
+            icon: mdi:sofa
+          - type: custom:mushroom-light-card
+            entity: light.living_room_ceiling_fan
+            name: Living Room Ceiling Fan
+            icon: mdi:ceiling-fan
+            use_light_color: true
+            show_brightness_control: true
+            show_color_temp_control: true
+            collapsible_controls: true
+          - type: custom:mushroom-light-card
+            entity: light.third_reality_inc_3rcb01057z_4
+            name: Living Room Fan Light 1
+            use_light_color: true
+            show_brightness_control: true
+            show_color_temp_control: true
+            collapsible_controls: true
+          - type: custom:mushroom-light-card
+            entity: light.third_reality_inc_3rcb01057z_5
+            name: Living Room Fan Light 2
+            use_light_color: true
+            show_brightness_control: true
+            show_color_temp_control: true
+            collapsible_controls: true
+          - type: custom:mushroom-light-card
+            entity: light.third_reality_inc_3rcb01057z_6
+            name: Living Room Fan Light 3
+            use_light_color: true
+            show_brightness_control: true
+            show_color_temp_control: true
+            collapsible_controls: true
+        column_span: 1
+      - type: grid
+        cards:
+          - type: heading
+            heading: Bedroom
+            heading_style: title
+            icon: mdi:bed
+          - type: custom:mushroom-light-card
+            entity: light.ceiling_fan
+            name: Ceiling Fan
+            icon: mdi:ceiling-fan
+            use_light_color: true
+            show_brightness_control: true
+            show_color_temp_control: true
+            collapsible_controls: true
+          - type: custom:mushroom-light-card
+            entity: light.third_reality_inc_3rcb01057z
+            name: Ceiling Fan Light 1
+            use_light_color: true
+            show_brightness_control: true
+            show_color_temp_control: true
+            collapsible_controls: true
+          - type: custom:mushroom-light-card
+            entity: light.third_reality_inc_3rcb01057z_2
+            name: Ceiling Fan Light 2
+            use_light_color: true
+            show_brightness_control: true
+            show_color_temp_control: true
+            collapsible_controls: true
+          - type: custom:mushroom-light-card
+            entity: light.third_reality_inc_3rcb01057z_3
+            name: Ceiling Fan Light 3
+            use_light_color: true
+            show_brightness_control: true
+            show_color_temp_control: true
+            collapsible_controls: true
+        column_span: 1
+      - type: grid
+        cards:
+          - type: heading
+            heading: Travis Office
+            heading_style: title
+            icon: mdi:desk
+          - type: custom:mushroom-light-card
+            entity: light.travis_office_p1s_uno_chamber_light
+            name: Chamber Light
+            use_light_color: true
+            show_brightness_control: true
+            show_color_temp_control: true
+            collapsible_controls: true
+        column_span: 1
+      - type: grid
+        cards:
+          - type: heading
+            heading: All Off
+            heading_style: title
+            icon: mdi:lightbulb-off
+          - type: tile
+            entity: scene.all_lights_off
+            name: All Lights Off
+            icon: mdi:lightbulb-group-off
+            grid_options:
+              columns: 12
+              rows: auto
+        column_span: 1
+  - type: sections
+    title: Security
+    icon: mdi:shield-home
+    path: security
+    max_columns: 3
+    theme: Google Dark Theme
+    show_icon_and_title: false
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Front Door
+            heading_style: title
+            icon: mdi:door-front
+          - type: picture-entity
+            entity: camera.front_door_live_view
+            camera_view: live
+            grid_options:
+              columns: 12
+              rows: 5
+          - type: custom:mushroom-switch-card
+            entity: switch.front_door_motion_detection
+            name: Front Door Motion
+            icon: mdi:motion-sensor
+          - type: tile
+            entity: sensor.front_door_battery
+            name: Front Door Battery
+            icon: mdi:battery
+        column_span: 1
+      - type: grid
+        cards:
+          - type: heading
+            heading: Downstairs
+            heading_style: title
+            icon: mdi:arrow-collapse-down
+          - type: picture-entity
+            entity: camera.downstairs_live_view
+            camera_view: live
+            grid_options:
+              columns: 12
+              rows: 5
+          - type: custom:mushroom-switch-card
+            entity: switch.downstairs_motion_detection
+            name: Downstairs Motion
+            icon: mdi:motion-sensor
+          - type: tile
+            entity: sensor.downstairs_battery
+            name: Downstairs Battery
+            icon: mdi:battery
+        column_span: 1
+      - type: grid
+        cards:
+          - type: heading
+            heading: Sirens
+            heading_style: title
+            icon: mdi:alarm-light
+          - type: tile
+            entity: siren.downstairs_siren
+            name: Downstairs Siren
+            icon: mdi:alarm-light
+          - type: tile
+            entity: siren.downstairs_siren_2
+            name: Downstairs Siren 2
+            icon: mdi:alarm-light
+        column_span: 1
+  - type: sections
+    title: Environment
+    icon: mdi:thermometer-lines
+    path: environment
+    max_columns: 3
+    theme: Google Dark Theme
+    show_icon_and_title: false
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Weather
+            heading_style: title
+            icon: mdi:weather-partly-cloudy
+          - type: weather-forecast
+            entity: weather.forecast_home
+            show_current: true
+            show_forecast: true
+            forecast_type: daily
+            secondary_info_attribute: humidity
+            grid_options:
+              columns: 12
+              rows: 4
+          - type: custom:weather-radar-card
+            height: 220px
+            wind_source: ndfd_wind
+            markers:
+              - entity: zone.home
+            past_minutes: 60
+            show_wildfires: true
+            show_alerts: true
+            alerts_min_severity: Severe
+            extra_labels: false
+            cluster_markers: true
+            static_map: false
+            show_snow: true
+            show_color_bar: false
+            show_progress_bar: false
+            show_loading_spinner: true
+            grid_options:
+              rows: 4
+              columns: 12
+        column_span: 2
+      - type: grid
+        cards:
+          - type: heading
+            heading: Bedroom
+            heading_style: title
+            icon: mdi:bed
+          - type: tile
+            entity: sensor.hobeian_zg_204zx_temperature_2
+            features:
+              - type: trend-graph
+          - type: tile
+            entity: sensor.hobeian_zg_204zx_humidity_2
+            features:
+              - type: trend-graph
+          - type: tile
+            entity: sensor.hobeian_zg_204zx_illuminance_2
+            features:
+              - type: trend-graph
+          - type: tile
+            entity: binary_sensor.hobeian_zg_204zx_2
+            name: Bedroom Presence
+        column_span: 1
+      - type: grid
+        cards:
+          - type: heading
+            heading: Basement
+            heading_style: title
+            icon: mdi:arrow-collapse-down
+          - type: tile
+            entity: sensor.hobeian_zg_204zx_temperature
+            features:
+              - type: trend-graph
+          - type: tile
+            entity: sensor.hobeian_zg_204zx_humidity
+            features:
+              - type: trend-graph
+          - type: tile
+            entity: sensor.hobeian_zg_204zx_illuminance
+            features:
+              - type: trend-graph
+          - type: tile
+            entity: binary_sensor.hobeian_zg_204zx
+            name: Basement Presence
+        column_span: 1
+  - type: sections
+    title: Printers
+    icon: mdi:printer-3d-nozzle
+    path: printers
+    max_columns: 3
+    theme: Google Dark Theme
+    show_icon_and_title: false
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: P1S UNO
+            heading_style: title
+            icon: mdi:printer-3d-nozzle
+          - type: custom:ha-bambulab-print_status-card
+            printer: f608edf699a233a2029516d70b468d10
+          - type: custom:ha-bambulab-print_control-card
+            printer: f608edf699a233a2029516d70b468d10
+          - type: custom:ha-bambulab-ams-card
+            ams: e3590bd4467460fd4868e6526b12eb5c
+            style: vector
+          - type: custom:ha-bambulab-spool-card
+            spool: e978899f2b877c862b41c836ba5a42e0
+        column_span: 1
+      - type: grid
+        cards:
+          - type: heading
+            heading: P1S DOS
+            heading_style: title
+            icon: mdi:printer-3d-nozzle
+          - type: custom:ha-bambulab-print_status-card
+            printer: 7ba8931634a3820d1a635c6fd7caccb7
+          - type: custom:ha-bambulab-print_control-card
+            printer: 7ba8931634a3820d1a635c6fd7caccb7
+          - type: custom:ha-bambulab-ams-card
+            ams: 2e0284a7807242422deeca5a0b3786b0
+            style: vector
+          - type: custom:ha-bambulab-spool-card
+            spool: 08528354b265dfded44e5486d79f224c
+        column_span: 1
+  - type: sections
+    title: System
+    icon: mdi:cog
+    path: system
+    max_columns: 3
+    theme: Google Dark Theme
+    show_icon_and_title: false
+    sections:
+      - type: grid
+        cards:
+          - type: heading
+            heading: Network
+            heading_style: title
+            icon: mdi:network
+          - type: entities
+            title: Network
+            entities:
+              - sensor.exos_router_download_speed
+              - sensor.exos_router_upload_speed
+              - binary_sensor.exos_router_wan_status
+            grid_options:
+              columns: 12
+              rows: auto
+        column_span: 1
+      - type: grid
+        cards:
+          - type: heading
+            heading: Home Assistant Host
+            heading_style: title
+            icon: mdi:server
+          - type: gauge
+            entity: sensor.home_assistant_core_cpu_percent
+            name: CPU
+            needle: false
+            severity:
+              green: 0
+              yellow: 70
+              red: 85
+            grid_options:
+              columns: 4
+              rows: 3
+          - type: gauge
+            entity: sensor.home_assistant_core_memory_percent
+            name: Memory
+            needle: false
+            severity:
+              green: 0
+              yellow: 70
+              red: 85
+            grid_options:
+              columns: 4
+              rows: 3
+          - type: gauge
+            entity: sensor.ha_disk_usage
+            name: Disk Usage
+            needle: false
+            severity:
+              green: 0
+              yellow: 70
+              red: 85
+            grid_options:
+              columns: 4
+              rows: 3
+        column_span: 2
+      - type: grid
+        cards:
+          - type: heading
+            heading: Cleaning
+            heading_style: title
+            icon: mdi:robot-vacuum
+          - type: custom:mushroom-vacuum-card
+            entity: vacuum.geordi_la_forge
+            layout: horizontal
+            fill_container: true
+            grid_options:
+              columns: 6
+              rows: auto
+          - type: custom:mushroom-vacuum-card
+            entity: vacuum.pooper_litter_box
+            layout: horizontal
+            fill_container: true
+            grid_options:
+              columns: 6
+              rows: auto
+        column_span: 2
+      - type: grid
+        cards:
+          - type: heading
+            heading: Updates
+            heading_style: title
+            icon: mdi:update
+          - type: tile
+            entity: update.home_assistant_core_update
+            name: Home Assistant Core
+          - type: tile
+            entity: update.home_assistant_operating_system_update
+            name: Operating System
+          - type: tile
+            entity: update.home_assistant_supervisor_update
+            name: Supervisor
+        column_span: 1
