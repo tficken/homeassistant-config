@@ -122,7 +122,7 @@ views:
             collapsible_controls: true
             grid_options:
               columns: 6
-              rows: auto
+              rows: 2
           - type: custom:mushroom-light-card
             entity: light.living_room_ceiling_fan
             name: Living Room Ceiling Fan
@@ -133,7 +133,7 @@ views:
             collapsible_controls: true
             grid_options:
               columns: 6
-              rows: auto
+              rows: 2
           - type: tile
             entity: media_player.living_room_fire_tv_living_room
             name: Living Room Fire TV
@@ -182,28 +182,10 @@ views:
             show_brightness_control: true
             show_color_temp_control: true
             collapsible_controls: true
-          - type: custom:mushroom-light-card
-            entity: light.third_reality_inc_3rcb01057z_4
-            name: Living Room Fan Light 1
-            use_light_color: true
-            show_brightness_control: true
-            show_color_temp_control: true
-            collapsible_controls: true
-          - type: custom:mushroom-light-card
-            entity: light.third_reality_inc_3rcb01057z_5
-            name: Living Room Fan Light 2
-            use_light_color: true
-            show_brightness_control: true
-            show_color_temp_control: true
-            collapsible_controls: true
-          - type: custom:mushroom-light-card
-            entity: light.third_reality_inc_3rcb01057z_6
-            name: Living Room Fan Light 3
-            use_light_color: true
-            show_brightness_control: true
-            show_color_temp_control: true
-            collapsible_controls: true
-        column_span: 1
+            grid_options:
+              columns: 12
+              rows: 2
+        column_span: 2
       - type: grid
         cards:
           - type: heading
@@ -218,28 +200,10 @@ views:
             show_brightness_control: true
             show_color_temp_control: true
             collapsible_controls: true
-          - type: custom:mushroom-light-card
-            entity: light.third_reality_inc_3rcb01057z
-            name: Ceiling Fan Light 1
-            use_light_color: true
-            show_brightness_control: true
-            show_color_temp_control: true
-            collapsible_controls: true
-          - type: custom:mushroom-light-card
-            entity: light.third_reality_inc_3rcb01057z_2
-            name: Ceiling Fan Light 2
-            use_light_color: true
-            show_brightness_control: true
-            show_color_temp_control: true
-            collapsible_controls: true
-          - type: custom:mushroom-light-card
-            entity: light.third_reality_inc_3rcb01057z_3
-            name: Ceiling Fan Light 3
-            use_light_color: true
-            show_brightness_control: true
-            show_color_temp_control: true
-            collapsible_controls: true
-        column_span: 1
+            grid_options:
+              columns: 12
+              rows: 2
+        column_span: 2
       - type: grid
         cards:
           - type: heading
@@ -253,6 +217,9 @@ views:
             show_brightness_control: true
             show_color_temp_control: true
             collapsible_controls: true
+            grid_options:
+              columns: 12
+              rows: 2
         column_span: 1
       - type: grid
         cards:
