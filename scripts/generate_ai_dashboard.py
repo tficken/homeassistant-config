@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import urllib.request
 import urllib.error
 
@@ -9,6 +10,47 @@ def get_config():
         "ha_url": os.environ.get("HA_URL", "http://homeassistant.local:8123").rstrip("/"),
         "ha_token": os.environ.get("HA_TOKEN", ""),
     }
+
+
+def get_llm_config():
+    return {
+        "base_url": os.environ.get("LLM_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
+        "api_key": os.environ.get("LLM_API_KEY", ""),
+        "model": os.environ.get("LLM_MODEL", "gpt-4o-mini"),
+    }
+
+
+def call_llm(prompt, llm_config):
+    payload = {
+        "model": llm_config["model"],
+        "messages": [
+            {"role": "system", "content": "You generate Home Assistant dashboards as a single HTML file."},
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.4,
+    }
+    req = urllib.request.Request(
+        f"{llm_config['base_url']}/chat/completions",
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {llm_config['api_key']}",
+            "Content-Type": "application/json",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=120) as resp:
+        data = json.loads(resp.read().decode("utf-8"))
+    return data["choices"][0]["message"]["content"]
+
+
+def extract_html(text):
+    """Extract HTML from markdown code fences or return the raw HTML block."""
+    text = text.strip()
+    fence = re.search(r"```(?:html)?\s*\n(.*?)\n```", text, re.DOTALL)
+    if fence:
+        return fence.group(1).strip()
+    if text.lower().startswith("<!doctype") or text.lower().startswith("<html"):
+        return text
+    raise ValueError("LLM response does not contain a recognizable HTML block")
 
 
 def api_request(url, token, path):
@@ -116,9 +158,14 @@ def build_prompt(entity_data):
 
 if __name__ == "__main__":
     import sys
-    config = get_config()
-    if "--dry-run" in sys.argv:
+    config = {**get_config(), **get_llm_config()}
+    if "--prompt-only" in sys.argv:
+        data = fetch_entities(config["ha_url"], config["ha_token"])
+        prompt = build_prompt(data)
+        print(prompt[:2000])
+        print("\n... (truncated)")
+    elif "--dry-run" in sys.argv:
         data = fetch_entities(config["ha_url"], config["ha_token"])
         print(f"Fetched {len(data['entities'])} entities and {len(data['states'])} states")
     else:
-        print("Run with --dry-run to test HA connectivity")
+        print("Usage: python3 scripts/generate_ai_dashboard.py [--dry-run|--prompt-only]")
