@@ -1,9 +1,16 @@
 .cloud/
 .storage/
 .cache/
+.dashboard-gen/
+.tools/
+.venv_esptool/
 deps/
 home-assistant_v2.db*
 zigbee.db*
 *.log
 *.log.fault
- backups/
+.HA_VERSION
+.ha_run.lock
+*.bak.*
+__pycache__/
+backups/
