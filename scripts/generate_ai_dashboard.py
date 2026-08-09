@@ -2,6 +2,7 @@ import json
 import os
 import re
 import shutil
+import sys
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -38,20 +39,39 @@ if (!token) token = prompt('Enter Home Assistant long-lived access token:');
 if (token) localStorage.setItem('ha_token', token);
 const statusEl = document.getElementById('status');
 function setStatus(s,c){ statusEl.textContent=s; statusEl.className=c; }
+function escapeHtml(text){
+  return String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+function renderCards(states){
+  const dashboard = document.getElementById('dashboard');
+  dashboard.innerHTML = '';
+  states.sort((a,b)=>a.entity_id.localeCompare(b.entity_id));
+  for(const s of states){
+    const name = (s.attributes && s.attributes.friendly_name) || s.entity_id;
+    const div = document.createElement('div');
+    div.className = 'card';
+    div.dataset.entityId = s.entity_id;
+    div.innerHTML = '<div class="entity-name">'+escapeHtml(name)+'</div><div class="entity-state">'+escapeHtml(s.state)+'</div>';
+    dashboard.appendChild(div);
+  }
+}
+function updateState(state){
+  const card = document.querySelector('[data-entity-id="'+state.entity_id+'"]');
+  if(!card) return;
+  const el = card.querySelector('.entity-state');
+  if(el) el.textContent = state.state;
+}
 function connect(){
   setStatus('connecting','connecting');
   ws = new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/api/websocket');
   ws.onopen = () => ws.send(JSON.stringify({type:'auth',access_token:token}));
   ws.onmessage = (ev) => {
     const msg = JSON.parse(ev.data);
-    if(msg.type==='auth_ok'){ setStatus('connected','connected'); ws.send(JSON.stringify({id:1,type:'subscribe_events',event_type:'state_changed'})); }
+    if(msg.type==='auth_ok'){ setStatus('connected','connected'); ws.send(JSON.stringify({id:1,type:'get_states'})); ws.send(JSON.stringify({id:2,type:'subscribe_events',event_type:'state_changed'})); }
+    if(msg.type==='result' && msg.id===1 && msg.success){ renderCards(msg.result); }
     if(msg.type==='event' && msg.event.event_type==='state_changed') updateState(msg.event.data.new_state);
   };
   ws.onclose = () => { setStatus('disconnected','disconnected'); setTimeout(connect,3000); };
-}
-function updateState(state){
-  const el = document.querySelector('[data-entity-id="'+state.entity_id+'"] .entity-state');
-  if(el) el.textContent = state.state;
 }
 connect();
 </script>
@@ -115,8 +135,19 @@ def api_request(url, token, path):
             "Content-Type": "application/json",
         },
     )
-    with urllib.request.urlopen(req, timeout=30) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        if e.code == 401:
+            print("Authentication failed \u2014 check HA_TOKEN is valid and not expired", file=sys.stderr)
+        else:
+            reason = e.reason or "unknown error"
+            print(f"Home Assistant API error ({e.code}) at {url}{path}: {reason}", file=sys.stderr)
+        sys.exit(1)
+    except urllib.error.URLError as e:
+        print(f"Failed to connect to Home Assistant at {url}: {e.reason}", file=sys.stderr)
+        sys.exit(1)
 
 
 def fetch_entities(ha_url, ha_token):
@@ -125,7 +156,7 @@ def fetch_entities(ha_url, ha_token):
     return {"entities": entities, "states": states}
 
 
-EXCLUDED_DOMAINS = {"update", "device_tracker", "person"}
+EXCLUDED_DOMAINS = {"update", "device_tracker", "person", "camera", "alarm_control_panel", "lock"}
 EXCLUDED_PREFIXES = (
     "sensor.home_assistant_core_",
     "sensor.home_assistant_host_",
@@ -236,7 +267,6 @@ def generate(config):
 
 
 if __name__ == "__main__":
-    import sys
     config = {**get_config(), **get_llm_config()}
     if "--prompt-only" in sys.argv:
         data = fetch_entities(config["ha_url"], config["ha_token"])

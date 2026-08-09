@@ -11,3 +11,5 @@ The AI-generated dashboard needs a token to read states and call services over t
 7. Paste it into the prompt when the dashboard first loads.
 
 The token is stored in your browser's localStorage for that device only. It is never included in the generated HTML file.
+
+Run the generator from your Home Assistant configuration directory (the folder that contains `configuration.yaml`) so it can write the dashboard to `www/ai-dashboard/index.html`.
