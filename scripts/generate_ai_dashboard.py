@@ -1,8 +1,62 @@
 import json
 import os
 import re
+import shutil
 import urllib.request
 import urllib.error
+from datetime import datetime
+
+
+FALLBACK_TEMPLATE = """<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Dashboard</title>
+<style>
+body { background: #111; color: #eee; font-family: system-ui, sans-serif; margin: 0; padding: 2rem; }
+#status { position: fixed; top: 0.5rem; right: 0.5rem; padding: 0.25rem 0.5rem; border-radius: 0.25rem; font-size: 0.8rem; }
+#status.connecting { background: #f90; color: #000; }
+#status.connected { background: #0c0; color: #000; }
+#status.disconnected { background: #c00; color: #fff; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 1rem; margin-top: 2rem; }
+.card { background: #222; border-radius: 0.75rem; padding: 1rem; }
+.entity-name { opacity: 0.7; font-size: 0.85rem; }
+.entity-state { font-size: 1.5rem; margin-top: 0.25rem; }
+button { margin-top: 0.5rem; padding: 0.5rem 1rem; border: none; border-radius: 0.5rem; background: #444; color: #fff; cursor: pointer; }
+</style>
+</head>
+<body>
+<div id="status" class="connecting">connecting</div>
+<h1>AI Dashboard</h1>
+<p>The AI-generated layout could not be parsed. This fallback lists your entities.</p>
+<div id="dashboard" class="grid"></div>
+<script>
+const HA_URL = location.origin;
+let ws, token = localStorage.getItem('ha_token');
+if (!token) token = prompt('Enter Home Assistant long-lived access token:');
+if (token) localStorage.setItem('ha_token', token);
+const statusEl = document.getElementById('status');
+function setStatus(s,c){ statusEl.textContent=s; statusEl.className=c; }
+function connect(){
+  setStatus('connecting','connecting');
+  ws = new WebSocket((location.protocol==='https:'?'wss://':'ws://')+location.host+'/api/websocket');
+  ws.onopen = () => ws.send(JSON.stringify({type:'auth',access_token:token}));
+  ws.onmessage = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if(msg.type==='auth_ok'){ setStatus('connected','connected'); ws.send(JSON.stringify({id:1,type:'subscribe_events',event_type:'state_changed'})); }
+    if(msg.type==='event' && msg.event.event_type==='state_changed') updateState(msg.event.data.new_state);
+  };
+  ws.onclose = () => { setStatus('disconnected','disconnected'); setTimeout(connect,3000); };
+}
+function updateState(state){
+  const el = document.querySelector('[data-entity-id="'+state.entity_id+'"] .entity-state');
+  if(el) el.textContent = state.state;
+}
+connect();
+</script>
+</body>
+</html>"""
 
 
 def get_config():
@@ -156,6 +210,31 @@ def build_prompt(entity_data):
     return DASHBOARD_INSTRUCTIONS + "\n" + "\n".join(lines)
 
 
+def write_dashboard(html, www_root="www"):
+    out_dir = os.path.join(www_root, "ai-dashboard")
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, "index.html")
+    if os.path.exists(out_path):
+        backup = os.path.join(out_dir, f"index.html.bak.{datetime.now().strftime('%Y%m%d_%H%M%S')}")
+        shutil.copy2(out_path, backup)
+        print(f"Backed up existing dashboard to {backup}")
+    with open(out_path, "w", encoding="utf-8") as f:
+        f.write(html)
+    print(f"Wrote dashboard to {out_path}")
+
+
+def generate(config):
+    data = fetch_entities(config["ha_url"], config["ha_token"])
+    prompt = build_prompt(data)
+    try:
+        raw = call_llm(prompt, config)
+        html = extract_html(raw)
+    except Exception as e:
+        print(f"LLM/parsing failed ({e}), using fallback template")
+        html = FALLBACK_TEMPLATE
+    write_dashboard(html)
+
+
 if __name__ == "__main__":
     import sys
     config = {**get_config(), **get_llm_config()}
@@ -168,4 +247,4 @@ if __name__ == "__main__":
         data = fetch_entities(config["ha_url"], config["ha_token"])
         print(f"Fetched {len(data['entities'])} entities and {len(data['states'])} states")
     else:
-        print("Usage: python3 scripts/generate_ai_dashboard.py [--dry-run|--prompt-only]")
+        generate(config)
