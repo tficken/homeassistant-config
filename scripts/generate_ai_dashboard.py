@@ -29,15 +29,42 @@ def fetch_entities(ha_url, ha_token):
     return {"entities": entities, "states": states}
 
 
-EXCLUDED_DOMAINS = {"update", "device_tracker", "person", "sensor.home_assistant_core_", "sensor.home_assistant_host_", "sensor.home_assistant_supervisor_"}
+EXCLUDED_DOMAINS = {"update", "device_tracker", "person"}
+EXCLUDED_PREFIXES = (
+    "sensor.home_assistant_core_",
+    "sensor.home_assistant_host_",
+    "sensor.home_assistant_supervisor_",
+)
 EXCLUDED_ENTITY_GLOBS = {"*firmware*", "*developer_lan_mode*", "*mqtt_encryption*"}
 
 
+def _glob_matches(value, pattern):
+    """Simple wildcard match treating '*' as any substring."""
+    parts = pattern.split("*")
+    if not parts:
+        return False
+    # Check that all non-empty parts appear in order within value.
+    pos = 0
+    for part in parts:
+        if not part:
+            continue
+        idx = value.find(part, pos)
+        if idx == -1:
+            return False
+        pos = idx + len(part)
+    return True
+
+
 def is_interesting(entity, state_by_id):
-    domain = entity.get("entity_id", "").split(".")[0]
+    eid = entity.get("entity_id", "")
+    domain = eid.split(".")[0]
     if domain in EXCLUDED_DOMAINS:
         return False
-    state = state_by_id.get(entity.get("entity_id"))
+    if eid.startswith(EXCLUDED_PREFIXES):
+        return False
+    if any(_glob_matches(eid, pattern) for pattern in EXCLUDED_ENTITY_GLOBS):
+        return False
+    state = state_by_id.get(eid)
     if state and state.get("state") in ("unavailable", "unknown", None):
         return False
     return True
