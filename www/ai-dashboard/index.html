@@ -539,14 +539,6 @@ function renderStatusLed(state) {
   return `<span class="status-led ${cls}"></span>`;
 }
 
-function renderAlertTicker(alerts) {
-  if (!alerts || !alerts.length) {
-    return `<div class="terminal-panel"><div class="panel-body" style="color:var(--text-muted);font-family:var(--font-mono);">SYSTEM NORMAL</div></div>`;
-  }
-  const items = alerts.slice(0,3).map(a => `<div style="color:var(--amber);font-family:var(--font-mono);margin:4px 0;">! ${escapeHtml(a)}</div>`).join("");
-  return `<div class="terminal-panel"><div class="panel-body">${items}</div></div>`;
-}
-
 function renderAlertBanner(alerts) {
   if (!alerts || !alerts.length) return "";
   const items = alerts.slice(0, 3).map(a => `<span style="margin-right:18px;">! ${escapeHtml(a)}</span>`).join("");
@@ -601,7 +593,15 @@ function renderEnvMetric(entityId) {
 function renderCameraFeed(entityId) {
   const name = friendlyName(entityId);
   const state = states[entityId];
-  const offline = isUnavailable(state) ? renderOfflineBadge() : "";
+  const offline = isUnavailable(state);
+  if (offline) {
+    return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
+      <div class="panel-title">${escapeHtml(name)}${renderOfflineBadge()}</div>
+      <div class="panel-body" style="padding:0;">
+        <div style="width:100%;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:#000;color:var(--danger);font-family:var(--font-mono);">CAMERA OFFLINE</div>
+      </div>
+    </div>`;
+  }
   let src = "";
   if (state && state.attributes && state.attributes.entity_picture) {
     src = state.attributes.entity_picture;
@@ -611,7 +611,7 @@ function renderCameraFeed(entityId) {
     src = `/api/camera_proxy_stream/${entityId}?token=${encodeURIComponent(token)}`;
   }
   return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
-    <div class="panel-title">${escapeHtml(name)}${offline}</div>
+    <div class="panel-title">${escapeHtml(name)}</div>
     <div class="panel-body" style="padding:0;">
       <img class="camera-feed" src="${src}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
     </div>
@@ -859,7 +859,9 @@ function renderControlScreen() {
         ${renderTerminalPanel("LIGHTS", lightCards || "<div style='color:var(--text-muted)'>NO LIGHTS</div>")}
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
-        ${renderMediaCard(mediaId)}
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
+          ${renderMediaCard(mediaId)}
+        </div>
         ${renderTerminalPanel("QUICK", `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${quickButtons}</div>`)}
       </div>
     </div>
@@ -1018,7 +1020,7 @@ function updateClock() {
     el.innerHTML = escapeHtml(timeStr).replace(/:/g, '<span class="colon">:</span>');
   }
   const d = document.getElementById("date");
-  if (d) d.textContent = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
+  if (d) d.textContent = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
 }
 
 // ---- Settings ----
