@@ -277,7 +277,33 @@ let entities = [];
 let areaMap = {};
 let entityById = {};
 let haConfig = null;
+let forecastCache = { daily: [], fetchedAt: null };
 let currentScreen = "home";
+
+async function refreshForecast() {
+  const weatherId = config.entities.weather || "weather.forecast_home";
+  const state = states[weatherId];
+  // Fallback 1: entity attribute
+  if (state && state.attributes && Array.isArray(state.attributes.forecast)) {
+    forecastCache.daily = state.attributes.forecast.slice(0, 5);
+    forecastCache.fetchedAt = Date.now();
+    return;
+  }
+  // Primary: HA service call
+  const res = await apiCall("POST", "/api/services/weather/get_forecasts", {
+    entity_id: weatherId,
+    type: "daily"
+  });
+  if (res && Array.isArray(res)) {
+    const entry = res.find(r => r.entity_id === weatherId);
+    if (entry && entry.forecast && Array.isArray(entry.forecast.forecast)) {
+      forecastCache.daily = entry.forecast.forecast.slice(0, 5);
+      forecastCache.fetchedAt = Date.now();
+      return;
+    }
+  }
+  forecastCache.daily = [];
+}
 
 function deepMerge(target, ...sources) {
   for (const src of sources) {
@@ -415,6 +441,18 @@ async function apiFetch(path) {
     return await r.json();
   } catch (e) {
     console.error("apiFetch failed", path, e);
+    return null;
+  }
+}
+
+async function apiCall(method, path, body) {
+  const headers = token ? { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+  try {
+    const r = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    console.error("apiCall failed", method, path, e);
     return null;
   }
 }
@@ -981,6 +1019,7 @@ function connectProxy() {
       states = {};
       for (const s of msg.result) states[s.entity_id] = s;
       await fetchRegistry();
+      await refreshForecast();
       renderAll();
     }
     if (msg.type === "event" && msg.event && msg.event.event_type === "state_changed") {
@@ -1013,6 +1052,7 @@ function connect() {
     if (msg.type === "result" && msg.id === 1 && msg.success) {
       states = {};
       for (const s of msg.result) states[s.entity_id] = s;
+      await refreshForecast();
       renderAll();
     }
     if (msg.type === "event" && msg.event && msg.event.event_type === "state_changed") {
@@ -1040,6 +1080,7 @@ async function init() {
     renderBottomButton("SECURITY", "security") +
     renderBottomButton("STATUS MONITOR", "status");
   showScreen("home");
+  setInterval(refreshForecast, 15 * 60 * 1000);
   if (window.HA_INTEGRATION_PROXY) {
     token = "";
     localStorage.removeItem("ha_token");
