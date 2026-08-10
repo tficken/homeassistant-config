@@ -469,7 +469,7 @@ function getAlerts() {
     const state = states[id];
     if (!state) continue;
     const domain = id.split(".")[0];
-    if (domain === "binary_sensor" && isActive(state.state)) {
+    if ((domain === "binary_sensor" || domain === "switch") && isActive(state.state)) {
       alerts.push(`${friendlyName(id)} detected`);
     }
     if (domain === "sensor" && state.attributes && state.attributes.device_class === "battery") {
@@ -510,8 +510,8 @@ function renderHomeScreen() {
 
   const leftCol = `
     <div style="display:flex;flex-direction:column;justify-content:center;height:100%;">
-      <div style="font-family:monospace;font-size:clamp(4rem,10vw,7rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);">${escapeHtml(timeStr)}</div>
-      <div style="font-family:monospace;font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
+      <div id="clock" style="font-family:monospace;font-size:clamp(4rem,10vw,7rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);">${escapeHtml(timeStr)}</div>
+      <div id="date" style="font-family:monospace;font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
     </div>
     ${renderTerminalPanel("WEATHER", `<div style="display:flex;align-items:center;gap:14px;"><div style="font-size:2.5rem;">${icon}</div><div><div style="font-size:1.8rem;color:var(--green);">${temp}</div><div style="color:var(--text-muted);font-family:monospace;">${escapeHtml(condition)} · HUM ${humidity}</div></div></div>`)}
   `;
@@ -561,7 +561,7 @@ function renderStatusScreen() {
   const environment = (config.sections && config.sections.environment && config.sections.environment.entities) || [];
   const system = (config.sections && config.sections.system && config.sections.system.entities) || [];
 
-  const cameraFeeds = cameras.map(id => renderCameraFeed(id)).join("");
+  const cameraFeeds = cameras.map(id => renderCameraFeed(id));
   const securityMetrics = security.map(id => renderMetricCard(id)).join("");
   const envMetrics = environment.map(id => renderMetricCard(id)).join("");
   const sysMetrics = system.filter(id => id.startsWith("sensor.")).map(id => renderMetricCard(id)).join("");
@@ -580,9 +580,18 @@ function renderStatusScreen() {
   const printerIds = Object.keys(states).filter(id => id.startsWith("sensor.p1s_") && id.includes("print_status"));
   const printerCards = printerIds.map(id => {
     const state = states[id];
+    const base = id.replace("print_status", "").replace(/_+$/, "");
+    const progressId = Object.keys(states).find(x => x.startsWith(base) && x.includes("print_progress") && x !== id);
+    const remainingId = Object.keys(states).find(x => x.startsWith(base) && x.includes("remaining_time") && x !== id);
+    const progress = progressId && states[progressId] ? parseFloat(states[progressId].state) : null;
+    const remaining = remainingId && states[remainingId] ? states[remainingId].state : null;
+    const progressBar = progress != null && !isNaN(progress)
+      ? `<div style="width:100%;height:8px;background:var(--green-dim);border-radius:4px;margin:8px 0;"><div style="width:${Math.min(100, Math.max(0, progress))}%;height:100%;background:var(--green);border-radius:4px;"></div></div><div style="color:var(--text-muted);font-size:0.75rem;">${progress}% ${remaining ? "· " + escapeHtml(remaining) + " left" : ""}</div>`
+      : "";
     return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${id}">
       <div class="panel-body" style="font-family:monospace;">
         <div style="color:var(--green);">${state ? escapeHtml(state.state) : "--"}</div>
+        ${progressBar}
         <div style="color:var(--text-muted);font-size:0.8rem;">${escapeHtml(friendlyName(id))}</div>
       </div>
     </div>`;
@@ -763,6 +772,7 @@ function connectProxy() {
   ws.onopen = () => {
     setStatus("connected");
     ws.send(JSON.stringify({ id: 1, type: "get_states" }));
+    ws.send(JSON.stringify({ id: 2, type: "subscribe_events", event_type: "state_changed" }));
   };
   ws.onmessage = async (ev) => {
     const msg = JSON.parse(ev.data);
@@ -824,6 +834,7 @@ async function init() {
   applyTheme();
   await fetchHAConfig();
   document.getElementById("dock").innerHTML =
+    renderBottomButton("HOME", "home") +
     renderBottomButton("CONTROL HUB", "control") +
     renderBottomButton("STATUS MONITOR", "status");
   showScreen("home");
