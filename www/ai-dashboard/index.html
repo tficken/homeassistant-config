@@ -35,20 +35,28 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
 .panel-title, #clock, #date, .bottom-btn, .scene-btn, .radar-timestamp, .metric-label, .status-led {
   font-family: var(--font-mono);
 }
+@keyframes crtFlicker {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.985; }
+}
 #app {
   position: fixed; inset: 0; z-index: 1;
   display: flex; flex-direction: column;
   padding: 18px;
   gap: 16px;
+  animation: crtFlicker 0.12s infinite;
 }
 .scanlines {
-  position: fixed; inset: 0; z-index: 1000; pointer-events: none;
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
   background: repeating-linear-gradient(
     to bottom,
     rgba(0,0,0,0) 0px,
     rgba(0,0,0,0) 2px,
-    rgba(0,20,0,0.10) 2px,
-    rgba(0,20,0,0.10) 4px
+    rgba(0,30,0,0.12) 2px,
+    rgba(0,30,0,0.12) 4px
   );
 }
 .vignette {
