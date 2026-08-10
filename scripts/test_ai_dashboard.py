@@ -19,26 +19,47 @@ def test_css_foundation():
     assert not missing, f"Missing CSS foundation: {missing}"
 
 
-COMPONENT_FUNCS = [
-    "renderTerminalPanel", "renderStatusLed", "renderAlertTicker",
-    "renderSceneButton", "renderLightCard", "renderMetricCard",
-    "renderCameraFeed", "renderRadarFrame", "renderMediaCard", "renderBottomButton"
-]
-
-
 def test_component_functions_exist():
     html = read_index()
-    missing = [f"function {fn}(" for fn in COMPONENT_FUNCS if f"function {fn}(" not in html]
+    funcs = [
+        "renderTerminalPanel", "renderStatusLed", "renderAlertTicker",
+        "renderSceneButton", "renderLightCard", "renderMetricCard",
+        "renderCameraFeed", "renderRadarFrame", "renderMediaCard", "renderBottomButton"
+    ]
+    missing = [f"function {fn}(" for fn in funcs if f"function {fn}(" not in html]
     assert not missing, f"Missing component functions: {missing}"
 
 
-HOME_MARKERS = ["id=\"home-screen\"", "renderHomeScreen(", "WEATHER RADAR", "PRESENCE", "CONTROL HUB", "STATUS MONITOR"]
-
-
-def test_home_screen_structure():
+def test_screens_and_navigation():
     html = read_index()
-    missing = [m for m in HOME_MARKERS if m not in html]
-    assert not missing, f"Missing home screen markers: {missing}"
+    markers = [
+        'id="home-screen"', 'id="control-screen"', 'id="status-screen"',
+        "function renderHomeScreen(", "function renderControlScreen(",
+        "function renderStatusScreen(", "function showScreen("
+    ]
+    missing = [m for m in markers if m not in html]
+    assert not missing, f"Missing screen/navigation markers: {missing}"
+
+
+def test_websocket_and_config_logic():
+    html = read_index()
+    markers = [
+        "function loadConfig(", "function connect(", "function connectProxy(",
+        "window.HA_INTEGRATION_PROXY", "function fetchHAConfig(",
+        "function fetchRegistry(", "function saveConfig("
+    ]
+    missing = [m for m in markers if m not in html]
+    assert not missing, f"Missing WS/config markers: {missing}"
+
+
+def test_settings_overlay():
+    html = read_index()
+    markers = [
+        'id="settings-overlay"', "function openSettings(",
+        "function closeSettings(", "function buildSettings("
+    ]
+    missing = [m for m in markers if m not in html]
+    assert not missing, f"Missing settings markers: {missing}"
 
 
 if __name__ == "__main__":
@@ -46,5 +67,10 @@ if __name__ == "__main__":
     print("css foundation ok")
     test_component_functions_exist()
     print("component functions ok")
-    test_home_screen_structure()
-    print("home screen structure ok")
+    test_screens_and_navigation()
+    print("screens and navigation ok")
+    test_websocket_and_config_logic()
+    print("websocket and config ok")
+    test_settings_overlay()
+    print("settings overlay ok")
+    print("all tests passed")

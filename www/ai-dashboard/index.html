@@ -2,10 +2,9 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AI Dashboard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Home Assistant Wall Dashboard</title>
 <style>
-
 :root {
   --bg: #030503;
   --bg-glow: #0a140a;
@@ -28,9 +27,7 @@ html, body {
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
-body {
-  position: relative;
-}
+body { position: relative; }
 #app {
   position: fixed; inset: 0; z-index: 1;
   display: flex; flex-direction: column;
@@ -92,7 +89,39 @@ body {
 }
 .bottom-btn:hover { background: rgba(20, 254, 23, 0.16); box-shadow: 0 0 18px rgba(20, 254, 23, 0.18); }
 .bottom-btn:active { transform: scale(0.98); }
-
+.scene-btn {
+  background: rgba(20, 254, 23, 0.08); border: 1px solid var(--border);
+  color: var(--green); font-family: "JetBrains Mono", monospace;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  padding: 16px; cursor: pointer; border-radius: 4px;
+  transition: background 0.15s;
+}
+.scene-btn:hover { background: rgba(20, 254, 23, 0.16); }
+.screen { display: none; flex-direction: column; gap: 14px; flex: 1; min-height: 0; }
+.screen.active { display: flex; }
+.settings-close {
+  background: rgba(255,255,255,0.08); border: 1px solid var(--border);
+  color: var(--text); border-radius: 4px; padding: 6px 12px; cursor: pointer;
+  font-family: "JetBrains Mono", monospace;
+}
+.btn {
+  background: rgba(255,255,255,0.08); border: 1px solid var(--border);
+  color: var(--text); border-radius: 4px; padding: 8px 14px; cursor: pointer;
+  font-family: "JetBrains Mono", monospace;
+}
+.btn:hover { background: rgba(255,255,255,0.14); }
+.btn-primary { background: rgba(20, 254, 23, 0.14); border-color: rgba(20, 254, 23, 0.45); color: var(--green); }
+.entity-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.07); border: 1px solid var(--border);
+  border-radius: 999px; padding: 5px 10px; font-size: 0.8rem; margin: 4px 4px 0 0;
+}
+.entity-chip button { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; }
+input, select {
+  background: rgba(255,255,255,0.07); border: 1px solid var(--border); border-radius: 4px;
+  padding: 8px 10px; color: var(--text); font-size: 0.9rem;
+}
+input[type="range"] { accent-color: var(--green); }
 </style>
 </head>
 <body>
@@ -103,69 +132,58 @@ body {
 <button id="settings-btn" style="position:fixed;top:10px;right:14px;z-index:50;background:transparent;border:none;color:var(--text-muted);font-family:monospace;cursor:pointer;" onclick="openSettings()">[ SETTINGS ]</button>
 
 <div id="app">
-  <div id="home-screen" class="screen" style="display:none;flex:1;flex-direction:column;gap:14px;"></div>
-  <div id="control-screen" class="screen" style="display:none;flex:1;flex-direction:column;gap:14px;">CONTROL HUB</div>
-  <div id="status-screen" class="screen" style="display:none;flex:1;flex-direction:column;gap:14px;">STATUS MONITOR</div>
+  <div id="home-screen" class="screen active"></div>
+  <div id="control-screen" class="screen">CONTROL HUB</div>
+  <div id="status-screen" class="screen">STATUS MONITOR</div>
   <div id="dock" style="display:flex;gap:14px;height:70px;flex-shrink:0;"></div>
 </div>
-<script>
 
+<div id="settings-overlay" style="position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.75);display:none;align-items:center;justify-content:center;">
+  <div id="settings-panel" class="terminal-panel" style="width:min(760px,92vw);max-height:88vh;overflow-y:auto;">
+    <div class="settings-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+      <h2 class="settings-title" style="font-size:1.2rem;font-weight:700;margin:0;font-family:monospace;">Dashboard Settings</h2>
+      <button class="settings-close" onclick="closeSettings()">Close</button>
+    </div>
+    <div id="settings-body"></div>
+    <div class="settings-row" style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px;">
+      <button class="btn" onclick="exportConfig()">Export JSON</button>
+      <button class="btn" onclick="importConfig()">Import JSON</button>
+      <button class="btn btn-primary" onclick="saveSettings()">Save & Apply</button>
+    </div>
+  </div>
+</div>
+
+<script>
 const DEFAULT_CONFIG = {
-  theme: {
-    backgroundImage: "",
-    accentColor: "#2dd4bf"
-  },
-  layout: {
-    sections: ["weather", "temperatures", "controls", "rooms"],
-    showDock: true,
-    showShortcut: true,
-    clock24h: false
-  },
+  theme: { backgroundImage: "", accentColor: "#2dd4bf" },
+  layout: { left: ["home", "environment", "presence"], center: ["clock", "radar", "forecast"], right: ["scenes", "quickControls", "security", "system", "cameras"], clock24h: false },
   entities: {
     weather: "weather.forecast_home",
-    temperatures: [],
+    temperatures: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_temperature_2"],
     summaryChips: [],
     mediaPlayer: "media_player.living_room_fire_tv_living_room",
-    quickControls: [
-      "scene.all_lights_off",
-      "scene.living_room_lights_on",
-      "script.goodnight",
-      "light.living_room_ceiling_fan"
-    ]
+    quickControls: ["scene.all_lights_off", "scene.living_room_lights_on", "script.goodnight", "light.living_room_ceiling_fan"]
   },
-  dock: {
-    items: [
-      { icon: "💡", entityId: "scene.all_lights_off", label: "All off" },
-      { icon: "🌙", entityId: "script.goodnight", label: "Goodnight" },
-      { icon: "⚙️", action: "settings", label: "Settings" }
-    ]
-  }
+  sections: {
+    home: { title: "Home", icon: "🏠", entities: ["person.woteg", "device_tracker.traviss_iphone", "weather.forecast_home"] },
+    scenes: { title: "Scenes", icon: "🎨", entities: ["scene.all_lights_off", "scene.living_room_lights_on", "scene.relax_mode", "scene.movie_mode", "script.goodnight", "script.focus_mode"] },
+    quickControls: { title: "Quick Controls", icon: "🎛️", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan", "media_player.living_room_fire_tv_living_room"] },
+    cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.downstairs_live_view"] },
+    security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2"] },
+    environment: { title: "Environment", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_illuminance", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2", "sensor.hobeian_zg_204zx_illuminance_2"] },
+    presence: { title: "Presence", icon: "👤", entities: ["binary_sensor.hobeian_zg_204zx", "binary_sensor.hobeian_zg_204zx_2"] },
+    system: { title: "System", icon: "⚙️", entities: ["sensor.home_assistant_core_cpu_percent", "sensor.home_assistant_core_memory_percent", "sensor.ha_disk_usage", "vacuum.geordi_la_forge", "vacuum.pooper_litter_box", "update.home_assistant_core_update", "update.home_assistant_operating_system_update", "update.home_assistant_supervisor_update"] }
+  },
+  dock: { items: [{ icon: "💡", entityId: "scene.all_lights_off", label: "All off" }, { icon: "🌙", entityId: "script.goodnight", label: "Goodnight" }, { icon: "⚙️", action: "settings", label: "Settings" }] }
 };
 
 const DOMAIN_ICONS = {
-  light: { on: "💡", off: "🌑" },
-  switch: { on: "⚡", off: "🔌" },
-  fan: { on: "🌀", off: "🍃" },
-  binary_sensor: { on: "🔔", off: "🔕" },
-  climate: "🌡️", media_player: "📺", vacuum: "🤖",
-  sensor: "📊", weather: "🌤️", scene: "🎬", script: "▶️",
-  button: "🔘", number: "🔢", select: "☰", cover: "🪟",
-  lock: "🔒", input_boolean: { on: "✅", off: "⬜" }
+  light: { on: "💡", off: "🌑" }, switch: { on: "⚡", off: "🔌" }, fan: { on: "🌀", off: "🍃" },
+  binary_sensor: { on: "🔔", off: "🔕" }, climate: "🌡️", media_player: "📺", vacuum: "🤖",
+  sensor: "📊", weather: "🌤️", scene: "🎬", script: "▶️", button: "🔘", number: "🔢",
+  select: "☰", cover: "🪟", lock: "🔒", input_boolean: { on: "✅", off: "⬜" },
+  person: "👤", device_tracker: "📍", camera: "📷", siren: "🚨", update: "🔄", alarm_control_panel: "🛡️"
 };
-
-const EXCLUDED_DOMAINS = new Set([
-  "update", "device_tracker", "person", "camera", "alarm_control_panel",
-  "automation", "input_text", "input_datetime", "input_select",
-  "input_number", "input_button", "persistent_notification", "sun", "zone", "tts"
-]);
-const EXCLUDED_PREFIXES = [
-  "sensor.home_assistant_core_", "sensor.home_assistant_host_", "sensor.home_assistant_supervisor_"
-];
-const KNOWN_ROOMS = [
-  "living room","master bedroom","guest room","bedroom","kitchen","dining room","office",
-  "bathroom","hallway","garage","front door","backyard","downstairs","upstairs","basement",
-  "entryway","patio","porch","deck","laundry","nursery","playroom","stairway","closet","pantry","mudroom"
-];
 
 let config = {};
 let token = "";
@@ -176,7 +194,8 @@ let areas = [];
 let entities = [];
 let areaMap = {};
 let entityById = {};
-let mediaState = null;
+let haConfig = null;
+let currentScreen = "home";
 
 function deepMerge(target, ...sources) {
   for (const src of sources) {
@@ -212,28 +231,8 @@ function saveConfig() {
 }
 
 function applyTheme() {
-  const bg = document.getElementById("bg");
-  if (config.theme.backgroundImage) {
-    bg.classList.add("image");
-    bg.style.setProperty("--bg-image", `url("${config.theme.backgroundImage}")`);
-  } else {
-    bg.classList.remove("image");
-    bg.style.removeProperty("--bg-image");
-  }
   const accent = config.theme.accentColor || DEFAULT_CONFIG.theme.accentColor;
-  const rgb = hexToRgb(accent);
   document.documentElement.style.setProperty("--accent", accent);
-  document.documentElement.style.setProperty("--accent-rgb", `${rgb.r}, ${rgb.g}, ${rgb.b}`);
-}
-
-function hexToRgb(hex) {
-  const m = hex.replace("#", "").match(/^(..?)(..?)(..?)$/);
-  if (!m) return { r: 45, g: 212, b: 191 };
-  return {
-    r: parseInt(m[1].padStart(2, m[1]), 16),
-    g: parseInt(m[2].padStart(2, m[2]), 16),
-    b: parseInt(m[3].padStart(2, m[3]), 16)
-  };
 }
 
 function friendlyName(entityId) {
@@ -242,40 +241,6 @@ function friendlyName(entityId) {
   const e = entityById[entityId];
   if (e) return e.name || e.original_name || entityId;
   return entityId.split(".").pop().replace(/_/g, " ");
-}
-
-function isInteresting(state) {
-  const eid = state.entity_id;
-  const domain = eid.split(".")[0];
-  if (EXCLUDED_DOMAINS.has(domain)) return false;
-  if (EXCLUDED_PREFIXES.some(p => eid.startsWith(p))) return false;
-  if (["unavailable", "unknown", null].includes(state.state)) return false;
-  return true;
-}
-
-function roomFromName(name) {
-  const lower = name.toLowerCase();
-  for (const r of KNOWN_ROOMS) if (lower.includes(r)) return r.replace(/\b\w/g, c => c.toUpperCase());
-  return null;
-}
-
-function getRoom(state) {
-  const e = entityById[state.entity_id];
-  if (e && e.area_id && areaMap[e.area_id]) return areaMap[e.area_id];
-  return roomFromName(friendlyName(state.entity_id)) || "General";
-}
-
-function groupByRoom() {
-  const rooms = {};
-  for (const s of Object.values(states)) {
-    if (!isInteresting(s)) continue;
-    const domain = s.entity_id.split(".")[0];
-    const room = getRoom(s);
-    if (!rooms[room]) rooms[room] = {};
-    if (!rooms[room][domain]) rooms[room][domain] = [];
-    rooms[room][domain].push(s);
-  }
-  return rooms;
 }
 
 function iconFor(entityId, state) {
@@ -290,11 +255,11 @@ function iconFor(entityId, state) {
 }
 
 function isActive(state) {
-  return ["on","playing","open","home","heat","cool","auto","active","true"].includes((state || "").toLowerCase());
+  return ["on","playing","open","home","heat","cool","auto","active","true","cleaning","docked","idle"].includes((state || "").toLowerCase());
 }
 
 function isActionable(domain) {
-  return ["light","switch","fan","scene","script","button","input_boolean","cover","lock","media_player"].includes(domain);
+  return ["light","switch","fan","scene","script","button","input_boolean","cover","lock","media_player","siren"].includes(domain);
 }
 
 function formatState(state) {
@@ -315,9 +280,20 @@ function weatherIcon(condition) {
   return "🌤️";
 }
 
+function escapeHtml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
 function setStatus(cls) {
-  const el = document.getElementById("status");
-  el.className = cls;
+  const led = document.getElementById("status-led");
+  const text = document.getElementById("status-text");
+  if (text) text.textContent = cls.toUpperCase();
+  if (led) {
+    led.className = "status-led";
+    if (cls === "connected") led.classList.add("on");
+    else if (cls === "disconnected") led.classList.add("danger");
+    else led.classList.add("warn");
+  }
   if (cls === "connected") reconnectDelay = 1000;
 }
 
@@ -334,133 +310,346 @@ function toggleEntity(entityId) {
   ws.send(JSON.stringify({ id: Date.now(), type: "call_service", domain, service, service_data: { entity_id: entityId } }));
 }
 
-function cardHTML(entityId, opts = {}) {
+function mediaCmd(eid, service) {
+  if (!ws) return;
+  ws.send(JSON.stringify({ id: Date.now(), type: "call_service", domain: "media_player", service, service_data: { entity_id: eid } }));
+}
+
+function setBrightness(entityId, pct) {
+  if (!ws) return;
+  const value = Math.round((parseInt(pct, 10) / 100) * 255);
+  ws.send(JSON.stringify({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, brightness: value } }));
+}
+
+async function apiFetch(path) {
+  const headers = token ? { "Authorization": `Bearer ${token}` } : {};
+  try {
+    const r = await fetch(path, { headers });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    console.error("apiFetch failed", path, e);
+    return null;
+  }
+}
+
+async function fetchRegistry() {
+  const [aRes, eRes] = await Promise.all([
+    apiFetch("/api/config/area_registry/list"),
+    apiFetch("/api/config/entity_registry/list")
+  ]);
+  areas = aRes || [];
+  entities = eRes || [];
+  areaMap = {};
+  for (const a of areas) areaMap[a.area_id] = a.name;
+  entityById = {};
+  for (const e of entities) entityById[e.entity_id] = e;
+}
+
+async function fetchHAConfig() {
+  if (haConfig) return haConfig;
+  haConfig = await apiFetch("/api/config");
+  return haConfig;
+}
+
+// ---- Component renderers ----
+
+function renderTerminalPanel(title, bodyHtml) {
+  return `<div class="terminal-panel">
+    <div class="panel-title">${escapeHtml(title)}</div>
+    <div class="panel-body">${bodyHtml}</div>
+  </div>`;
+}
+
+function renderStatusLed(state) {
+  let cls = "";
+  const s = String(state || "").toLowerCase();
+  if (["on","playing","open","home","heat","cool","auto","active","true","cleaning","docked","idle"].includes(s)) cls = "on";
+  else if (["unavailable","unknown","offline"].includes(s)) cls = "danger";
+  return `<span class="status-led ${cls}"></span>`;
+}
+
+function renderAlertTicker(alerts) {
+  if (!alerts || !alerts.length) {
+    return `<div class="terminal-panel"><div class="panel-body" style="color:var(--text-muted);font-family:monospace;">SYSTEM NORMAL</div></div>`;
+  }
+  const items = alerts.slice(0,3).map(a => `<div style="color:var(--amber);font-family:monospace;margin:4px 0;">! ${escapeHtml(a)}</div>`).join("");
+  return `<div class="terminal-panel"><div class="panel-body">${items}</div></div>`;
+}
+
+function renderSceneButton(entityId) {
+  const name = friendlyName(entityId);
+  return `<button class="scene-btn" onclick="toggleEntity('${entityId}')">${escapeHtml(name)}</button>`;
+}
+
+function renderLightCard(entityId) {
   const state = states[entityId];
-  const domain = entityId.split(".")[0];
-  const name = opts.name || friendlyName(entityId);
   const active = state ? isActive(state.state) : false;
-  const actionable = opts.actionable !== false && isActionable(domain);
-  const classes = ["card"];
-  if (active) classes.push("active");
-  if (actionable) classes.push("actionable");
-  const onclick = actionable ? `onclick="toggleEntity('${entityId}')"` : "";
-  const icon = iconFor(entityId, state && state.state);
-  const st = state ? formatState(state) : "unknown";
-  return `<div class="${classes.join(" ")}" data-entity-id="${entityId}" ${onclick}>
-    <div class="card-row"><div class="card-icon">${icon}</div>
-    <div style="min-width:0;"><div class="card-name">${escapeHtml(name)}</div><div class="card-state">${escapeHtml(st)}</div></div></div>
+  const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
+  const pct = Math.round((brightness / 255) * 100);
+  return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
+    <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;" onclick="toggleEntity('${entityId}')">
+      <div>${renderStatusLed(active ? "on" : "off")} <span style="font-family:monospace;">${escapeHtml(friendlyName(entityId))}</span></div>
+      <div style="color:var(--text-muted);font-family:monospace;">${active ? "ON" : "OFF"}</div>
+    </div>
+    ${active ? `<div class="panel-body" style="padding-top:0;"><input type="range" min="0" max="100" value="${pct}" style="width:100%;" onchange="setBrightness('${entityId}', this.value)" onclick="event.stopPropagation();"></div>` : ""}
   </div>`;
 }
 
-function escapeHtml(s) {
-  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-}
-
-function renderWeather() {
-  const eid = config.entities.weather;
-  const s = states[eid];
-  let condition = "--", temp = "--", icon = "🌤️";
-  let forecastHTML = "";
-  if (s) {
-    condition = s.state.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase());
-    temp = s.attributes && s.attributes.temperature != null ? s.attributes.temperature : "--";
-    icon = weatherIcon(s.state);
-    const fc = (s.attributes && s.attributes.forecast) || [];
-    forecastHTML = fc.slice(0,4).map(d => {
-      const t = d.temperature != null ? `${d.temperature}°` : "--";
-      return `<div class="weather-cell"><div class="w-icon">${weatherIcon(d.condition)}</div><div class="w-val">${t}</div></div>`;
-    }).join("");
-  }
-  return `<div class="panel">
-    <div class="section-title">Weather</div>
-    <div class="weather-main"><div class="weather-icon">${icon}</div><div class="weather-temp">${temp}°</div></div>
-    <div class="weather-condition">${escapeHtml(condition)}</div>
-    <div class="weather-row">${forecastHTML}</div>
+function renderMetricCard(entityId) {
+  const state = states[entityId];
+  if (!state) return "";
+  const unit = state.attributes && state.attributes.unit_of_measurement ? state.attributes.unit_of_measurement : "";
+  return `<div class="terminal-panel" style="text-align:center;padding:8px;" data-entity-id="${entityId}">
+    <div style="font-family:monospace;font-size:1.4rem;color:var(--green);">${escapeHtml(state.state)}<span style="font-size:0.8rem;color:var(--text-muted);">${escapeHtml(unit)}</span></div>
+    <div style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(friendlyName(entityId))}</div>
   </div>`;
 }
 
-function renderTemperatures() {
-  let ids = config.entities.temperatures || [];
-  if (!ids.length) {
-    ids = Object.values(states)
-      .filter(s => {
-        const a = s.attributes || {};
-        return (a.device_class === "temperature" || /°[CF]|temperature/i.test(a.unit_of_measurement || ""));
-      })
-      .slice(0,4).map(s => s.entity_id);
-  }
-  if (!ids.length) return "";
-  const cards = ids.map(id => cardHTML(id)).join("");
-  return `<div class="panel"><div class="section-title">Temperatures</div><div class="grid-3">${cards}</div></div>`;
+function renderCameraFeed(entityId) {
+  const name = friendlyName(entityId);
+  const src = window.HA_INTEGRATION_PROXY ? `/api/camera_proxy_stream/${entityId}` : `/api/camera_proxy_stream/${entityId}?token=${encodeURIComponent(token)}`;
+  return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
+    <div class="panel-title">${escapeHtml(name)}</div>
+    <div class="panel-body" style="padding:0;">
+      <img class="camera-feed" src="${src}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
+    </div>
+  </div>`;
 }
 
-function renderControls() {
-  const ids = config.entities.quickControls || [];
-  if (!ids.length) return "";
-  const cards = ids.map(id => cardHTML(id)).join("");
-  return `<div class="panel"><div class="section-title">Controls</div><div class="grid-2">${cards}</div></div>`;
+function renderRadarFrame() {
+  if (!haConfig || haConfig.latitude == null) return `<div class="terminal-panel"><div class="panel-body" style="color:var(--text-muted);">RADAR UNAVAILABLE</div></div>`;
+  const src = `https://www.rainviewer.com/api.html?lat=${haConfig.latitude}&lon=${haConfig.longitude}&z=8&r=true&c=1&d=true`;
+  return `<div class="terminal-panel" style="height:100%;display:flex;flex-direction:column;">
+    <div class="panel-title">WEATHER RADAR</div>
+    <div class="panel-body" style="flex:1;padding:0;min-height:0;">
+      <iframe class="radar-frame" src="${src}" style="width:100%;height:100%;border:none;display:block;min-height:200px;" loading="lazy" allow="fullscreen"></iframe>
+    </div>
+  </div>`;
 }
 
-function renderRooms() {
-  const rooms = groupByRoom();
-  const order = config.layout.roomOrder || [];
-  const names = Object.keys(rooms).sort((a,b) => {
-    const ia = order.indexOf(a), ib = order.indexOf(b);
-    if (ia !== -1 && ib !== -1) return ia - ib;
-    if (ia !== -1) return -1; if (ib !== -1) return 1;
-    if (a === "General") return 1; if (b === "General") return -1;
-    return a.localeCompare(b);
+function renderMediaCard(entityId) {
+  const state = states[entityId];
+  if (!state) return "";
+  const title = state.attributes && (state.attributes.media_title || state.attributes.friendly_name) || friendlyName(entityId);
+  const artist = state.attributes && state.attributes.media_artist ? state.attributes.media_artist : state.state;
+  const playing = state.state === "playing";
+  return `<div class="terminal-panel" data-entity-id="${entityId}">
+    <div class="panel-title">${escapeHtml(friendlyName(entityId))}</div>
+    <div class="panel-body" style="font-family:monospace;">
+      <div style="color:var(--green);">${escapeHtml(title)}</div>
+      <div style="color:var(--text-muted);font-size:0.85rem;">${escapeHtml(artist)}</div>
+      <div style="display:flex;gap:10px;margin-top:10px;">
+        <button class="btn" onclick="mediaCmd('${entityId}','media_previous_track')">⏮</button>
+        <button class="btn" onclick="mediaCmd('${entityId}','${playing ? "media_pause" : "media_play"}')">${playing ? "⏸" : "▶"}</button>
+        <button class="btn" onclick="mediaCmd('${entityId}','media_next_track')">⏭</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderBottomButton(label, target) {
+  return `<button class="bottom-btn" onclick="showScreen('${target}')">${escapeHtml(label)}</button>`;
+}
+
+// ---- Screens ----
+
+function getPresenceEntities() {
+  const homeSection = (config.sections && config.sections.home && config.sections.home.entities) || [];
+  return homeSection.filter(id => {
+    const domain = id.split(".")[0];
+    return domain === "person" || domain === "device_tracker";
   });
-  const domainOrder = ["light","switch","climate","fan","media_player","vacuum","scene","script","binary_sensor","sensor","number","select","button"];
-  let html = "";
-  for (const room of names) {
-    const groups = rooms[room];
-    const domains = Object.keys(groups).sort((a,b) => {
-      const ia = domainOrder.indexOf(a), ib = domainOrder.indexOf(b);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a.localeCompare(b);
-    });
-    let roomHtml = "";
-    for (const d of domains) {
-      const title = d === "binary_sensor" ? "Sensors" : d.replace(/_/g," ").replace(/\b\w/g,c=>c.toUpperCase()) + "s";
-      const cards = groups[d].map(s => cardHTML(s.entity_id)).join("");
-      roomHtml += `<div class="domain-group"><div class="domain-title">${escapeHtml(title)}</div><div class="grid-2">${cards}</div></div>`;
+}
+
+function getAlerts() {
+  const alerts = [];
+  const sec = config.sections && config.sections.security ? config.sections.security.entities : [];
+  for (const id of sec) {
+    const state = states[id];
+    if (!state) continue;
+    const domain = id.split(".")[0];
+    if (domain === "binary_sensor" && isActive(state.state)) {
+      alerts.push(`${friendlyName(id)} detected`);
     }
-    if (roomHtml) html += `<div class="panel room"><div class="room-title">${escapeHtml(room)}</div>${roomHtml}</div>`;
+    if (domain === "sensor" && state.attributes && state.attributes.device_class === "battery") {
+      const val = parseFloat(state.state);
+      if (!isNaN(val) && val < 20) alerts.push(`${friendlyName(id)} low`);
+    }
   }
-  return html;
+  const sys = config.sections && config.sections.system ? config.sections.system.entities : [];
+  for (const id of sys) {
+    if (id.startsWith("update.") && states[id] && states[id].state === "on") {
+      alerts.push(`${friendlyName(id)} available`);
+    }
+  }
+  return alerts;
 }
 
-function renderSidebar() {
-  const sections = config.layout.sections || DEFAULT_CONFIG.layout.sections;
-  let html = "";
-  for (const sec of sections) {
-    if (sec === "weather") html += renderWeather();
-    else if (sec === "temperatures") html += renderTemperatures();
-    else if (sec === "controls") html += renderControls();
-    else if (sec === "rooms") html += renderRooms();
-  }
-  document.getElementById("sidebar").innerHTML = html;
-}
+function renderHomeScreen() {
+  const weatherId = config.entities.weather || "weather.forecast_home";
+  const weather = states[weatherId];
+  const temp = weather && weather.attributes && weather.attributes.temperature != null ? `${weather.attributes.temperature}°` : "--";
+  const humidity = weather && weather.attributes && weather.attributes.humidity != null ? `${weather.attributes.humidity}%` : "--";
+  const condition = weather ? weather.state.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "--";
+  const icon = weatherIcon(weather ? weather.state : "");
 
-function renderCenter() {
-  const chips = (config.entities.summaryChips || []).map(c => {
-    const s = states[c.entity];
-    const val = s ? `${s.state}${c.unit || ""}` : "--";
-    const color = chipColor(c, s && s.state);
-    return `<div class="chip"><span class="chip-dot" style="background:${color};box-shadow:0 0 8px ${color}"></span>${escapeHtml(c.label)} ${escapeHtml(val)}</div>`;
+  const presence = getPresenceEntities().map(id => {
+    const state = states[id];
+    const home = state ? isActive(state.state) : false;
+    return `<div style="display:flex;align-items:center;gap:10px;font-family:monospace;font-size:1.1rem;">
+      ${renderStatusLed(home ? "home" : "off")}
+      <span>${escapeHtml(friendlyName(id))}</span>
+      <span style="color:${home ? 'var(--green)' : 'var(--text-muted)'}">${home ? "HOME" : "AWAY"}</span>
+    </div>`;
   }).join("");
-  document.getElementById("center").innerHTML = `
-    <div class="chips">${chips}</div>
-    <div class="clock-time" id="clock">--:--</div>
-    <div class="clock-date" id="date">Loading...</div>
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: !config.layout.clock24h });
+  const dateStr = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
+
+  const leftCol = `
+    <div style="display:flex;flex-direction:column;justify-content:center;height:100%;">
+      <div style="font-family:monospace;font-size:clamp(4rem,10vw,7rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);">${escapeHtml(timeStr)}</div>
+      <div style="font-family:monospace;font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
+    </div>
+    ${renderTerminalPanel("WEATHER", `<div style="display:flex;align-items:center;gap:14px;"><div style="font-size:2.5rem;">${icon}</div><div><div style="font-size:1.8rem;color:var(--green);">${temp}</div><div style="color:var(--text-muted);font-family:monospace;">${escapeHtml(condition)} · HUM ${humidity}</div></div></div>`)}
   `;
+
+  const main = `
+    <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:14px;flex:1;min-height:0;">
+      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;">${leftCol}</div>
+      <div style="min-height:0;">${renderRadarFrame()}</div>
+    </div>
+    <div>${renderAlertTicker(getAlerts())}</div>
+    <div>${renderTerminalPanel("PRESENCE", `<div style="display:flex;gap:24px;flex-wrap:wrap;">${presence}</div>`)}</div>
+  `;
+
+  document.getElementById("home-screen").innerHTML = main;
 }
 
-function chipColor(chip, value) {
-  const num = parseFloat(value);
-  if (Number.isNaN(num) || !chip.goodRange) return "var(--accent)";
-  const [min, max] = chip.goodRange;
-  return num >= min && num <= max ? "var(--success)" : "var(--warning)";
+function renderControlScreen() {
+  const scenes = (config.sections && config.sections.scenes && config.sections.scenes.entities) || [];
+  const quick = (config.sections && config.sections.quickControls && config.sections.quickControls.entities) || [];
+  const mediaId = config.entities.mediaPlayer || "media_player.living_room_fire_tv_living_room";
+
+  const sceneButtons = scenes.map(id => renderSceneButton(id)).join("");
+  const lightIds = quick.filter(id => id.startsWith("light."));
+  const lightCards = lightIds.map(id => renderLightCard(id)).join("");
+  const quickButtons = scenes.slice(0, 2).map(id => renderSceneButton(id)).join("");
+
+  const main = `
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;flex:1;min-height:0;">
+      <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
+        ${renderTerminalPanel("SCENES", `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${sceneButtons}</div>`)}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
+        ${renderTerminalPanel("LIGHTS", lightCards || "<div style='color:var(--text-muted)'>NO LIGHTS</div>")}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
+        ${renderMediaCard(mediaId)}
+        ${renderTerminalPanel("QUICK", quickButtons)}
+      </div>
+    </div>
+  `;
+  document.getElementById("control-screen").innerHTML = main;
+}
+
+function renderStatusScreen() {
+  const cameras = (config.sections && config.sections.cameras && config.sections.cameras.entities) || [];
+  const security = (config.sections && config.sections.security && config.sections.security.entities) || [];
+  const environment = (config.sections && config.sections.environment && config.sections.environment.entities) || [];
+  const system = (config.sections && config.sections.system && config.sections.system.entities) || [];
+
+  const cameraFeeds = cameras.map(id => renderCameraFeed(id)).join("");
+  const securityMetrics = security.map(id => renderMetricCard(id)).join("");
+  const envMetrics = environment.map(id => renderMetricCard(id)).join("");
+  const sysMetrics = system.filter(id => id.startsWith("sensor.")).map(id => renderMetricCard(id)).join("");
+
+  const vacuumIds = system.filter(id => id.startsWith("vacuum."));
+  const vacuumCards = vacuumIds.map(id => {
+    const state = states[id];
+    return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${id}">
+      <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;font-family:monospace;">
+        <span>${escapeHtml(friendlyName(id))}</span>
+        <span style="color:var(--green);">${state ? escapeHtml(state.state) : "--"}</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  const printerIds = Object.keys(states).filter(id => id.startsWith("sensor.p1s_") && id.includes("print_status"));
+  const printerCards = printerIds.map(id => {
+    const state = states[id];
+    return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${id}">
+      <div class="panel-body" style="font-family:monospace;">
+        <div style="color:var(--green);">${state ? escapeHtml(state.state) : "--"}</div>
+        <div style="color:var(--text-muted);font-size:0.8rem;">${escapeHtml(friendlyName(id))}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const main = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0;overflow:hidden;">
+      <div style="min-height:0;overflow:hidden;">${cameraFeeds[0] || ""}</div>
+      <div style="min-height:0;overflow:hidden;">${cameraFeeds[1] || ""}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;min-height:0;overflow:hidden;">
+      <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel("SECURITY", securityMetrics)}</div>
+      <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel("ENVIRONMENT", envMetrics)}</div>
+      <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel("SYSTEM", sysMetrics + vacuumCards + printerCards)}</div>
+    </div>
+  `;
+  document.getElementById("status-screen").innerHTML = main;
+}
+
+function showScreen(name) {
+  document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
+  const target = document.getElementById(name + "-screen");
+  if (!target) return;
+  target.classList.add("active");
+  currentScreen = name;
+  if (name === "home") renderHomeScreen();
+  else if (name === "control") renderControlScreen();
+  else if (name === "status") renderStatusScreen();
+}
+
+function entityBelongsToScreen(entityId, screen) {
+  const sectionMap = {
+    home: [config.entities.weather, ...getPresenceEntities()],
+    control: [
+      ...((config.sections.scenes && config.sections.scenes.entities) || []),
+      ...((config.sections.quickControls && config.sections.quickControls.entities) || []),
+      config.entities.mediaPlayer
+    ],
+    status: [
+      ...((config.sections.cameras && config.sections.cameras.entities) || []),
+      ...((config.sections.security && config.sections.security.entities) || []),
+      ...((config.sections.environment && config.sections.environment.entities) || []),
+      ...((config.sections.system && config.sections.system.entities) || [])
+    ]
+  };
+  const ids = sectionMap[screen] || [];
+  if (ids.includes(entityId)) return true;
+  if (screen === "home") {
+    const sec = (config.sections.security && config.sections.security.entities) || [];
+    const sys = (config.sections.system && config.sections.system.entities) || [];
+    if (sec.includes(entityId) || sys.includes(entityId)) return true;
+  }
+  return false;
+}
+
+function updateCard(state) {
+  if (!entityBelongsToScreen(state.entity_id, currentScreen)) return;
+  if (currentScreen === "home") renderHomeScreen();
+  else if (currentScreen === "control") renderControlScreen();
+  else if (currentScreen === "status") renderStatusScreen();
+}
+
+function renderAll() {
+  if (currentScreen === "home") renderHomeScreen();
+  else if (currentScreen === "control") renderControlScreen();
+  else if (currentScreen === "status") renderStatusScreen();
+  updateClock();
 }
 
 function updateClock() {
@@ -472,98 +661,100 @@ function updateClock() {
   if (d) d.textContent = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
 }
 
-function renderDock() {
-  const items = config.dock.items || DEFAULT_CONFIG.dock.items;
-  const html = items.map(it => {
-    if (it.action === "settings") {
-      return `<button class="dock-btn" title="${escapeHtml(it.label)}" onclick="openSettings()">${it.icon}</button>`;
-    }
-    const action = it.entityId ? `onclick="toggleEntity('${it.entityId}')"` : "";
-    return `<button class="dock-btn" title="${escapeHtml(it.label)}" ${action}>${it.icon}</button>`;
-  }).join("");
-  document.getElementById("dock").innerHTML = html;
-  document.getElementById("dock").style.display = config.layout.showDock !== false ? "flex" : "none";
+// ---- Settings ----
+
+function openSettings() {
+  buildSettings();
+  document.getElementById("settings-overlay").style.display = "flex";
+}
+function closeSettings() {
+  document.getElementById("settings-overlay").style.display = "none";
 }
 
-function renderBottom() {
-  const eid = config.entities.mediaPlayer;
-  const s = eid && states[eid];
-  const shortcut = document.getElementById("voice-btn");
-  shortcut.style.display = config.layout.showShortcut !== false ? "flex" : "none";
-  if (!s) { document.getElementById("bottom").innerHTML = ""; return; }
-  const title = s.attributes && (s.attributes.media_title || s.attributes.friendly_name) || friendlyName(eid);
-  const artist = s.attributes && s.attributes.media_artist ? s.attributes.media_artist : s.state;
-  const playing = s.state === "playing";
-  document.getElementById("bottom").innerHTML = `
-    <div></div>
-    <div class="panel media-card">
-      <div class="media-art">🎵</div>
-      <div class="media-info">
-        <div class="media-title">${escapeHtml(title)}</div>
-        <div class="media-subtitle">${escapeHtml(artist)}</div>
-      </div>
-      <div class="media-controls">
-        <button class="media-btn" onclick="mediaCmd('${eid}','media_previous_track')">⏮</button>
-        <button class="media-btn" onclick="mediaCmd('${eid}','${playing ? "media_pause" : "media_play"}')">${playing ? "⏸" : "▶"}</button>
-        <button class="media-btn" onclick="mediaCmd('${eid}','media_next_track')">⏭</button>
-      </div>
-    </div>`;
+function buildSettings() {
+  const body = document.getElementById("settings-body");
+  const entityOptions = (domainFilter) => {
+    let list = Object.values(states);
+    if (domainFilter) list = list.filter(s => domainFilter.includes(s.entity_id.split(".")[0]));
+    return list.map(s => `<option value="${s.entity_id}" ${s.entity_id === config.entities.weather ? "selected" : ""}>${escapeHtml(friendlyName(s.entity_id))} (${s.entity_id})</option>`).join("");
+  };
+  const quickChips = (config.entities.quickControls || []).map(id =>
+    `<span class="entity-chip">${escapeHtml(friendlyName(id))} <button onclick="removeQuick('${id}')">×</button></span>`
+  ).join("");
+  body.innerHTML = `
+    <div class="settings-section" style="margin-bottom:22px;"><h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">Appearance</h3>
+      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">Accent color</label><input id="cfg-accent" type="color" value="${config.theme.accentColor}"></div>
+      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">24-hour clock</label><input id="cfg-24h" type="checkbox" ${config.layout.clock24h ? "checked" : ""}></div>
+    </div>
+    <div class="settings-section" style="margin-bottom:22px;"><h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">Layout</h3>
+      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">Weather entity</label><select id="cfg-weather"><option value="">-- none --</option>${entityOptions(["weather"])}</select></div>
+      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">Media player</label><select id="cfg-media"><option value="">-- none --</option>${entityOptions(["media_player"])}</select></div>
+    </div>
+    <div class="settings-section" style="margin-bottom:22px;"><h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">Quick Controls</h3><div id="quick-list">${quickChips}</div>
+      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><select id="cfg-add-quick"><option value="">Add entity...</option>${entityOptions(["light","switch","scene","script","fan","input_boolean","button"])}</select></div>
+    </div>
+    <div class="settings-section" style="margin-bottom:22px;"><h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">Data</h3>
+      <p style="color:var(--text-muted);font-size:0.85rem;">Settings are saved in this browser. Use Export to get a JSON file you can save as <code>config.json</code> in this folder.</p>
+      <button class="btn" onclick="logout()" style="background:rgba(248,113,113,0.15);border-color:rgba(248,113,113,0.3);">Clear token & reload</button>
+    </div>
+  `;
+  document.getElementById("cfg-weather").value = config.entities.weather || "";
+  document.getElementById("cfg-media").value = config.entities.mediaPlayer || "";
+  document.getElementById("cfg-add-quick").addEventListener("change", e => { if(e.target.value) addQuick(e.target.value); e.target.value=""; });
 }
 
-function mediaCmd(eid, service) {
-  if (!ws) return;
-  ws.send(JSON.stringify({ id: Date.now(), type: "call_service", domain: "media_player", service, service_data: { entity_id: eid } }));
+function addQuick(id) {
+  if (!config.entities.quickControls.includes(id)) config.entities.quickControls.push(id);
+  buildSettings();
+}
+function removeQuick(id) {
+  config.entities.quickControls = config.entities.quickControls.filter(x => x !== id);
+  buildSettings();
 }
 
-function renderAll() {
-  renderSidebar();
-  renderCenter();
-  renderDock();
-  renderBottom();
-  updateClock();
+function saveSettings() {
+  config.theme.accentColor = document.getElementById("cfg-accent").value;
+  config.layout.clock24h = document.getElementById("cfg-24h").checked;
+  config.entities.weather = document.getElementById("cfg-weather").value || "";
+  config.entities.mediaPlayer = document.getElementById("cfg-media").value || "";
+  saveConfig();
+  applyTheme();
+  renderAll();
+  closeSettings();
 }
 
-function updateCard(state) {
-  const card = document.querySelector(`[data-entity-id="${state.entity_id}"]`);
-  if (!card) return;
-  const domain = state.entity_id.split(".")[0];
-  const active = isActive(state.state);
-  card.classList.toggle("active", active);
-  const st = card.querySelector(".card-state");
-  if (st) st.textContent = formatState(state);
-  const icon = card.querySelector(".card-icon");
-  if (icon) icon.textContent = iconFor(state.entity_id, state.state);
-  if (domain === "media_player" && state.entity_id === config.entities.mediaPlayer) renderBottom();
-  if (domain === "weather" && state.entity_id === config.entities.weather) renderSidebar();
+function exportConfig() {
+  const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "dashboard-config.json"; a.click();
+  URL.revokeObjectURL(url);
 }
 
-async function fetchRegistry() {
-  const headers = token ? { "Authorization": `Bearer ${token}` } : {};
-  try {
-    const [aRes, eRes] = await Promise.all([
-      fetch("/api/config/area_registry/list", { headers }),
-      fetch("/api/config/entity_registry/list", { headers })
-    ]);
-    areas = aRes.ok ? await aRes.json() : [];
-    entities = eRes.ok ? await eRes.json() : [];
-    areaMap = {};
-    for (const a of areas) areaMap[a.area_id] = a.name;
-    entityById = {};
-    for (const e of entities) entityById[e.entity_id] = e;
-  } catch (e) {
-    console.error("Failed to fetch registry", e);
-  }
+function importConfig() {
+  const input = document.createElement("input");
+  input.type = "file"; input.accept = "application/json";
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    try {
+      const txt = await file.text();
+      const data = JSON.parse(txt);
+      config = deepMerge(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), data);
+      saveConfig();
+      applyTheme();
+      renderAll();
+      buildSettings();
+    } catch (e) { alert("Invalid JSON: " + e.message); }
+  };
+  input.click();
 }
 
-async function fetchHAConfig() {
-  const headers = token ? { "Authorization": `Bearer ${token}` } : {};
-  try {
-    const r = await fetch("/api/config", { headers });
-    if (r.ok) haConfig = await r.json();
-  } catch (e) {
-    console.error("Failed to fetch HA config", e);
-  }
+function logout() {
+  localStorage.removeItem("ha_token");
+  location.reload();
 }
+
+// ---- Connection ----
 
 function connectProxy() {
   setStatus("connecting");
@@ -626,143 +817,17 @@ function connect() {
   ws.onerror = () => { setStatus("disconnected"); ws.close(); };
 }
 
-function logout() {
-  localStorage.removeItem("ha_token");
-  location.reload();
-}
-
-function openSettings() {
-  buildSettings();
-  document.getElementById("settings-overlay").classList.add("open");
-}
-function closeSettings() {
-  document.getElementById("settings-overlay").classList.remove("open");
-}
-
-function buildSettings() {
-  const body = document.getElementById("settings-body");
-  const entityOptions = (domainFilter) => {
-    let list = Object.values(states);
-    if (domainFilter) list = list.filter(s => domainFilter.includes(s.entity_id.split(".")[0]));
-    return list.map(s => `<option value="${s.entity_id}" ${s.entity_id === config.entities.weather ? "selected" : ""}>${escapeHtml(friendlyName(s.entity_id))} (${s.entity_id})</option>`).join("");
-  };
-  const sectionCheckboxes = ["weather","temperatures","controls","rooms"].map(sec => {
-    const checked = config.layout.sections.includes(sec) ? "checked" : "";
-    return `<label style="display:inline-flex;align-items:center;gap:6px;margin-right:12px;"><input type="checkbox" value="${sec}" ${checked}> ${sec}</label>`;
-  }).join("");
-  const quickChips = (config.entities.quickControls || []).map(id =>
-    `<span class="entity-chip">${escapeHtml(friendlyName(id))} <button onclick="removeQuick('${id}')">×</button></span>`
-  ).join("");
-  const chipChips = (config.entities.summaryChips || []).map(c =>
-    `<span class="entity-chip">${escapeHtml(c.label)} <button onclick="removeChip('${c.entity}')">×</button></span>`
-  ).join("");
-  body.innerHTML = `
-    <div class="settings-section"><h3>Appearance</h3>
-      <div class="settings-row"><label>Background URL</label><input id="cfg-bg" type="text" value="${escapeHtml(config.theme.backgroundImage)}"></div>
-      <div class="settings-row"><label>Accent color</label><input id="cfg-accent" type="color" value="${config.theme.accentColor}"></div>
-      <div class="settings-row"><label>24-hour clock</label><input id="cfg-24h" type="checkbox" ${config.layout.clock24h ? "checked" : ""}></div>
-    </div>
-    <div class="settings-section"><h3>Layout</h3>
-      <div class="settings-row">${sectionCheckboxes}</div>
-      <div class="settings-row"><label>Weather entity</label><select id="cfg-weather"><option value="">-- none --</option>${entityOptions(["weather"])}</select></div>
-      <div class="settings-row"><label>Media player</label><select id="cfg-media"><option value="">-- none --</option>${entityOptions(["media_player"])}</select></div>
-    </div>
-    <div class="settings-section"><h3>Quick Controls</h3><div id="quick-list">${quickChips}</div>
-      <div class="settings-row"><select id="cfg-add-quick"><option value="">Add entity...</option>${entityOptions(["light","switch","scene","script","fan","input_boolean","button"])}</select></div>
-    </div>
-    <div class="settings-section"><h3>Summary Chips</h3><div id="chip-list">${chipChips}</div>
-      <div class="settings-row"><select id="cfg-add-chip-entity"><option value="">Entity...</option>${entityOptions(["sensor","binary_sensor"])}</select>
-      <input id="cfg-add-chip-label" placeholder="Label" style="flex:1;min-width:100px;">
-      <input id="cfg-add-chip-unit" placeholder="Unit" style="flex:0;min-width:60px;">
-      <input id="cfg-add-chip-min" placeholder="Good min" type="number" style="flex:0;min-width:70px;">
-      <input id="cfg-add-chip-max" placeholder="Good max" type="number" style="flex:0;min-width:70px;">
-      <button class="btn" onclick="addChip()">Add</button></div>
-    </div>
-    <div class="settings-section"><h3>Data</h3>
-      <p style="color:var(--text-muted);font-size:0.85rem;">Settings are saved in this browser. Use Export to get a JSON file you can save as <code>config.json</code> in this folder.</p>
-      <button class="btn" onclick="logout()" style="background:rgba(248,113,113,0.15);border-color:rgba(248,113,113,0.3);">Clear token & reload</button>
-    </div>
-  `;
-  // fix selects to current values
-  document.getElementById("cfg-weather").value = config.entities.weather || "";
-  document.getElementById("cfg-media").value = config.entities.mediaPlayer || "";
-  document.getElementById("cfg-add-quick").addEventListener("change", e => { if(e.target.value) addQuick(e.target.value); e.target.value=""; });
-}
-
-function addQuick(id) {
-  if (!config.entities.quickControls.includes(id)) config.entities.quickControls.push(id);
-  buildSettings();
-}
-function removeQuick(id) {
-  config.entities.quickControls = config.entities.quickControls.filter(x => x !== id);
-  buildSettings();
-}
-function addChip() {
-  const entity = document.getElementById("cfg-add-chip-entity").value;
-  const label = document.getElementById("cfg-add-chip-label").value || friendlyName(entity);
-  const unit = document.getElementById("cfg-add-chip-unit").value;
-  const min = parseFloat(document.getElementById("cfg-add-chip-min").value);
-  const max = parseFloat(document.getElementById("cfg-add-chip-max").value);
-  if (!entity) return;
-  const chip = { entity, label, unit };
-  if (!Number.isNaN(min) && !Number.isNaN(max)) chip.goodRange = [min, max];
-  config.entities.summaryChips.push(chip);
-  buildSettings();
-}
-function removeChip(entity) {
-  config.entities.summaryChips = config.entities.summaryChips.filter(c => c.entity !== entity);
-  buildSettings();
-}
-
-function saveSettings() {
-  config.theme.backgroundImage = document.getElementById("cfg-bg").value.trim();
-  config.theme.accentColor = document.getElementById("cfg-accent").value;
-  config.layout.clock24h = document.getElementById("cfg-24h").checked;
-  const sections = [];
-  document.querySelectorAll('#settings-body input[type="checkbox"]').forEach(cb => {
-    if (cb.value && ["weather","temperatures","controls","rooms"].includes(cb.value) && cb.checked) sections.push(cb.value);
-  });
-  config.layout.sections = sections;
-  config.entities.weather = document.getElementById("cfg-weather").value || "";
-  config.entities.mediaPlayer = document.getElementById("cfg-media").value || "";
-  saveConfig();
-  applyTheme();
-  renderAll();
-  closeSettings();
-}
-
-function exportConfig() {
-  const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = "dashboard-config.json"; a.click();
-  URL.revokeObjectURL(url);
-}
-
-function importConfig() {
-  const input = document.createElement("input");
-  input.type = "file"; input.accept = "application/json";
-  input.onchange = async () => {
-    const file = input.files[0]; if (!file) return;
-    try {
-      const txt = await file.text();
-      const data = JSON.parse(txt);
-      config = deepMerge(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), data);
-      saveConfig();
-      applyTheme();
-      renderAll();
-      buildSettings();
-    } catch (e) { alert("Invalid JSON: " + e.message); }
-  };
-  input.click();
-}
+// ---- Init ----
 
 async function init() {
   config = await loadConfig();
   applyTheme();
-  renderAll();
+  await fetchHAConfig();
+  document.getElementById("dock").innerHTML =
+    renderBottomButton("CONTROL HUB", "control") +
+    renderBottomButton("STATUS MONITOR", "status");
+  showScreen("home");
   if (window.HA_INTEGRATION_PROXY) {
-    // The integration proxy handles Home Assistant auth server-side.
     token = "";
     localStorage.removeItem("ha_token");
     connect();
@@ -777,269 +842,7 @@ async function init() {
   setInterval(updateClock, 1000);
 }
 
-// Override helpers for the CRT terminal design
-function isActive(state) {
-  return ["on", "home", "playing", "open", "active", "true", "cleaning", "docked", "idle"].includes(String(state || "").toLowerCase());
-}
-
-function weatherIcon(state) {
-  const s = String(state || "").toLowerCase();
-  if (s.includes("sun") || s === "clear") return "☀️";
-  if (s.includes("cloud")) return "☁️";
-  if (s.includes("rain")) return "🌧️";
-  if (s.includes("snow")) return "❄️";
-  if (s.includes("storm") || s.includes("thunder")) return "⛈️";
-  if (s.includes("fog") || s.includes("mist")) return "🌫️";
-  return "⛅";
-}
-
-function escapeHtml(str) {
-  return String(str == null ? "" : str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
-}
-
-function showScreen(screenId) {
-  document.querySelectorAll('.screen').forEach(el => el.style.display = 'none');
-  const target = document.getElementById(screenId);
-  if (target) target.style.display = 'flex';
-}
-
-function setStatus(s, c) {
-  const textEl = document.getElementById('status-text');
-  const ledEl = document.getElementById('status-led');
-  const legacy = document.getElementById('status');
-  const cls = c != null ? c : s;
-  const text = c != null ? s : cls;
-  if (textEl) textEl.textContent = String(text).toUpperCase();
-  if (legacy) { legacy.textContent = text; legacy.className = cls; }
-  if (ledEl) {
-    ledEl.className = 'status-led';
-    if (cls === 'connected') ledEl.classList.add('on');
-    else if (cls === 'disconnected' || cls === 'error') ledEl.classList.add('danger');
-    else ledEl.classList.add('warn');
-  }
-  if (cls === 'connected') reconnectDelay = 1000;
-}
-
-function openSettings() {
-  let panel = document.getElementById('settings-panel');
-  if (!panel) {
-    panel = document.createElement('div');
-    panel.id = 'settings-panel';
-    panel.innerHTML = `<div style="position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;" onclick="if(event.target===this)closeSettings()"><div class="terminal-panel" style="width:min(90%,500px);"><div class="panel-title">SETTINGS</div><div class="panel-body">Token: <input id="settings-token" type="password" value="${escapeHtml(token || '')}" style="width:100%;"><br><br><button class="bottom-btn" onclick="localStorage.setItem('ha_token',document.getElementById('settings-token').value);location.reload();">SAVE</button><button class="bottom-btn" onclick="closeSettings()">CLOSE</button></div></div></div>`;
-    document.body.appendChild(panel);
-  }
-  panel.style.display = 'flex';
-}
-
-function closeSettings() {
-  const panel = document.getElementById('settings-panel');
-  if (panel) panel.style.display = 'none';
-}
-
-function renderAll() {
-  const dock = document.getElementById('dock');
-  if (dock) dock.innerHTML = renderBottomButton('CONTROL HUB', 'control') + renderBottomButton('STATUS MONITOR', 'status');
-  renderHomeScreen();
-  updateClock();
-}
-
-async function init() {
-  config = await loadConfig();
-  applyTheme();
-  await fetchHAConfig();
-  renderAll();
-  if (window.HA_INTEGRATION_PROXY) {
-    token = '';
-    localStorage.removeItem('ha_token');
-    connect();
-  } else {
-    token = localStorage.getItem('ha_token');
-    if (!token) {
-      token = prompt('Enter Home Assistant long-lived access token:');
-      if (token) localStorage.setItem('ha_token', token);
-    }
-    if (token) connect();
-  }
-  setInterval(updateClock, 1000);
-}
-
-// Task 2 component renderers
-function renderTerminalPanel(title, bodyHtml) {
-  return `<div class="terminal-panel">
-    <div class="panel-title">${escapeHtml(title)}</div>
-    <div class="panel-body">${bodyHtml}</div>
-  </div>`;
-}
-
-function renderStatusLed(state) {
-  let cls = "";
-  const s = String(state || "").toLowerCase();
-  if (["on","playing","open","home","heat","cool","auto","active","true","cleaning","docked","idle"].includes(s)) cls = "on";
-  else if (["unavailable","unknown","offline"].includes(s)) cls = "danger";
-  return `<span class="status-led ${cls}"></span>`;
-}
-
-function renderAlertTicker(alerts) {
-  if (!alerts || !alerts.length) {
-    return `<div class="terminal-panel"><div class="panel-body" style="color:var(--text-muted);font-family:monospace;">SYSTEM NORMAL</div></div>`;
-  }
-  const items = alerts.slice(0,3).map(a => `<div style="color:var(--amber);font-family:monospace;margin:4px 0;">! ${escapeHtml(a)}</div>`).join("");
-  return `<div class="terminal-panel"><div class="panel-body">${items}</div></div>`;
-}
-
-function renderSceneButton(entityId) {
-  const state = states[entityId];
-  const name = friendlyName(entityId);
-  const domain = entityId.split(".")[0];
-  return `<button class="bottom-btn" style="flex:none;width:100%;margin:4px 0;" onclick="toggleEntity('${entityId}')">${escapeHtml(name)}</button>`;
-}
-
-function renderLightCard(entityId) {
-  const state = states[entityId];
-  const active = state ? isActive(state.state) : false;
-  const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
-  const pct = Math.round((brightness / 255) * 100);
-  return `<div class="terminal-panel" style="margin-bottom:10px;">
-    <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;" onclick="toggleEntity('${entityId}')">
-      <div>${renderStatusLed(active ? "on" : "off")} <span style="font-family:monospace;">${escapeHtml(friendlyName(entityId))}</span></div>
-      <div style="color:var(--text-muted);font-family:monospace;">${active ? "ON" : "OFF"}</div>
-    </div>
-    ${active ? `<div class="panel-body" style="padding-top:0;"><input type="range" min="0" max="100" value="${pct}" style="width:100%;" onchange="setBrightness('${entityId}', this.value)" onclick="event.stopPropagation();"></div>` : ""}
-  </div>`;
-}
-
-function renderMetricCard(entityId) {
-  const state = states[entityId];
-  if (!state) return "";
-  const unit = state.attributes && state.attributes.unit_of_measurement ? state.attributes.unit_of_measurement : "";
-  return `<div class="terminal-panel" style="text-align:center;padding:8px;">
-    <div style="font-family:monospace;font-size:1.4rem;color:var(--green);">${escapeHtml(state.state)}<span style="font-size:0.8rem;color:var(--text-muted);">${escapeHtml(unit)}</span></div>
-    <div style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(friendlyName(entityId))}</div>
-  </div>`;
-}
-
-function renderCameraFeed(entityId) {
-  const name = friendlyName(entityId);
-  const src = window.HA_INTEGRATION_PROXY ? `/api/camera_proxy_stream/${entityId}` : `/api/camera_proxy_stream/${entityId}?token=${encodeURIComponent(token)}`;
-  return `<div class="terminal-panel" style="margin-bottom:10px;">
-    <div class="panel-title">${escapeHtml(name)}</div>
-    <div class="panel-body" style="padding:0;">
-      <img class="camera-feed" src="${src}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
-    </div>
-  </div>`;
-}
-
-function renderRadarFrame() {
-  if (!haConfig || haConfig.latitude == null) return `<div class="terminal-panel"><div class="panel-body" style="color:var(--text-muted);">RADAR UNAVAILABLE</div></div>`;
-  const src = `https://www.rainviewer.com/api.html?lat=${haConfig.latitude}&lon=${haConfig.longitude}&z=8&r=true&c=1&d=true`;
-  return `<div class="terminal-panel" style="height:100%;display:flex;flex-direction:column;">
-    <div class="panel-title">WEATHER RADAR</div>
-    <div class="panel-body" style="flex:1;padding:0;min-height:0;">
-      <iframe class="radar-frame" src="${src}" style="width:100%;height:100%;border:none;display:block;min-height:200px;" loading="lazy" allow="fullscreen"></iframe>
-    </div>
-  </div>`;
-}
-
-function renderMediaCard(entityId) {
-  const state = states[entityId];
-  if (!state) return "";
-  return `<div class="terminal-panel">
-    <div class="panel-title">${escapeHtml(friendlyName(entityId))}</div>
-    <div class="panel-body" style="font-family:monospace;">
-      <div style="color:var(--green);">${escapeHtml(state.state)}</div>
-      <button class="bottom-btn" style="margin-top:10px;padding:10px;font-size:0.9rem;" onclick="toggleEntity('${entityId}')">PLAY / PAUSE</button>
-    </div>
-  </div>`;
-}
-
-function renderBottomButton(label, target) {
-  return `<button class="bottom-btn" onclick="showScreen('${target}')">${escapeHtml(label)}</button>`;
-}
-
-function setBrightness(entityId, pct) {
-  if (!ws) return;
-  const value = Math.round((parseInt(pct, 10) / 100) * 255);
-  ws.send(JSON.stringify({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, brightness: value } }));
-}
-
-// Task 3 Home Screen functions
-function getPresenceEntities() {
-  const homeSection = (config.sections && config.sections.home && config.sections.home.entities) || [];
-  return homeSection.filter(id => {
-    const domain = id.split(".")[0];
-    return domain === "person" || domain === "device_tracker";
-  });
-}
-
-function getAlerts() {
-  const alerts = [];
-  const sec = config.sections && config.sections.security ? config.sections.security.entities : [];
-  for (const id of sec) {
-    const state = states[id];
-    if (!state) continue;
-    const domain = id.split(".")[0];
-    if (domain === "binary_sensor" && isActive(state.state)) {
-      alerts.push(`${friendlyName(id)} detected`);
-    }
-    if (domain === "sensor" && state.attributes && state.attributes.device_class === "battery") {
-      const val = parseFloat(state.state);
-      if (!isNaN(val) && val < 20) alerts.push(`${friendlyName(id)} low`);
-    }
-  }
-  // Add pending updates
-  const sys = config.sections && config.sections.system ? config.sections.system.entities : [];
-  for (const id of sys) {
-    if (id.startsWith("update.") && states[id] && states[id].state === "on") {
-      alerts.push(`${friendlyName(id)} available`);
-    }
-  }
-  return alerts;
-}
-
-function renderHomeScreen() {
-  const weatherId = config.entities.weather || "weather.forecast_home";
-  const weather = states[weatherId];
-  const temp = weather && weather.attributes && weather.attributes.temperature != null ? `${weather.attributes.temperature}°` : "--";
-  const humidity = weather && weather.attributes && weather.attributes.humidity != null ? `${weather.attributes.humidity}%` : "--";
-  const condition = weather ? weather.state.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "--";
-  const icon = weatherIcon(weather ? weather.state : "");
-
-  const presence = getPresenceEntities().map(id => {
-    const state = states[id];
-    const home = state ? isActive(state.state) : false;
-    return `<div style="display:flex;align-items:center;gap:10px;font-family:monospace;font-size:1.1rem;">
-      ${renderStatusLed(home ? "home" : "off")}
-      <span>${escapeHtml(friendlyName(id))}</span>
-      <span style="color:${home ? 'var(--green)' : 'var(--text-muted)'};">${home ? "HOME" : "AWAY"}</span>
-    </div>`;
-  }).join("");
-
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-  const dateStr = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
-
-  const leftCol = `
-    <div style="display:flex;flex-direction:column;justify-content:center;height:100%;">
-      <div style="font-family:monospace;font-size:clamp(4rem,10vw,7rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);">${escapeHtml(timeStr)}</div>
-      <div style="font-family:monospace;font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
-    </div>
-    ${renderTerminalPanel("WEATHER", `<div style="display:flex;align-items:center;gap:14px;"><div style="font-size:2.5rem;">${icon}</div><div><div style="font-size:1.8rem;color:var(--green);">${temp}</div><div style="color:var(--text-muted);font-family:monospace;">${escapeHtml(condition)} · HUM ${humidity}</div></div></div>`)}
-  `;
-
-  const main = `
-    <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:14px;flex:1;min-height:0;">
-      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;">${leftCol}</div>
-      <div style="min-height:0;">${renderRadarFrame()}</div>
-    </div>
-    <div>${renderAlertTicker(getAlerts())}</div>
-    <div>${renderTerminalPanel("PRESENCE", `<div style="display:flex;gap:24px;flex-wrap:wrap;">${presence}</div>`)}</div>
-  `;
-
-  document.getElementById("home-screen").innerHTML = main;
-}
-
 document.addEventListener("DOMContentLoaded", init);
-
 </script>
 </body>
 </html>
