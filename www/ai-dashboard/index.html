@@ -239,7 +239,7 @@ input[type="range"] { accent-color: var(--green); }
   <div id="control-screen" class="screen">CONTROL HUB</div>
   <div id="security-screen" class="screen">SECURITY</div>
   <div id="status-screen" class="screen">STATUS MONITOR</div>
-  <div id="dock" style="display:flex;gap:14px;height:70px;flex-shrink:0;"></div>
+  <div id="dock" style="display:flex;gap:14px;height:82px;flex-shrink:0;"></div>
 </div>
 
 <div id="settings-overlay" style="position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.75);display:none;align-items:center;justify-content:center;">
@@ -694,8 +694,16 @@ function renderMediaCard(entityId) {
   </div>`;
 }
 
-function renderBottomButton(label, target) {
-  return `<button class="bottom-btn" onclick="showScreen('${target}')">${escapeHtml(label)}</button>`;
+function renderBottomButton(label, target, active = false) {
+  const cls = active ? "bottom-btn active-dock-btn" : "bottom-btn";
+  return `<button class="${cls}" onclick="showScreen('${target}')">${escapeHtml(label)}</button>`;
+}
+
+function renderDock() {
+  return renderBottomButton("HOME", "home", currentScreen === "home") +
+    renderBottomButton("CONTROL HUB", "control", currentScreen === "control") +
+    renderBottomButton("SECURITY", "security", currentScreen === "security") +
+    renderBottomButton("STATUS MONITOR", "status", currentScreen === "status");
 }
 
 // ---- Screens ----
@@ -946,6 +954,7 @@ function showScreen(name) {
   if (!target) return;
   target.classList.add("active");
   currentScreen = name;
+  document.getElementById("dock").innerHTML = renderDock();
   if (name === "home") renderHomeScreen();
   else if (name === "control") renderControlScreen();
   else if (name === "security") renderSecurityScreen();
@@ -1172,11 +1181,7 @@ async function init() {
   config = await loadConfig();
   applyTheme();
   await fetchHAConfig();
-  document.getElementById("dock").innerHTML =
-    renderBottomButton("HOME", "home") +
-    renderBottomButton("CONTROL HUB", "control") +
-    renderBottomButton("SECURITY", "security") +
-    renderBottomButton("STATUS MONITOR", "status");
+  document.getElementById("dock").innerHTML = renderDock();
   showScreen("home");
   setInterval(refreshForecast, 15 * 60 * 1000);
   if (window.HA_INTEGRATION_PROXY) {
