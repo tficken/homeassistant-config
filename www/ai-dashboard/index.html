@@ -620,13 +620,13 @@ async function initRadarMap() {
 
     let idx = layers.length - 1;
     layers[idx].setOpacity(0.65);
-    timestamp.textContent = new Date(useFrames[idx].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    timestamp.textContent = "RADAR UPDATED " + new Date(useFrames[idx].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
     radarAnimInterval = setInterval(() => {
       layers[idx].setOpacity(0);
       idx = (idx + 1) % layers.length;
       layers[idx].setOpacity(0.65);
-      timestamp.textContent = new Date(useFrames[idx].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      timestamp.textContent = "RADAR UPDATED " + new Date(useFrames[idx].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     }, 700);
 
     setTimeout(() => map.invalidateSize(), 150);
