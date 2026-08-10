@@ -32,8 +32,19 @@ def test_component_functions_exist():
     assert not missing, f"Missing component functions: {missing}"
 
 
+HOME_MARKERS = ["id=\"home-screen\"", "renderHomeScreen(", "WEATHER RADAR", "PRESENCE", "CONTROL HUB", "STATUS MONITOR"]
+
+
+def test_home_screen_structure():
+    html = read_index()
+    missing = [m for m in HOME_MARKERS if m not in html]
+    assert not missing, f"Missing home screen markers: {missing}"
+
+
 if __name__ == "__main__":
     test_css_foundation()
     print("css foundation ok")
     test_component_functions_exist()
     print("component functions ok")
+    test_home_screen_structure()
+    print("home screen structure ok")

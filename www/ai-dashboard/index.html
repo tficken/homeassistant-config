@@ -94,666 +94,18 @@ body {
 </style>
 </head>
 <body>
-<div id="status" class="connecting">connecting</div>
-<button class="logout" onclick="logout()">Change token</button>
-<h1>Home Assistant Dashboard</h1>
+<div class="scanlines"></div>
+<div class="vignette"></div>
+<div id="status-led" class="status-led" style="position:fixed;top:14px;left:14px;z-index:50;"></div>
+<div id="status-text" style="position:fixed;top:12px;left:32px;z-index:50;font-family:monospace;font-size:0.75rem;color:var(--text-muted);">CONNECTING</div>
+<button id="settings-btn" style="position:fixed;top:10px;right:14px;z-index:50;background:transparent;border:none;color:var(--text-muted);font-family:monospace;cursor:pointer;" onclick="openSettings()">[ SETTINGS ]</button>
 
-      <section>
-        <h2>Light</h2>
-        <div class="grid">
-          
-                <div class="card actionable" data-entity-id="light.third_reality_inc_3rcb01057z" data-domain="light" onclick="toggle(this)">
-                  <div class="entity-name">Ceiling fan light 1</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card actionable" data-entity-id="light.third_reality_inc_3rcb01057z_2" data-domain="light" onclick="toggle(this)">
-                  <div class="entity-name">Ceiling fan light 2</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card actionable" data-entity-id="light.third_reality_inc_3rcb01057z_3" data-domain="light" onclick="toggle(this)">
-                  <div class="entity-name">Ceiling fan light 3</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card actionable" data-entity-id="light.living_room_ceiling_fan" data-domain="light" onclick="toggle(this)">
-                  <div class="entity-name">Living room ceiling fan</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card actionable" data-entity-id="light.third_reality_inc_3rcb01057z_4" data-domain="light" onclick="toggle(this)">
-                  <div class="entity-name">Living room ceiling fan light 1</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card actionable" data-entity-id="light.third_reality_inc_3rcb01057z_5" data-domain="light" onclick="toggle(this)">
-                  <div class="entity-name">Living room ceiling fan light 2</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card actionable" data-entity-id="light.third_reality_inc_3rcb01057z_6" data-domain="light" onclick="toggle(this)">
-                  <div class="entity-name">Living room ceiling fan light 3</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card actionable" data-entity-id="light.ceiling_fan" data-domain="light" onclick="toggle(this)">
-                  <div class="entity-name">Office ceiling fan</div>
-                  <div class="entity-state">on</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Switch</h2>
-        <div class="grid">
-          
-                <div class="card actionable" data-entity-id="switch.front_door_motion_detection" data-domain="switch" onclick="toggle(this)">
-                  <div class="entity-name">Front Door Motion detection</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card actionable" data-entity-id="switch.downstairs_motion_detection" data-domain="switch" onclick="toggle(this)">
-                  <div class="entity-name">backyard Motion detection</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card actionable" data-entity-id="switch.pooper_night_light_mode" data-domain="switch" onclick="toggle(this)">
-                  <div class="entity-name">pooper Night light mode</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card actionable" data-entity-id="switch.pooper_panel_lockout" data-domain="switch" onclick="toggle(this)">
-                  <div class="entity-name">pooper Panel lockout</div>
-                  <div class="entity-state">off</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Media Player</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="media_player.living_room_fire_tv_living_room">
-                  <div class="entity-name">Fire TV - Living Room</div>
-                  <div class="entity-state">off</div>
-                </div>
-                <div class="card" data-entity-id="media_player.travis_office_office_fire_tv">
-                  <div class="entity-name">Fire TV - Office</div>
-                  <div class="entity-state">idle</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Vacuum</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="vacuum.pooper_litter_box">
-                  <div class="entity-name">pooper Litter box</div>
-                  <div class="entity-state">error</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Sensor</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="sensor.backup_backup_manager_state">
-                  <div class="entity-name">Backup Backup Manager state</div>
-                  <div class="entity-state">idle</div>
-                </div>
-                <div class="card" data-entity-id="sensor.exos_router_download_speed">
-                  <div class="entity-name">EXOS router Download speed</div>
-                  <div class="entity-state">132.604787725505 KiB/s</div>
-                </div>
-                <div class="card" data-entity-id="sensor.exos_router_external_ip">
-                  <div class="entity-name">EXOS router External IP</div>
-                  <div class="entity-state">167.248.55.89</div>
-                </div>
-                <div class="card" data-entity-id="sensor.exos_router_upload_speed">
-                  <div class="entity-name">EXOS router Upload speed</div>
-                  <div class="entity-state">85.876902387576 KiB/s</div>
-                </div>
-                <div class="card" data-entity-id="sensor.front_door_battery">
-                  <div class="entity-name">Front Door Battery</div>
-                  <div class="entity-state">65 %</div>
-                </div>
-                <div class="card" data-entity-id="sensor.front_door_last_activity">
-                  <div class="entity-name">Front Door Last activity</div>
-                  <div class="entity-state">2026-08-09T00:50:58+00:00</div>
-                </div>
-                <div class="card" data-entity-id="sensor.ha_disk_usage">
-                  <div class="entity-name">HA disk usage</div>
-                  <div class="entity-state">7 %</div>
-                </div>
-                <div class="card" data-entity-id="sensor.hobeian_zg_204zx_battery">
-                  <div class="entity-name">HOBEIAN ZG-204ZX Battery</div>
-                  <div class="entity-state">90.0 %</div>
-                </div>
-                <div class="card" data-entity-id="sensor.hobeian_zg_204zx_battery_2">
-                  <div class="entity-name">HOBEIAN ZG-204ZX Battery</div>
-                  <div class="entity-state">90.0 %</div>
-                </div>
-                <div class="card" data-entity-id="sensor.hobeian_zg_204zx_humidity">
-                  <div class="entity-name">Humidity</div>
-                  <div class="entity-state">64.1 %</div>
-                </div>
-                <div class="card" data-entity-id="sensor.hobeian_zg_204zx_humidity_2">
-                  <div class="entity-name">Humidity</div>
-                  <div class="entity-state">53.4 %</div>
-                </div>
-                <div class="card" data-entity-id="sensor.hobeian_zg_204zx_illuminance">
-                  <div class="entity-name">Light</div>
-                  <div class="entity-state">1333 lx</div>
-                </div>
-                <div class="card" data-entity-id="sensor.hobeian_zg_204zx_illuminance_2">
-                  <div class="entity-name">Light</div>
-                  <div class="entity-state">1078 lx</div>
-                </div>
-                <div class="card" data-entity-id="sensor.sun_next_dawn">
-                  <div class="entity-name">Sun Next dawn</div>
-                  <div class="entity-state">2026-08-10T11:02:06+00:00</div>
-                </div>
-                <div class="card" data-entity-id="sensor.sun_next_dusk">
-                  <div class="entity-name">Sun Next dusk</div>
-                  <div class="entity-state">2026-08-10T02:03:11+00:00</div>
-                </div>
-                <div class="card" data-entity-id="sensor.sun_next_midnight">
-                  <div class="entity-name">Sun Next midnight</div>
-                  <div class="entity-state">2026-08-10T06:32:20+00:00</div>
-                </div>
-                <div class="card" data-entity-id="sensor.sun_next_noon">
-                  <div class="entity-name">Sun Next noon</div>
-                  <div class="entity-state">2026-08-10T18:32:27+00:00</div>
-                </div>
-                <div class="card" data-entity-id="sensor.sun_next_rising">
-                  <div class="entity-name">Sun Next rising</div>
-                  <div class="entity-state">2026-08-10T11:32:35+00:00</div>
-                </div>
-                <div class="card" data-entity-id="sensor.sun_next_setting">
-                  <div class="entity-name">Sun Next setting</div>
-                  <div class="entity-state">2026-08-10T01:32:43+00:00</div>
-                </div>
-                <div class="card" data-entity-id="sensor.hobeian_zg_204zx_temperature">
-                  <div class="entity-name">Temp</div>
-                  <div class="entity-state">69.44 °F</div>
-                </div>
-                <div class="card" data-entity-id="sensor.hobeian_zg_204zx_temperature_2">
-                  <div class="entity-name">Temp</div>
-                  <div class="entity-state">72.86 °F</div>
-                </div>
-                <div class="card" data-entity-id="sensor.traviss_iphone_app_version">
-                  <div class="entity-name">Travis’s iPhone App Version</div>
-                  <div class="entity-state">2026.7.2</div>
-                </div>
-                <div class="card" data-entity-id="sensor.traviss_iphone_battery_level">
-                  <div class="entity-name">Travis’s iPhone Battery Level</div>
-                  <div class="entity-state">80 %</div>
-                </div>
-                <div class="card" data-entity-id="sensor.traviss_iphone_battery_state">
-                  <div class="entity-name">Travis’s iPhone Battery State</div>
-                  <div class="entity-state">Not Charging</div>
-                </div>
-                <div class="card" data-entity-id="sensor.traviss_iphone_location_permission">
-                  <div class="entity-name">Travis’s iPhone Location permission</div>
-                  <div class="entity-state">Authorized Always</div>
-                </div>
-                <div class="card" data-entity-id="sensor.traviss_iphone_watch_battery_level">
-                  <div class="entity-name">Travis’s iPhone Watch Battery Level</div>
-                  <div class="entity-state">100 %</div>
-                </div>
-                <div class="card" data-entity-id="sensor.traviss_iphone_watch_battery_state">
-                  <div class="entity-name">Travis’s iPhone Watch Battery State</div>
-                  <div class="entity-state">Full</div>
-                </div>
-                <div class="card" data-entity-id="sensor.downstairs_battery">
-                  <div class="entity-name">backyard Battery</div>
-                  <div class="entity-state">100 %</div>
-                </div>
-                <div class="card" data-entity-id="sensor.downstairs_last_activity">
-                  <div class="entity-name">backyard Last activity</div>
-                  <div class="entity-state">2026-08-09T06:17:33+00:00</div>
-                </div>
-                <div class="card" data-entity-id="sensor.ipad_app_version">
-                  <div class="entity-name">iPad App Version</div>
-                  <div class="entity-state">2026.7.3</div>
-                </div>
-                <div class="card" data-entity-id="sensor.ipad_battery_level">
-                  <div class="entity-name">iPad Battery Level</div>
-                  <div class="entity-state">100 %</div>
-                </div>
-                <div class="card" data-entity-id="sensor.ipad_battery_state">
-                  <div class="entity-name">iPad Battery State</div>
-                  <div class="entity-state">Full</div>
-                </div>
-                <div class="card" data-entity-id="sensor.ipad_kiosk_brightness">
-                  <div class="entity-name">iPad Kiosk Brightness</div>
-                  <div class="entity-state">5</div>
-                </div>
-                <div class="card" data-entity-id="sensor.ipad_kiosk_volume">
-                  <div class="entity-name">iPad Kiosk Volume</div>
-                  <div class="entity-state">30</div>
-                </div>
-                <div class="card" data-entity-id="sensor.ipad_location_permission">
-                  <div class="entity-name">iPad Location permission</div>
-                  <div class="entity-state">Authorized Always</div>
-                </div>
-                <div class="card" data-entity-id="sensor.pooper_last_seen">
-                  <div class="entity-name">pooper Last seen</div>
-                  <div class="entity-state">2026-08-09T18:39:04+00:00</div>
-                </div>
-                <div class="card" data-entity-id="sensor.pooper_sleep_mode_end_time">
-                  <div class="entity-name">pooper Sleep mode end time</div>
-                  <div class="entity-state">2026-08-09T11:33:00+00:00</div>
-                </div>
-                <div class="card" data-entity-id="sensor.pooper_sleep_mode_start_time">
-                  <div class="entity-name">pooper Sleep mode start time</div>
-                  <div class="entity-state">2026-08-10T03:33:00+00:00</div>
-                </div>
-                <div class="card" data-entity-id="sensor.pooper_status_code">
-                  <div class="entity-name">pooper Status code</div>
-                  <div class="entity-state">dfs</div>
-                </div>
-                <div class="card" data-entity-id="sensor.pooper_waste_drawer">
-                  <div class="entity-name">pooper Waste drawer</div>
-                  <div class="entity-state">100.0 %</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Binary Sensor</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="binary_sensor.exos_router_wan_status">
-                  <div class="entity-name">EXOS router WAN status</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card" data-entity-id="binary_sensor.hobeian_zg_204zx">
-                  <div class="entity-name">Presence</div>
-                  <div class="entity-state">off</div>
-                </div>
-                <div class="card" data-entity-id="binary_sensor.hobeian_zg_204zx_2">
-                  <div class="entity-name">Presence</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card" data-entity-id="binary_sensor.raspberry_pi_power_status">
-                  <div class="entity-name">Raspberry Pi Power status</div>
-                  <div class="entity-state">off</div>
-                </div>
-                <div class="card" data-entity-id="binary_sensor.ipad_kiosk_mode">
-                  <div class="entity-name">iPad Kiosk Mode</div>
-                  <div class="entity-state">on</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Scene</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="scene.all_lights_off">
-                  <div class="entity-name">All lights off</div>
-                  <div class="entity-state">2026-08-05T22:20:10.520349+00:00</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Script</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="script.all_lights_off">
-                  <div class="entity-name">All lights off</div>
-                  <div class="entity-state">off</div>
-                </div>
-                <div class="card" data-entity-id="script.focus_mode">
-                  <div class="entity-name">Focus mode</div>
-                  <div class="entity-state">off</div>
-                </div>
-                <div class="card" data-entity-id="script.goodnight">
-                  <div class="entity-name">Goodnight</div>
-                  <div class="entity-state">off</div>
-                </div>
-                <div class="card" data-entity-id="script.living_room_lights_off">
-                  <div class="entity-name">Living room lights off</div>
-                  <div class="entity-state">off</div>
-                </div>
-                <div class="card" data-entity-id="script.living_room_lights_on">
-                  <div class="entity-name">Living room lights on</div>
-                  <div class="entity-state">off</div>
-                </div>
-                <div class="card" data-entity-id="script.movie_mode">
-                  <div class="entity-name">Movie mode</div>
-                  <div class="entity-state">off</div>
-                </div>
-                <div class="card" data-entity-id="script.pause_all_media">
-                  <div class="entity-name">Pause all media</div>
-                  <div class="entity-state">off</div>
-                </div>
-                <div class="card" data-entity-id="script.relax_mode">
-                  <div class="entity-name">Relax mode</div>
-                  <div class="entity-state">off</div>
-                </div>
-                <div class="card" data-entity-id="script.restart_ha">
-                  <div class="entity-name">Restart Home Assistant</div>
-                  <div class="entity-state">off</div>
-                </div>
-                <div class="card" data-entity-id="script.travis_office_lights_off">
-                  <div class="entity-name">Travis Office lights off</div>
-                  <div class="entity-state">off</div>
-                </div>
-                <div class="card" data-entity-id="script.travis_office_lights_on">
-                  <div class="entity-name">Travis Office lights on</div>
-                  <div class="entity-state">off</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Weather</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="weather.forecast_home">
-                  <div class="entity-name">Forecast Home</div>
-                  <div class="entity-state">sunny</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Number</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_on_level">
-                  <div class="entity-name">Ceiling fan light 1 On level</div>
-                  <div class="entity-state">255</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_on_off_transition_time">
-                  <div class="entity-name">Ceiling fan light 1 On/Off transition time</div>
-                  <div class="entity-state">3</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_power_on_level">
-                  <div class="entity-name">Ceiling fan light 1 Power-on level</div>
-                  <div class="entity-state">255</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_start_up_color_temperature">
-                  <div class="entity-name">Ceiling fan light 1 Start-up color temperature</div>
-                  <div class="entity-state">65535</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_on_level_2">
-                  <div class="entity-name">Ceiling fan light 2 On level</div>
-                  <div class="entity-state">255</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_on_off_transition_time_2">
-                  <div class="entity-name">Ceiling fan light 2 On/Off transition time</div>
-                  <div class="entity-state">3</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_power_on_level_2">
-                  <div class="entity-name">Ceiling fan light 2 Power-on level</div>
-                  <div class="entity-state">255</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_start_up_color_temperature_2">
-                  <div class="entity-name">Ceiling fan light 2 Start-up color temperature</div>
-                  <div class="entity-state">65535</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_on_level_3">
-                  <div class="entity-name">Ceiling fan light 3 On level</div>
-                  <div class="entity-state">255</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_on_off_transition_time_3">
-                  <div class="entity-name">Ceiling fan light 3 On/Off transition time</div>
-                  <div class="entity-state">3</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_power_on_level_3">
-                  <div class="entity-name">Ceiling fan light 3 Power-on level</div>
-                  <div class="entity-state">255</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_start_up_color_temperature_3">
-                  <div class="entity-name">Ceiling fan light 3 Start-up color temperature</div>
-                  <div class="entity-state">65535</div>
-                </div>
-                <div class="card" data-entity-id="number.downstairs_volume">
-                  <div class="entity-name">Downstairs Volume</div>
-                  <div class="entity-state">9.0</div>
-                </div>
-                <div class="card" data-entity-id="number.front_door_volume">
-                  <div class="entity-name">Front Door Volume</div>
-                  <div class="entity-state">8.0</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_on_level_4">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z On level</div>
-                  <div class="entity-state">255</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_on_level_5">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z On level</div>
-                  <div class="entity-state">255</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_on_level_6">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z On level</div>
-                  <div class="entity-state">255</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_on_off_transition_time_4">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z On/Off transition time</div>
-                  <div class="entity-state">3</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_on_off_transition_time_5">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z On/Off transition time</div>
-                  <div class="entity-state">3</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_on_off_transition_time_6">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z On/Off transition time</div>
-                  <div class="entity-state">3</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_power_on_level_4">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z Power-on level</div>
-                  <div class="entity-state">255</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_power_on_level_5">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z Power-on level</div>
-                  <div class="entity-state">255</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_power_on_level_6">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z Power-on level</div>
-                  <div class="entity-state">255</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_start_up_color_temperature_4">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z Start-up color temperature</div>
-                  <div class="entity-state">65535</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_start_up_color_temperature_5">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z Start-up color temperature</div>
-                  <div class="entity-state">65535</div>
-                </div>
-                <div class="card" data-entity-id="number.third_reality_inc_3rcb01057z_start_up_color_temperature_6">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z Start-up color temperature</div>
-                  <div class="entity-state">65535</div>
-                </div>
-                <div class="card" data-entity-id="number.downstairs_volume_2">
-                  <div class="entity-name">backyard Volume</div>
-                  <div class="entity-state">11.0</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Select</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="select.third_reality_inc_3rcb01057z_power_on_behavior">
-                  <div class="entity-name">Ceiling fan light 1 Power-on behavior</div>
-                  <div class="entity-state">On</div>
-                </div>
-                <div class="card" data-entity-id="select.third_reality_inc_3rcb01057z_power_on_behavior_2">
-                  <div class="entity-name">Ceiling fan light 2 Power-on behavior</div>
-                  <div class="entity-state">On</div>
-                </div>
-                <div class="card" data-entity-id="select.third_reality_inc_3rcb01057z_power_on_behavior_3">
-                  <div class="entity-name">Ceiling fan light 3 Power-on behavior</div>
-                  <div class="entity-state">On</div>
-                </div>
-                <div class="card" data-entity-id="select.third_reality_inc_3rcb01057z_power_on_behavior_4">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z Power-on behavior</div>
-                  <div class="entity-state">On</div>
-                </div>
-                <div class="card" data-entity-id="select.third_reality_inc_3rcb01057z_power_on_behavior_5">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z Power-on behavior</div>
-                  <div class="entity-state">On</div>
-                </div>
-                <div class="card" data-entity-id="select.third_reality_inc_3rcb01057z_power_on_behavior_6">
-                  <div class="entity-name">Third Reality, Inc 3RCB01057Z Power-on behavior</div>
-                  <div class="entity-state">On</div>
-                </div>
-                <div class="card" data-entity-id="select.pooper_clean_cycle_wait_time_minutes">
-                  <div class="entity-name">pooper Clean cycle wait time minutes</div>
-                  <div class="entity-state">7 min</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Automation</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="automation.bambu_p1s_uno_print_error">
-                  <div class="entity-name">Bambu P1S UNO print error</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card" data-entity-id="automation.bambu_p1s_uno_print_finished">
-                  <div class="entity-name">Bambu P1S UNO print finished</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card" data-entity-id="automation.bambu_p1s_print_error">
-                  <div class="entity-name">Bambu P1S print error</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card" data-entity-id="automation.bambu_p1s_print_finished">
-                  <div class="entity-name">Bambu P1S print finished</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card" data-entity-id="automation.cleanup_old_backups">
-                  <div class="entity-name">Cleanup old backups</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card" data-entity-id="automation.disk_space_alert">
-                  <div class="entity-name">Disk space alert</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card" data-entity-id="automation.low_battery_alert">
-                  <div class="entity-name">Low battery alert</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card" data-entity-id="automation.wall_panel_day_backlight">
-                  <div class="entity-name">Wall panel day backlight</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card" data-entity-id="automation.wall_panel_night_backlight">
-                  <div class="entity-name">Wall panel night backlight</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card" data-entity-id="automation.wall_panel_push_pages_on_startup">
-                  <div class="entity-name">Wall panel push pages on startup</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card" data-entity-id="automation.weekly_full_backup">
-                  <div class="entity-name">Weekly full backup</div>
-                  <div class="entity-state">on</div>
-                </div>
-                <div class="card" data-entity-id="automation.backyard_night_motion">
-                  <div class="entity-name">backyard night motion</div>
-                  <div class="entity-state">on</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Conversation</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="conversation.home_assistant">
-                  <div class="entity-name">Home Assistant</div>
-                  <div class="entity-state">2026-08-07T15:17:11.408504+00:00</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Event</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="event.front_door_ding">
-                  <div class="entity-name">Front Door Ding</div>
-                  <div class="entity-state">2026-08-01T04:10:54.093+00:00</div>
-                </div>
-                <div class="card" data-entity-id="event.front_door_motion">
-                  <div class="entity-name">Front Door Motion</div>
-                  <div class="entity-state">2026-08-05T12:13:11.772+00:00</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Input Boolean</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="input_boolean.voice_mute">
-                  <div class="entity-name">Voice mute</div>
-                  <div class="entity-state">off</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Notify</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="notify.traviss_iphone">
-                  <div class="entity-name">Travis’s iPhone</div>
-                  <div class="entity-state">2026-08-05T21:47:41.492747+00:00</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Siren</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="siren.downstairs_siren">
-                  <div class="entity-name">backyard Siren</div>
-                  <div class="entity-state">off</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Sun</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="sun.sun">
-                  <div class="entity-name">Sun</div>
-                  <div class="entity-state">above_horizon</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Time</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="time.pooper_sleep_mode_start_time">
-                  <div class="entity-name">pooper Sleep mode start time</div>
-                  <div class="entity-state">22:33:00</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Todo</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="todo.shopping_list">
-                  <div class="entity-name">Shopping List</div>
-                  <div class="entity-state">0</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Tts</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="tts.google_translate_en_com">
-                  <div class="entity-name">Google Translate en com</div>
-                  <div class="entity-state">2026-07-20T22:58:34.921101+00:00</div>
-                </div>
-                <div class="card" data-entity-id="tts.piper">
-                  <div class="entity-name">piper</div>
-                  <div class="entity-state">2026-08-07T14:29:57.521805+00:00</div>
-                </div>
-        </div>
-      </section>
-      <section>
-        <h2>Zone</h2>
-        <div class="grid">
-          
-                <div class="card" data-entity-id="zone.home">
-                  <div class="entity-name">Home</div>
-                  <div class="entity-state">2</div>
-                </div>
-        </div>
-      </section>
+<div id="app">
+  <div id="home-screen" class="screen" style="display:none;flex:1;flex-direction:column;gap:14px;"></div>
+  <div id="control-screen" class="screen" style="display:none;flex:1;flex-direction:column;gap:14px;">CONTROL HUB</div>
+  <div id="status-screen" class="screen" style="display:none;flex:1;flex-direction:column;gap:14px;">STATUS MONITOR</div>
+  <div id="dock" style="display:flex;gap:14px;height:70px;flex-shrink:0;"></div>
+</div>
 <script>
 const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.host + '/api/websocket';
 let ws, token = localStorage.getItem('ha_token');
@@ -893,12 +245,81 @@ function setBrightness(entityId, pct) {
   ws.send(JSON.stringify({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, brightness: value } }));
 }
 
-// Apply initial on-state styling
-document.querySelectorAll('.actionable').forEach(el => {
-  const state = el.querySelector('.entity-state').textContent.trim();
-  const on = state === 'on' || state === 'playing' || state === 'open' || state === 'home';
-  el.classList.toggle('on', on);
-});
+function getPresenceEntities() {
+  const homeSection = (config.sections && config.sections.home && config.sections.home.entities) || [];
+  return homeSection.filter(id => {
+    const domain = id.split(".")[0];
+    return domain === "person" || domain === "device_tracker";
+  });
+}
+
+function getAlerts() {
+  const alerts = [];
+  const sec = config.sections && config.sections.security ? config.sections.security.entities : [];
+  for (const id of sec) {
+    const state = states[id];
+    if (!state) continue;
+    const domain = id.split(".")[0];
+    if (domain === "binary_sensor" && isActive(state.state)) {
+      alerts.push(`${friendlyName(id)} detected`);
+    }
+    if (domain === "sensor" && state.attributes && state.attributes.device_class === "battery") {
+      const val = parseFloat(state.state);
+      if (!isNaN(val) && val < 20) alerts.push(`${friendlyName(id)} low`);
+    }
+  }
+  // Add pending updates
+  const sys = config.sections && config.sections.system ? config.sections.system.entities : [];
+  for (const id of sys) {
+    if (id.startsWith("update.") && states[id] && states[id].state === "on") {
+      alerts.push(`${friendlyName(id)} available`);
+    }
+  }
+  return alerts;
+}
+
+function renderHomeScreen() {
+  const weatherId = config.entities.weather || "weather.forecast_home";
+  const weather = states[weatherId];
+  const temp = weather && weather.attributes && weather.attributes.temperature != null ? `${weather.attributes.temperature}°` : "--";
+  const humidity = weather && weather.attributes && weather.attributes.humidity != null ? `${weather.attributes.humidity}%` : "--";
+  const condition = weather ? weather.state.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "--";
+  const icon = weatherIcon(weather ? weather.state : "");
+
+  const presence = getPresenceEntities().map(id => {
+    const state = states[id];
+    const home = state ? isActive(state.state) : false;
+    return `<div style="display:flex;align-items:center;gap:10px;font-family:monospace;font-size:1.1rem;">
+      ${renderStatusLed(home ? "home" : "off")}
+      <span>${escapeHtml(friendlyName(id))}</span>
+      <span style="color:${home ? 'var(--green)' : 'var(--text-muted)'}">${home ? "HOME" : "AWAY"}</span>
+    </div>`;
+  }).join("");
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  const dateStr = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
+
+  const leftCol = `
+    <div style="display:flex;flex-direction:column;justify-content:center;height:100%;">
+      <div style="font-family:monospace;font-size:clamp(4rem,10vw,7rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);">${escapeHtml(timeStr)}</div>
+      <div style="font-family:monospace;font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
+    </div>
+    ${renderTerminalPanel("WEATHER", `<div style="display:flex;align-items:center;gap:14px;"><div style="font-size:2.5rem;">${icon}</div><div><div style="font-size:1.8rem;color:var(--green);">${temp}</div><div style="color:var(--text-muted);font-family:monospace;">${escapeHtml(condition)} · HUM ${humidity}</div></div></div>`)}
+  `;
+
+  const main = `
+    <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:14px;flex:1;min-height:0;">
+      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;">${leftCol}</div>
+      <div style="min-height:0;">${renderRadarFrame()}</div>
+    </div>
+    <div>${renderAlertTicker(getAlerts())}</div>
+    <div>${renderTerminalPanel("PRESENCE", `<div style="display:flex;gap:24px;flex-wrap:wrap;">${presence}</div>`)}</div>
+  `;
+
+  document.getElementById("home-screen").innerHTML = main;
+}
+
 connect();
 </script>
 </body>
