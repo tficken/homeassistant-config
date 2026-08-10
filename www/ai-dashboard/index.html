@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Home Assistant Wall Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" />
 <style>
 :root {
   --bg: #030503;
@@ -15,8 +18,9 @@
   --text-muted: #5a7a5a;
   --amber: #ffae00;
   --danger: #ff3333;
-  --panel-bg: rgba(10, 20, 10, 0.85);
-  --border: rgba(20, 254, 23, 0.25);
+  --font-mono: 'Share Tech Mono', monospace;
+  --panel-bg: rgba(8, 18, 8, 0.92);
+  --border: rgba(20, 254, 23, 0.45);
 }
 * { box-sizing: border-box; }
 html, body {
@@ -122,6 +126,27 @@ input, select {
   padding: 8px 10px; color: var(--text); font-size: 0.9rem;
 }
 input[type="range"] { accent-color: var(--green); }
+.leaflet-container { background: #000; }
+#radar-map { width: 100%; height: 100%; position: relative; }
+@keyframes clockPulse {
+  0%, 100% { text-shadow: 0 0 24px rgba(20,254,23,0.45); opacity: 1; }
+  50% { text-shadow: 0 0 48px rgba(20,254,23,0.85); opacity: 0.82; }
+}
+#clock { animation: clockPulse 2.2s infinite ease-in-out; }
+.radar-timestamp {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 500;
+  background: rgba(0,0,0,0.6);
+  color: var(--green);
+  font-family: monospace;
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  pointer-events: none;
+}
 </style>
 </head>
 <body>
@@ -134,6 +159,7 @@ input[type="range"] { accent-color: var(--green); }
 <div id="app">
   <div id="home-screen" class="screen active"></div>
   <div id="control-screen" class="screen">CONTROL HUB</div>
+  <div id="security-screen" class="screen">SECURITY</div>
   <div id="status-screen" class="screen">STATUS MONITOR</div>
   <div id="dock" style="display:flex;gap:14px;height:70px;flex-shrink:0;"></div>
 </div>
@@ -243,6 +269,10 @@ function friendlyName(entityId) {
   return entityId.split(".").pop().replace(/_/g, " ");
 }
 
+function entityArea(entityId) {
+  return (window.HA_AREAS && window.HA_AREAS[entityId]) || "";
+}
+
 function iconFor(entityId, state) {
   const domain = entityId.split(".")[0];
   const s = (state || "").toLowerCase();
@@ -348,6 +378,10 @@ async function fetchRegistry() {
 
 async function fetchHAConfig() {
   if (haConfig) return haConfig;
+  if (window.HA_CONFIG) {
+    haConfig = window.HA_CONFIG;
+    return haConfig;
+  }
   haConfig = await apiFetch("/api/config");
   return haConfig;
 }
@@ -406,9 +440,30 @@ function renderMetricCard(entityId) {
   </div>`;
 }
 
+function renderEnvMetric(entityId) {
+  const state = states[entityId];
+  if (!state) return "";
+  const unit = state.attributes && state.attributes.unit_of_measurement ? state.attributes.unit_of_measurement : "";
+  const deviceClass = state.attributes && state.attributes.device_class;
+  const labelMap = { temperature: "TEMP", humidity: "HUM", illuminance: "LIGHT" };
+  const label = labelMap[deviceClass] || (deviceClass ? deviceClass.toUpperCase() : entityId.split("_").pop().toUpperCase());
+  return `<div class="terminal-panel" style="text-align:center;padding:10px 4px;" data-entity-id="${entityId}">
+    <div style="font-family:monospace;font-size:1.5rem;color:var(--green);">${escapeHtml(state.state)}<span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(unit)}</span></div>
+    <div style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">${escapeHtml(label)}</div>
+  </div>`;
+}
+
 function renderCameraFeed(entityId) {
   const name = friendlyName(entityId);
-  const src = window.HA_INTEGRATION_PROXY ? `/api/camera_proxy_stream/${entityId}` : `/api/camera_proxy_stream/${entityId}?token=${encodeURIComponent(token)}`;
+  const state = states[entityId];
+  let src = "";
+  if (state && state.attributes && state.attributes.entity_picture) {
+    src = state.attributes.entity_picture;
+  } else if (window.HA_INTEGRATION_PROXY) {
+    src = `/api/camera_proxy_stream/${entityId}`;
+  } else {
+    src = `/api/camera_proxy_stream/${entityId}?token=${encodeURIComponent(token)}`;
+  }
   return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
     <div class="panel-title">${escapeHtml(name)}</div>
     <div class="panel-body" style="padding:0;">
@@ -419,13 +474,63 @@ function renderCameraFeed(entityId) {
 
 function renderRadarFrame() {
   if (!haConfig || haConfig.latitude == null) return `<div class="terminal-panel"><div class="panel-body" style="color:var(--text-muted);">RADAR UNAVAILABLE</div></div>`;
-  const src = `https://www.rainviewer.com/api.html?lat=${haConfig.latitude}&lon=${haConfig.longitude}&z=8&r=true&c=1&d=true`;
   return `<div class="terminal-panel" style="height:100%;display:flex;flex-direction:column;">
     <div class="panel-title">WEATHER RADAR</div>
     <div class="panel-body" style="flex:1;padding:0;min-height:0;">
-      <iframe class="radar-frame" src="${src}" style="width:100%;height:100%;border:none;display:block;min-height:200px;" loading="lazy" allow="fullscreen"></iframe>
+      <div id="radar-map">INITIALIZING RADAR...</div>
     </div>
   </div>`;
+}
+
+let radarMap = null;
+let radarAnimInterval = null;
+async function initRadarMap() {
+  const el = document.getElementById("radar-map");
+  if (!el || !window.L || !haConfig) return;
+  if (radarMap) { radarMap.remove(); radarMap = null; }
+  if (radarAnimInterval) { clearInterval(radarAnimInterval); radarAnimInterval = null; }
+  try {
+    const res = await fetch("https://api.rainviewer.com/public/weather-maps.json", { cache: "no-store" });
+    const data = await res.json();
+    const frames = data.radar && data.radar.past;
+    if (!frames || !frames.length) throw new Error("no radar frames");
+    const map = window.L.map(el, { zoomControl: false, attributionControl: false, maxZoom: 7 }).setView(
+      [haConfig.latitude, haConfig.longitude], 7
+    );
+    window.L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+      { subdomains: "abcd", maxZoom: 19 }
+    ).addTo(map);
+
+    // Use the last 8 frames (~80 min) to keep tile count reasonable.
+    const useFrames = frames.slice(-8);
+    const layers = useFrames.map(f =>
+      window.L.tileLayer(`${data.host}${f.path}/256/{z}/{x}/{y}/7/1_1.png`, {
+        opacity: 0, maxZoom: 7, minZoom: 3
+      }).addTo(map)
+    );
+
+    const timestamp = document.createElement("div");
+    timestamp.className = "radar-timestamp";
+    el.appendChild(timestamp);
+
+    let idx = layers.length - 1;
+    layers[idx].setOpacity(0.65);
+    timestamp.textContent = new Date(useFrames[idx].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+    radarAnimInterval = setInterval(() => {
+      layers[idx].setOpacity(0);
+      idx = (idx + 1) % layers.length;
+      layers[idx].setOpacity(0.65);
+      timestamp.textContent = new Date(useFrames[idx].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }, 700);
+
+    setTimeout(() => map.invalidateSize(), 150);
+    radarMap = map;
+  } catch (e) {
+    console.error("radar init failed", e);
+    el.innerHTML = '<div style="color:var(--text-muted);padding:14px;">RADAR OFFLINE</div>';
+  }
 }
 
 function renderMediaCard(entityId) {
@@ -530,6 +635,7 @@ function renderHomeScreen() {
   `;
 
   document.getElementById("home-screen").innerHTML = main;
+  initRadarMap();
 }
 
 function renderControlScreen() {
@@ -560,14 +666,27 @@ function renderControlScreen() {
 }
 
 function renderStatusScreen() {
-  const cameras = (config.sections && config.sections.cameras && config.sections.cameras.entities) || [];
-  const security = (config.sections && config.sections.security && config.sections.security.entities) || [];
   const environment = (config.sections && config.sections.environment && config.sections.environment.entities) || [];
   const system = (config.sections && config.sections.system && config.sections.system.entities) || [];
 
-  const cameraFeeds = cameras.map(id => renderCameraFeed(id));
-  const securityMetrics = security.map(id => renderMetricCard(id)).join("");
-  const envMetrics = environment.map(id => renderMetricCard(id)).join("");
+  const envGroups = {};
+  const envOrder = [];
+  for (const id of environment) {
+    const area = entityArea(id) || "Other";
+    if (!envGroups[area]) {
+      envGroups[area] = [];
+      envOrder.push(area);
+    }
+    envGroups[area].push(id);
+  }
+  const envMetrics = envOrder.map(area => {
+    const metrics = envGroups[area].map(id => renderEnvMetric(id)).join("");
+    return `<div style="margin-bottom:12px;">
+      <div style="font-family:monospace;font-size:0.8rem;color:var(--green);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">${escapeHtml(area)}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">${metrics}</div>
+    </div>`;
+  }).join("");
+
   const sysMetrics = system.filter(id => id.startsWith("sensor.")).map(id => renderMetricCard(id)).join("");
 
   const vacuumIds = system.filter(id => id.startsWith("vacuum."));
@@ -603,16 +722,33 @@ function renderStatusScreen() {
 
   const main = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0;overflow:hidden;">
-      <div style="min-height:0;overflow:hidden;">${cameraFeeds[0] || ""}</div>
-      <div style="min-height:0;overflow:hidden;">${cameraFeeds[1] || ""}</div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;min-height:0;overflow:hidden;">
-      <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel("SECURITY", securityMetrics)}</div>
       <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel("ENVIRONMENT", envMetrics)}</div>
       <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel("SYSTEM", sysMetrics + vacuumCards + printerCards)}</div>
     </div>
   `;
   document.getElementById("status-screen").innerHTML = main;
+}
+
+function renderSecurityScreen() {
+  const cameras = (config.sections && config.sections.cameras && config.sections.cameras.entities) || [];
+  const security = (config.sections && config.sections.security && config.sections.security.entities) || [];
+
+  const cameraFeeds = cameras.map(id => renderCameraFeed(id)).join("");
+  const securityCards = security.map(id => {
+    const domain = id.split(".")[0];
+    if (domain === "switch" || domain === "siren" || domain === "button" || domain === "script") {
+      return renderSceneButton(id);
+    }
+    return renderMetricCard(id);
+  }).join("");
+
+  const main = `
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;min-height:0;overflow:hidden;">
+      ${cameraFeeds}
+    </div>
+    <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel("DOOR & MOTION STATUS", `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;">${securityCards}</div>`)}</div>
+  `;
+  document.getElementById("security-screen").innerHTML = main;
 }
 
 function showScreen(name) {
@@ -623,6 +759,7 @@ function showScreen(name) {
   currentScreen = name;
   if (name === "home") renderHomeScreen();
   else if (name === "control") renderControlScreen();
+  else if (name === "security") renderSecurityScreen();
   else if (name === "status") renderStatusScreen();
 }
 
@@ -634,9 +771,11 @@ function entityBelongsToScreen(entityId, screen) {
       ...((config.sections.quickControls && config.sections.quickControls.entities) || []),
       config.entities.mediaPlayer
     ],
-    status: [
+    security: [
       ...((config.sections.cameras && config.sections.cameras.entities) || []),
-      ...((config.sections.security && config.sections.security.entities) || []),
+      ...((config.sections.security && config.sections.security.entities) || [])
+    ],
+    status: [
       ...((config.sections.environment && config.sections.environment.entities) || []),
       ...((config.sections.system && config.sections.system.entities) || [])
     ]
@@ -655,12 +794,14 @@ function updateCard(state) {
   if (!entityBelongsToScreen(state.entity_id, currentScreen)) return;
   if (currentScreen === "home") renderHomeScreen();
   else if (currentScreen === "control") renderControlScreen();
+  else if (currentScreen === "security") renderSecurityScreen();
   else if (currentScreen === "status") renderStatusScreen();
 }
 
 function renderAll() {
   if (currentScreen === "home") renderHomeScreen();
   else if (currentScreen === "control") renderControlScreen();
+  else if (currentScreen === "security") renderSecurityScreen();
   else if (currentScreen === "status") renderStatusScreen();
   updateClock();
 }
@@ -840,6 +981,7 @@ async function init() {
   document.getElementById("dock").innerHTML =
     renderBottomButton("HOME", "home") +
     renderBottomButton("CONTROL HUB", "control") +
+    renderBottomButton("SECURITY", "security") +
     renderBottomButton("STATUS MONITOR", "status");
   showScreen("home");
   if (window.HA_INTEGRATION_PROXY) {
