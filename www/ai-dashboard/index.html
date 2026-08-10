@@ -280,6 +280,30 @@ let haConfig = null;
 let forecastCache = { daily: [], fetchedAt: null };
 let currentScreen = "home";
 
+async function apiFetch(path) {
+  const headers = token ? { "Authorization": `Bearer ${token}` } : {};
+  try {
+    const r = await fetch(path, { headers });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    console.error("apiFetch failed", path, e);
+    return null;
+  }
+}
+
+async function apiCall(method, path, body) {
+  const headers = token ? { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+  try {
+    const r = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    console.error("apiCall failed", method, path, e);
+    return null;
+  }
+}
+
 async function refreshForecast() {
   const weatherId = config.entities.weather || "weather.forecast_home";
   const state = states[weatherId];
@@ -287,20 +311,19 @@ async function refreshForecast() {
   if (state && state.attributes && Array.isArray(state.attributes.forecast)) {
     forecastCache.daily = state.attributes.forecast.slice(0, 5);
     forecastCache.fetchedAt = Date.now();
+    if (currentScreen === "home") renderHomeScreen();
     return;
   }
   // Primary: HA service call
-  const res = await apiCall("POST", "/api/services/weather/get_forecasts", {
+  const res = await apiCall("POST", "/api/services/weather/get_forecasts?return_response=true", {
     entity_id: weatherId,
     type: "daily"
   });
-  if (res && Array.isArray(res)) {
-    const entry = res.find(r => r.entity_id === weatherId);
-    if (entry && entry.forecast && Array.isArray(entry.forecast.forecast)) {
-      forecastCache.daily = entry.forecast.forecast.slice(0, 5);
-      forecastCache.fetchedAt = Date.now();
-      return;
-    }
+  if (res && res.service_response && res.service_response[weatherId] && Array.isArray(res.service_response[weatherId].forecast)) {
+    forecastCache.daily = res.service_response[weatherId].forecast.slice(0, 5);
+    forecastCache.fetchedAt = Date.now();
+    if (currentScreen === "home") renderHomeScreen();
+    return;
   }
   forecastCache.daily = [];
 }
@@ -441,30 +464,6 @@ function setBrightness(entityId, pct) {
   if (!ws) return;
   const value = Math.round((parseInt(pct, 10) / 100) * 255);
   ws.send(JSON.stringify({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, brightness: value } }));
-}
-
-async function apiFetch(path) {
-  const headers = token ? { "Authorization": `Bearer ${token}` } : {};
-  try {
-    const r = await fetch(path, { headers });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch (e) {
-    console.error("apiFetch failed", path, e);
-    return null;
-  }
-}
-
-async function apiCall(method, path, body) {
-  const headers = token ? { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
-  try {
-    const r = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch (e) {
-    console.error("apiCall failed", method, path, e);
-    return null;
-  }
 }
 
 async function fetchRegistry() {
@@ -620,13 +619,13 @@ async function initRadarMap() {
 
     let idx = layers.length - 1;
     layers[idx].setOpacity(0.65);
-    timestamp.textContent = "RADAR UPDATED " + new Date(useFrames[idx].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    timestamp.textContent = "RADAR UPDATED " + new Date(useFrames[useFrames.length - 1].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
     radarAnimInterval = setInterval(() => {
       layers[idx].setOpacity(0);
       idx = (idx + 1) % layers.length;
       layers[idx].setOpacity(0.65);
-      timestamp.textContent = "RADAR UPDATED " + new Date(useFrames[idx].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      timestamp.textContent = "RADAR UPDATED " + new Date(useFrames[useFrames.length - 1].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     }, 700);
 
     setTimeout(() => map.invalidateSize(), 150);
