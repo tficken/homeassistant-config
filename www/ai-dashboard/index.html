@@ -546,6 +546,12 @@ function renderAlertTicker(alerts) {
   return `<div class="terminal-panel"><div class="panel-body">${items}</div></div>`;
 }
 
+function renderAlertBanner(alerts) {
+  if (!alerts || !alerts.length) return "";
+  const items = alerts.slice(0, 3).map(a => `<span style="margin-right:18px;">! ${escapeHtml(a)}</span>`).join("");
+  return `<div style="width:100%;background:rgba(255,174,0,0.12);border:1px solid var(--amber);color:var(--amber);font-family:var(--font-mono);padding:10px 14px;letter-spacing:0.05em;">${items}</div>`;
+}
+
 function renderSceneButton(entityId) {
   const name = friendlyName(entityId);
   return `<button class="scene-btn" onclick="toggleEntity('${entityId}')">${escapeHtml(name)}</button>`;
@@ -795,23 +801,26 @@ function renderHomeScreen() {
 
   const now = new Date();
   const timeStr = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: !config.layout.clock24h });
+  const timeStrMarked = escapeHtml(timeStr).replace(/:/g, '<span class="colon">:</span>');
   const dateStr = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
 
-  const leftCol = `
-    <div style="display:flex;flex-direction:column;justify-content:center;height:100%;">
-      <div id="clock" style="font-family:var(--font-mono);font-size:clamp(4rem,10vw,7rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);">${escapeHtml(timeStr)}</div>
-      <div id="date" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
-    </div>
-    ${weatherPanel}
-  `;
-
   const main = `
-    <div style="display:grid;grid-template-columns:1fr 1.4fr;gap:14px;flex:1;min-height:0;">
-      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;">${leftCol}</div>
-      <div style="min-height:0;">${renderRadarFrame()}</div>
+    ${renderAlertBanner(getAlerts())}
+    <div style="display:grid;grid-template-columns:0.9fr 1.2fr 1fr;gap:14px;flex:1;min-height:0;">
+      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;justify-content:center;">
+        <div style="display:flex;flex-direction:column;justify-content:center;height:100%;">
+          <div id="clock" style="font-family:var(--font-mono);font-size:clamp(4rem,9vw,6.5rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);">${timeStrMarked}</div>
+          <div id="date" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;">
+        ${weatherPanel}
+      </div>
+      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;">
+        <div style="flex:1;min-height:0;">${renderRadarFrame()}</div>
+        <div>${renderTerminalPanel("PRESENCE", `<div style="display:flex;flex-direction:column;gap:10px;">${presence}</div>`)}</div>
+      </div>
     </div>
-    <div>${renderAlertTicker(getAlerts())}</div>
-    <div><div style="display:flex;gap:14px;flex-wrap:wrap;">${presence}</div></div>
   `;
 
   document.getElementById("home-screen").innerHTML = main;
@@ -990,7 +999,10 @@ function updateClock() {
   const now = new Date();
   const opts = config.layout.clock24h ? { hour: "2-digit", minute: "2-digit", hour12: false } : { hour: "numeric", minute: "2-digit" };
   const el = document.getElementById("clock");
-  if (el) el.textContent = now.toLocaleTimeString([], opts);
+  if (el) {
+    const timeStr = now.toLocaleTimeString([], opts);
+    el.innerHTML = escapeHtml(timeStr).replace(/:/g, '<span class="colon">:</span>');
+  }
   const d = document.getElementById("date");
   if (d) d.textContent = now.toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" });
 }
