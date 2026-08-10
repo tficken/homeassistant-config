@@ -139,6 +139,12 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
   background: rgba(20, 254, 23, 0.05);
   box-shadow: inset 0 0 12px rgba(20, 254, 23, 0.25);
 }
+.bottom-btn.active-dock-btn {
+  border-color: rgba(20, 254, 23, 0.85);
+  box-shadow: 0 0 22px rgba(20, 254, 23, 0.35), inset 0 -3px 0 var(--green);
+  color: var(--green);
+  text-shadow: 0 0 10px var(--green);
+}
 .scene-btn {
   background: rgba(10, 20, 10, 0.85);
   border: 1px solid var(--border);
@@ -189,6 +195,22 @@ input[type="range"] { accent-color: var(--green); }
   50% { text-shadow: 0 0 48px rgba(20,254,23,0.85); opacity: 0.82; }
 }
 #clock { animation: clockPulse 2.2s infinite ease-in-out; }
+#clock .colon { animation: colonPulse 1.2s infinite ease-in-out; }
+@keyframes colonPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.offline-badge {
+  display: inline-block;
+  background: rgba(255, 51, 51, 0.18);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
 .radar-timestamp {
   position: absolute;
   top: 6px;
@@ -396,6 +418,16 @@ function iconFor(entityId, state) {
 
 function isActive(state) {
   return ["on","playing","open","home","heat","cool","auto","active","true","cleaning","docked","idle"].includes((state || "").toLowerCase());
+}
+
+function isUnavailable(state) {
+  if (!state) return true;
+  const s = String(state.state).toLowerCase();
+  return s === "unavailable" || s === "unknown";
+}
+
+function renderOfflineBadge() {
+  return `<span class="offline-badge">OFFLINE</span>`;
 }
 
 function isActionable(domain) {
