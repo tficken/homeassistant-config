@@ -151,7 +151,8 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
   border-radius: 2px;
   color: var(--green);
   font-family: var(--font-mono);
-  padding: 10px 12px;
+  padding: 14px 16px;
+  font-size: 1rem;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
@@ -567,7 +568,7 @@ function renderLightCard(entityId) {
       <div>${renderStatusLed(active ? "on" : "off")} <span style="font-family:var(--font-mono);">${escapeHtml(friendlyName(entityId))}</span></div>
       <div style="color:var(--text-muted);font-family:var(--font-mono);">${active ? "ON" : "OFF"}</div>
     </div>
-    ${active ? `<div class="panel-body" style="padding-top:0;"><input type="range" min="0" max="100" value="${pct}" style="width:100%;" onchange="setBrightness('${entityId}', this.value)" onclick="event.stopPropagation();"></div>` : ""}
+    ${active ? `<div class="panel-body" style="padding-top:0;"><input type="range" min="0" max="100" value="${pct}" style="width:100%;min-height:44px;" onchange="setBrightness('${entityId}', this.value)" onclick="event.stopPropagation();"></div>` : ""}
   </div>`;
 }
 
@@ -846,16 +847,16 @@ function renderControlScreen() {
   const quickButtons = scenes.slice(0, 2).map(id => renderSceneButton(id)).join("");
 
   const main = `
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;flex:1;min-height:0;">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:14px;flex:1;min-height:0;">
       <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
-        ${renderTerminalPanel("SCENES", `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">${sceneButtons}</div>`)}
+        ${renderTerminalPanel("SCENES", `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${sceneButtons}</div>`)}
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
         ${renderTerminalPanel("LIGHTS", lightCards || "<div style='color:var(--text-muted)'>NO LIGHTS</div>")}
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
         ${renderMediaCard(mediaId)}
-        ${renderTerminalPanel("QUICK", quickButtons)}
+        ${renderTerminalPanel("QUICK", `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${quickButtons}</div>`)}
       </div>
     </div>
   `;
