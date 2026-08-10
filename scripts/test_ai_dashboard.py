@@ -19,6 +19,21 @@ def test_css_foundation():
     assert not missing, f"Missing CSS foundation: {missing}"
 
 
+COMPONENT_FUNCS = [
+    "renderTerminalPanel", "renderStatusLed", "renderAlertTicker",
+    "renderSceneButton", "renderLightCard", "renderMetricCard",
+    "renderCameraFeed", "renderRadarFrame", "renderMediaCard", "renderBottomButton"
+]
+
+
+def test_component_functions_exist():
+    html = read_index()
+    missing = [f"function {fn}(" for fn in COMPONENT_FUNCS if f"function {fn}(" not in html]
+    assert not missing, f"Missing component functions: {missing}"
+
+
 if __name__ == "__main__":
     test_css_foundation()
     print("css foundation ok")
+    test_component_functions_exist()
+    print("component functions ok")

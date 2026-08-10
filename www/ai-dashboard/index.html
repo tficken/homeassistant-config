@@ -795,6 +795,104 @@ function connect(){
   };
   ws.onclose = () => { setStatus('disconnected', 'disconnected'); setTimeout(connect, 3000); };
 }
+function renderTerminalPanel(title, bodyHtml) {
+  return `<div class="terminal-panel">
+    <div class="panel-title">${escapeHtml(title)}</div>
+    <div class="panel-body">${bodyHtml}</div>
+  </div>`;
+}
+
+function renderStatusLed(state) {
+  let cls = "";
+  const s = String(state || "").toLowerCase();
+  if (["on","playing","open","home","heat","cool","auto","active","true","cleaning","docked","idle"].includes(s)) cls = "on";
+  else if (["unavailable","unknown","offline"].includes(s)) cls = "danger";
+  return `<span class="status-led ${cls}"></span>`;
+}
+
+function renderAlertTicker(alerts) {
+  if (!alerts || !alerts.length) {
+    return `<div class="terminal-panel"><div class="panel-body" style="color:var(--text-muted);font-family:monospace;">SYSTEM NORMAL</div></div>`;
+  }
+  const items = alerts.slice(0,3).map(a => `<div style="color:var(--amber);font-family:monospace;margin:4px 0;">! ${escapeHtml(a)}</div>`).join("");
+  return `<div class="terminal-panel"><div class="panel-body">${items}</div></div>`;
+}
+
+function renderSceneButton(entityId) {
+  const state = states[entityId];
+  const name = friendlyName(entityId);
+  const domain = entityId.split(".")[0];
+  return `<button class="bottom-btn" style="flex:none;width:100%;margin:4px 0;" onclick="toggleEntity('${entityId}')">${escapeHtml(name)}</button>`;
+}
+
+function renderLightCard(entityId) {
+  const state = states[entityId];
+  const active = state ? isActive(state.state) : false;
+  const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
+  const pct = Math.round((brightness / 255) * 100);
+  return `<div class="terminal-panel" style="margin-bottom:10px;">
+    <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;" onclick="toggleEntity('${entityId}')">
+      <div>${renderStatusLed(active ? "on" : "off")} <span style="font-family:monospace;">${escapeHtml(friendlyName(entityId))}</span></div>
+      <div style="color:var(--text-muted);font-family:monospace;">${active ? "ON" : "OFF"}</div>
+    </div>
+    ${active ? `<div class="panel-body" style="padding-top:0;"><input type="range" min="0" max="100" value="${pct}" style="width:100%;" onchange="setBrightness('${entityId}', this.value)" onclick="event.stopPropagation();"></div>` : ""}
+  </div>`;
+}
+
+function renderMetricCard(entityId) {
+  const state = states[entityId];
+  if (!state) return "";
+  const unit = state.attributes && state.attributes.unit_of_measurement ? state.attributes.unit_of_measurement : "";
+  return `<div class="terminal-panel" style="text-align:center;padding:8px;">
+    <div style="font-family:monospace;font-size:1.4rem;color:var(--green);">${escapeHtml(state.state)}<span style="font-size:0.8rem;color:var(--text-muted);">${escapeHtml(unit)}</span></div>
+    <div style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(friendlyName(entityId))}</div>
+  </div>`;
+}
+
+function renderCameraFeed(entityId) {
+  const name = friendlyName(entityId);
+  const src = window.HA_INTEGRATION_PROXY ? `/api/camera_proxy_stream/${entityId}` : `/api/camera_proxy_stream/${entityId}?token=${encodeURIComponent(token)}`;
+  return `<div class="terminal-panel" style="margin-bottom:10px;">
+    <div class="panel-title">${escapeHtml(name)}</div>
+    <div class="panel-body" style="padding:0;">
+      <img class="camera-feed" src="${src}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
+    </div>
+  </div>`;
+}
+
+function renderRadarFrame() {
+  if (!haConfig || haConfig.latitude == null) return `<div class="terminal-panel"><div class="panel-body" style="color:var(--text-muted);">RADAR UNAVAILABLE</div></div>`;
+  const src = `https://www.rainviewer.com/api.html?lat=${haConfig.latitude}&lon=${haConfig.longitude}&z=8&r=true&c=1&d=true`;
+  return `<div class="terminal-panel" style="height:100%;display:flex;flex-direction:column;">
+    <div class="panel-title">WEATHER RADAR</div>
+    <div class="panel-body" style="flex:1;padding:0;min-height:0;">
+      <iframe class="radar-frame" src="${src}" style="width:100%;height:100%;border:none;display:block;min-height:200px;" loading="lazy" allow="fullscreen"></iframe>
+    </div>
+  </div>`;
+}
+
+function renderMediaCard(entityId) {
+  const state = states[entityId];
+  if (!state) return "";
+  return `<div class="terminal-panel">
+    <div class="panel-title">${escapeHtml(friendlyName(entityId))}</div>
+    <div class="panel-body" style="font-family:monospace;">
+      <div style="color:var(--green);">${escapeHtml(state.state)}</div>
+      <button class="bottom-btn" style="margin-top:10px;padding:10px;font-size:0.9rem;" onclick="toggleEntity('${entityId}')">PLAY / PAUSE</button>
+    </div>
+  </div>`;
+}
+
+function renderBottomButton(label, target) {
+  return `<button class="bottom-btn" onclick="showScreen('${target}')">${escapeHtml(label)}</button>`;
+}
+
+function setBrightness(entityId, pct) {
+  if (!ws) return;
+  const value = Math.round((parseInt(pct, 10) / 100) * 255);
+  ws.send(JSON.stringify({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, brightness: value } }));
+}
+
 // Apply initial on-state styling
 document.querySelectorAll('.actionable').forEach(el => {
   const state = el.querySelector('.entity-state').textContent.trim();
