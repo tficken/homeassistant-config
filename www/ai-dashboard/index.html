@@ -351,6 +351,11 @@ function friendlyName(entityId) {
   return entityId.split(".").pop().replace(/_/g, " ");
 }
 
+function presenceLabel(entityId) {
+  if (config.presenceLabels && config.presenceLabels[entityId]) return config.presenceLabels[entityId];
+  return friendlyName(entityId);
+}
+
 function entityArea(entityId) {
   return (window.HA_AREAS && window.HA_AREAS[entityId]) || "";
 }
@@ -740,11 +745,21 @@ function renderHomeScreen() {
   const presence = getPresenceEntities().map(id => {
     const state = states[id];
     const home = state ? isActive(state.state) : false;
-    return `<div style="display:flex;align-items:center;gap:10px;font-family:var(--font-mono);font-size:1.1rem;">
-      ${renderStatusLed(home ? "home" : "off")}
-      <span>${escapeHtml(friendlyName(id))}</span>
-      <span style="color:${home ? 'var(--green)' : 'var(--text-muted)'}">${home ? "HOME" : "AWAY"}</span>
-    </div>`;
+    const label = presenceLabel(id);
+    const initial = label.charAt(0).toUpperCase();
+    return `
+      <div style="flex:1;min-width:120px;max-width:180px;" data-entity-id="${id}">
+        <div class="terminal-panel" style="display:flex;align-items:center;gap:14px;padding:14px;">
+          <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:1.6rem;color:var(--green);box-shadow:0 0 12px rgba(20,254,23,0.15);">${initial}</div>
+          <div style="flex:1;">
+            <div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text);">${escapeHtml(label)}</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+              ${renderStatusLed(home ? "home" : "off")}
+              <span style="font-family:var(--font-mono);font-size:0.85rem;color:${home ? 'var(--green)' : 'var(--text-muted)'}">${home ? "HOME" : "AWAY"}</span>
+            </div>
+          </div>
+        </div>
+      </div>`;
   }).join("");
 
   const now = new Date();
@@ -765,7 +780,7 @@ function renderHomeScreen() {
       <div style="min-height:0;">${renderRadarFrame()}</div>
     </div>
     <div>${renderAlertTicker(getAlerts())}</div>
-    <div>${renderTerminalPanel("PRESENCE", `<div style="display:flex;gap:24px;flex-wrap:wrap;">${presence}</div>`)}</div>
+    <div><div style="display:flex;gap:14px;flex-wrap:wrap;">${presence}</div></div>
   `;
 
   document.getElementById("home-screen").innerHTML = main;
