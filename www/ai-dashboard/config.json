@@ -1,4 +1,8 @@
 {
+  "presenceLabels": {
+    "person.woteg": "Travis",
+    "person.bobbie": "Bobbie"
+  },
   "theme": {
     "backgroundImage": "",
     "accentColor": "#2dd4bf"
@@ -30,7 +34,7 @@
       "icon": "🏠",
       "entities": [
         "person.woteg",
-        "device_tracker.traviss_iphone",
+        "person.bobbie",
         "weather.forecast_home"
       ]
     },
