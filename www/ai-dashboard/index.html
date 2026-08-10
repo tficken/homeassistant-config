@@ -93,23 +93,48 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
 .status-led.warn { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
 .status-led.danger { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
 .bottom-btn {
-  flex: 1; display: flex; align-items: center; justify-content: center;
-  background: rgba(20, 254, 23, 0.08); border: 1px solid var(--border);
-  color: var(--green); font-family: "JetBrains Mono", monospace; font-size: 1.1rem;
-  text-transform: uppercase; letter-spacing: 0.1em;
-  padding: 18px; cursor: pointer; user-select: none;
-  transition: background 0.15s, box-shadow 0.15s;
+  flex: 1;
+  height: 100%;
+  background: rgba(10, 20, 10, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--green);
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: 0 0 10px rgba(20, 254, 23, 0.05);
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s, color 0.15s;
 }
-.bottom-btn:hover { background: rgba(20, 254, 23, 0.16); box-shadow: 0 0 18px rgba(20, 254, 23, 0.18); }
-.bottom-btn:active { transform: scale(0.98); }
+.bottom-btn:hover {
+  background: rgba(20, 254, 23, 0.1);
+  border-color: rgba(20, 254, 23, 0.8);
+  box-shadow: 0 0 18px rgba(20, 254, 23, 0.25);
+  text-shadow: 0 0 8px var(--green);
+}
+.bottom-btn:active {
+  background: rgba(20, 254, 23, 0.05);
+  box-shadow: inset 0 0 12px rgba(20, 254, 23, 0.25);
+}
 .scene-btn {
-  background: rgba(20, 254, 23, 0.08); border: 1px solid var(--border);
-  color: var(--green); font-family: "JetBrains Mono", monospace;
-  text-transform: uppercase; letter-spacing: 0.08em;
-  padding: 16px; cursor: pointer; border-radius: 4px;
-  transition: background 0.15s;
+  background: rgba(10, 20, 10, 0.85);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  color: var(--green);
+  font-family: var(--font-mono);
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
-.scene-btn:hover { background: rgba(20, 254, 23, 0.16); }
+.scene-btn:hover {
+  background: rgba(20, 254, 23, 0.12);
+  border-color: rgba(20, 254, 23, 0.8);
+  box-shadow: 0 0 14px rgba(20, 254, 23, 0.2);
+}
+.scene-btn:active {
+  box-shadow: inset 0 0 10px rgba(20, 254, 23, 0.25);
+}
 .screen { display: none; flex-direction: column; gap: 14px; flex: 1; min-height: 0; }
 .screen.active { display: flex; }
 .settings-close {
