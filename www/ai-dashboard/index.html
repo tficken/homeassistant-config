@@ -469,10 +469,14 @@ function getAlerts() {
     const state = states[id];
     if (!state) continue;
     const domain = id.split(".")[0];
-    if ((domain === "binary_sensor" || domain === "switch") && isActive(state.state)) {
+    const deviceClass = state.attributes && state.attributes.device_class;
+    if (domain === "binary_sensor" && deviceClass === "motion" && isActive(state.state)) {
       alerts.push(`${friendlyName(id)} detected`);
     }
-    if (domain === "sensor" && state.attributes && state.attributes.device_class === "battery") {
+    if (domain === "siren" && isActive(state.state)) {
+      alerts.push(`${friendlyName(id)} active`);
+    }
+    if (domain === "sensor" && deviceClass === "battery") {
       const val = parseFloat(state.state);
       if (!isNaN(val) && val < 20) alerts.push(`${friendlyName(id)} low`);
     }
