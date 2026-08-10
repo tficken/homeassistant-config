@@ -111,8 +111,17 @@ const wsUrl = (location.protocol === 'https:' ? 'wss://' : 'ws://') + location.h
 let ws, token = localStorage.getItem('ha_token');
 if (!token) token = prompt('Enter Home Assistant long-lived access token:');
 if (token) localStorage.setItem('ha_token', token);
-const statusEl = document.getElementById('status');
-function setStatus(s,c){ statusEl.textContent = s; statusEl.className = c; }
+const statusLedEl = document.getElementById('status-led');
+const statusTextEl = document.getElementById('status-text');
+function setStatus(s,c){
+  if (statusTextEl) statusTextEl.textContent = s.toUpperCase();
+  if (statusLedEl) {
+    statusLedEl.className = 'status-led';
+    if (c === 'connected') statusLedEl.classList.add('on');
+    else if (c === 'disconnected' || c === 'error') statusLedEl.classList.add('danger');
+    else statusLedEl.classList.add('warn');
+  }
+}
 function logout(){ localStorage.removeItem('ha_token'); location.reload(); }
 function toggle(el){
   const eid = el.dataset.entityId;
@@ -243,6 +252,58 @@ function setBrightness(entityId, pct) {
   if (!ws) return;
   const value = Math.round((parseInt(pct, 10) / 100) * 255);
   ws.send(JSON.stringify({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, brightness: value } }));
+}
+
+// Minimal stubs for helpers referenced by renderers / onclick handlers.
+// These are intentionally simple and will be replaced/extended in later tasks.
+let states = {};
+let config = { entities: {}, sections: {} };
+let haConfig = null;
+let areas = [], entities = [], areaMap = {}, entityById = {};
+function friendlyName(entityId) {
+  const s = states[entityId];
+  if (s && s.attributes && s.attributes.friendly_name) return s.attributes.friendly_name;
+  const parts = entityId.split(".");
+  return parts[1] ? parts[1].replace(/_/g, " ") : entityId;
+}
+function escapeHtml(str) {
+  return String(str == null ? "" : str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+function isActive(state) {
+  return ["on", "home", "playing", "open", "active", "true", "cleaning", "docked", "idle"].includes(String(state || "").toLowerCase());
+}
+function weatherIcon(state) {
+  const s = String(state || "").toLowerCase();
+  if (s.includes("sun") || s === "clear") return "☀️";
+  if (s.includes("cloud")) return "☁️";
+  if (s.includes("rain")) return "🌧️";
+  if (s.includes("snow")) return "❄️";
+  if (s.includes("storm") || s.includes("thunder")) return "⛈️";
+  if (s.includes("fog") || s.includes("mist")) return "🌫️";
+  return "⛅";
+}
+function toggleEntity(entityId) {
+  if (!ws) return;
+  const domain = entityId.split(".")[0];
+  ws.send(JSON.stringify({ id: Date.now(), type: "call_service", domain: domain, service: "toggle", service_data: { entity_id: entityId } }));
+}
+function showScreen(screenId) {
+  document.querySelectorAll('.screen').forEach(el => el.style.display = 'none');
+  const target = document.getElementById(screenId);
+  if (target) target.style.display = 'flex';
+}
+function openSettings() {
+  const panel = document.getElementById('settings-panel') || document.createElement('div');
+  if (!panel.id) {
+    panel.id = 'settings-panel';
+    panel.innerHTML = `<div style="position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.85);display:flex;align-items:center;justify-content:center;" onclick="if(event.target===this)closeSettings()"><div class="terminal-panel" style="width:min(90%,500px);"><div class="panel-title">SETTINGS</div><div class="panel-body">Token: <input id="settings-token" type="password" value="${escapeHtml(token || '')}" style="width:100%;"><br><br><button class="bottom-btn" onclick="localStorage.setItem('ha_token',document.getElementById('settings-token').value);location.reload();">SAVE</button><button class="bottom-btn" onclick="closeSettings()">CLOSE</button></div></div></div>`;
+    document.body.appendChild(panel);
+  }
+  panel.style.display = 'block';
+}
+function closeSettings() {
+  const panel = document.getElementById('settings-panel');
+  if (panel) panel.style.display = 'none';
 }
 
 function getPresenceEntities() {
