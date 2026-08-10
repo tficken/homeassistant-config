@@ -1,0 +1,11 @@
+{
+  "domain": "ai_dashboard_proxy",
+  "name": "AI Dashboard Proxy",
+  "codeowners": ["@woteg"],
+  "config_flow": false,
+  "dependencies": ["http"],
+  "documentation": "https://github.com/woteg/homeassistant-config",
+  "iot_class": "local_push",
+  "requirements": [],
+  "version": "1.0.0"
+}

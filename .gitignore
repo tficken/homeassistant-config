@@ -14,3 +14,9 @@ zigbee.db*
 *.bak.*
 __pycache__/
 backups/
+token.ha
+secrets.yaml
+.superpowers/
+image/
+tts/
+www/media/

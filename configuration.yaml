@@ -71,6 +71,10 @@ shell_command:
 automation: !include automations.yaml
 script: !include scripts.yaml
 scene: !include scenes.yaml
+
+# AI dashboard proxy (serves /ai-dashboard/ and handles auth server-side)
+ai_dashboard_proxy:
+
 openhasp: !include_dir_merge_named openhasp/
 
 light:

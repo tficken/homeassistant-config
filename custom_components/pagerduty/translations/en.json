@@ -1,0 +1,33 @@
+{
+    "services": {
+        "send_notification": {
+            "name":"PagerDuty Notification",
+            "description": "Send a notification to PagerDuty Service ID.",
+            "fields": {
+                "service_id": {
+                    "name":"PagerDuty Notification",
+                    "description": "The unique ID of the PagerDuty service",
+                    "example": "P123456"
+                }
+            }
+        }
+    },
+    "title": "PagerDuty",
+    "config": {
+        "step": {
+            "user": {
+                "title": "Connect to PagerDuty",
+                "description": "Enter your API key to connect to PagerDuty.",
+                "data": {
+                    "api_key": "API Key",
+                    "ignored_team_ids": "Ignored Team IDs (comma-separated)",
+                    "api_server": "PagerDuty API Server"
+                }
+            }
+        },
+        "error": {
+            "invalid_api_key": "The API key is invalid. Please check and try again.",
+            "invalid_api_key_or_roles": "Missing api roles"
+        }
+    }
+}
