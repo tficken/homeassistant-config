@@ -744,7 +744,7 @@ function renderHomeScreen() {
   const wind = weatherAttr.wind_speed != null ? `${Math.round(weatherAttr.wind_speed)} ${weatherAttr.wind_speed_unit || ""}`.trim() : "--";
 
   const forecastHtml = forecastCache.daily.length
-    ? `<div style="display:flex;gap:10px;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+    ? `<div style="display:flex;gap:14px;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
         ${forecastCache.daily.map(day => {
           const date = day.datetime ? new Date(day.datetime) : null;
           const dayName = date ? date.toLocaleDateString([], { weekday: "short" }).toUpperCase() : "--";
@@ -753,9 +753,9 @@ function renderHomeScreen() {
           const minT = formatTemp(day.templow);
           return `<div style="text-align:center;flex:1;">
             <div style="font-size:0.7rem;color:var(--text-muted);font-family:var(--font-mono);">${dayName}</div>
-            <div style="font-size:1.4rem;margin:4px 0;">${icon}</div>
-            <div style="font-size:0.85rem;color:var(--green);font-family:var(--font-mono);">${maxT}</div>
-            <div style="font-size:0.75rem;color:var(--text-muted);font-family:var(--font-mono);">${minT}</div>
+            <div style="font-size:1.6rem;margin:4px 0;">${icon}</div>
+            <div style="font-size:1rem;color:var(--green);font-family:var(--font-mono);">${maxT}</div>
+            <div style="font-size:1rem;color:var(--text-muted);font-family:var(--font-mono);">${minT}</div>
           </div>`;
         }).join("")}
       </div>`
@@ -763,9 +763,9 @@ function renderHomeScreen() {
 
   const weatherPanel = renderTerminalPanel("WEATHER", `
     <div style="display:flex;align-items:center;gap:14px;">
-      <div style="font-size:2.5rem;">${icon}</div>
+      <div style="font-size:3.5rem;">${icon}</div>
       <div>
-        <div style="font-size:1.8rem;color:var(--green);">${temp}</div>
+        <div style="font-size:2.4rem;color:var(--green);">${temp}</div>
         <div style="color:var(--text-muted);font-family:var(--font-mono);">${escapeHtml(condition)} · HUM ${humidity}</div>
         <div style="color:var(--text-muted);font-family:var(--font-mono);font-size:0.8rem;margin-top:2px;">HI ${high} · LO ${low} · WIND ${wind}</div>
       </div>
