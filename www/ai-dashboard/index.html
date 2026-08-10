@@ -396,6 +396,11 @@ function escapeHtml(s) {
   return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 }
 
+function formatTemp(v) {
+  if (v == null || v === "unknown" || v === "unavailable") return "--";
+  return `${Math.round(v)}°`;
+}
+
 function setStatus(cls) {
   const led = document.getElementById("status-led");
   const text = document.getElementById("status-text");
@@ -697,6 +702,41 @@ function renderHomeScreen() {
   const condition = weather ? weather.state.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "--";
   const icon = weatherIcon(weather ? weather.state : "");
 
+  const weatherAttr = weather ? weather.attributes || {} : {};
+  const high = formatTemp(weatherAttr.temperature);
+  const low = formatTemp(weatherAttr.templow);
+  const wind = weatherAttr.wind_speed != null ? `${Math.round(weatherAttr.wind_speed)} ${weatherAttr.wind_speed_unit || ""}`.trim() : "--";
+
+  const forecastHtml = forecastCache.daily.length
+    ? `<div style="display:flex;gap:10px;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+        ${forecastCache.daily.map(day => {
+          const date = day.datetime ? new Date(day.datetime) : null;
+          const dayName = date ? date.toLocaleDateString([], { weekday: "short" }).toUpperCase() : "--";
+          const icon = weatherIcon(day.condition);
+          const maxT = formatTemp(day.temperature);
+          const minT = formatTemp(day.templow);
+          return `<div style="text-align:center;flex:1;">
+            <div style="font-size:0.7rem;color:var(--text-muted);font-family:var(--font-mono);">${dayName}</div>
+            <div style="font-size:1.4rem;margin:4px 0;">${icon}</div>
+            <div style="font-size:0.85rem;color:var(--green);font-family:var(--font-mono);">${maxT}</div>
+            <div style="font-size:0.75rem;color:var(--text-muted);font-family:var(--font-mono);">${minT}</div>
+          </div>`;
+        }).join("")}
+      </div>`
+    : "";
+
+  const weatherPanel = renderTerminalPanel("WEATHER", `
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div style="font-size:2.5rem;">${icon}</div>
+      <div>
+        <div style="font-size:1.8rem;color:var(--green);">${temp}</div>
+        <div style="color:var(--text-muted);font-family:var(--font-mono);">${escapeHtml(condition)} · HUM ${humidity}</div>
+        <div style="color:var(--text-muted);font-family:var(--font-mono);font-size:0.8rem;margin-top:2px;">HI ${high} · LO ${low} · WIND ${wind}</div>
+      </div>
+    </div>
+    ${forecastHtml}
+  `);
+
   const presence = getPresenceEntities().map(id => {
     const state = states[id];
     const home = state ? isActive(state.state) : false;
@@ -716,7 +756,7 @@ function renderHomeScreen() {
       <div id="clock" style="font-family:var(--font-mono);font-size:clamp(4rem,10vw,7rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);">${escapeHtml(timeStr)}</div>
       <div id="date" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
     </div>
-    ${renderTerminalPanel("WEATHER", `<div style="display:flex;align-items:center;gap:14px;"><div style="font-size:2.5rem;">${icon}</div><div><div style="font-size:1.8rem;color:var(--green);">${temp}</div><div style="color:var(--text-muted);font-family:var(--font-mono);">${escapeHtml(condition)} · HUM ${humidity}</div></div></div>`)}
+    ${weatherPanel}
   `;
 
   const main = `
