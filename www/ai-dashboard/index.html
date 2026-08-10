@@ -85,12 +85,27 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
   text-shadow: 0 0 8px rgba(20, 254, 23, 0.45);
 }
 .panel-body { padding: 10px 14px 14px; }
-.status-led {
-  width: 10px; height: 10px; border-radius: 50%; display: inline-block;
-  background: var(--text-muted); box-shadow: 0 0 6px var(--text-muted);
+@keyframes ledPulse {
+  0%, 100% { box-shadow: 0 0 8px var(--green); }
+  50% { box-shadow: 0 0 16px var(--green); }
 }
-.status-led.on { background: var(--green); box-shadow: 0 0 10px var(--green); }
-.status-led.warn { background: var(--amber); box-shadow: 0 0 10px var(--amber); }
+.status-led {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  background: var(--text-muted);
+  box-shadow: 0 0 4px var(--text-muted);
+}
+.status-led.on {
+  background: var(--green);
+  box-shadow: 0 0 10px var(--green);
+  animation: ledPulse 2s infinite ease-in-out;
+}
+.status-led.warn {
+  background: var(--amber);
+  box-shadow: 0 0 10px var(--amber);
+}
 .status-led.danger { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
 .bottom-btn {
   flex: 1;
