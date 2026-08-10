@@ -58,20 +58,26 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
 .terminal-panel {
   background: var(--panel-bg);
   border: 1px solid var(--border);
-  border-radius: 4px;
+  border-radius: 2px;
   position: relative;
   box-shadow: 0 0 18px rgba(20, 254, 23, 0.08);
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
-.terminal-panel::before {
-  content: "┌";
-  position: absolute; top: -1px; left: 6px;
-  color: var(--green); font-family: monospace; font-size: 0.9rem;
+.terminal-panel:hover {
+  border-color: rgba(20, 254, 23, 0.7);
+  box-shadow: 0 0 24px rgba(20, 254, 23, 0.18);
 }
+.terminal-panel::before,
 .terminal-panel::after {
-  content: "┐";
-  position: absolute; top: -1px; right: 6px;
-  color: var(--green); font-family: monospace; font-size: 0.9rem;
+  position: absolute;
+  top: -1px;
+  color: var(--green);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  text-shadow: 0 0 6px var(--green);
 }
+.terminal-panel::before { content: "┌"; left: 6px; }
+.terminal-panel::after { content: "┐"; right: 6px; }
 .panel-title {
   font-family: "JetBrains Mono", "SF Mono", monospace;
   font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.12em;
