@@ -560,15 +560,16 @@ function renderSceneButton(entityId) {
 
 function renderLightCard(entityId) {
   const state = states[entityId];
+  const offline = isUnavailable(state);
   const active = state ? isActive(state.state) : false;
   const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
   const pct = Math.round((brightness / 255) * 100);
   return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
     <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;" onclick="toggleEntity('${entityId}')">
-      <div>${renderStatusLed(active ? "on" : "off")} <span style="font-family:var(--font-mono);">${escapeHtml(friendlyName(entityId))}</span></div>
-      <div style="color:var(--text-muted);font-family:var(--font-mono);">${active ? "ON" : "OFF"}</div>
+      <div>${renderStatusLed(offline ? "unavailable" : (active ? "on" : "off"))} <span style="font-family:var(--font-mono);">${escapeHtml(friendlyName(entityId))}</span></div>
+      <div style="color:var(--text-muted);font-family:var(--font-mono);">${offline ? "OFFLINE" : (active ? "ON" : "OFF")}</div>
     </div>
-    ${active ? `<div class="panel-body" style="padding-top:0;"><input type="range" min="0" max="100" value="${pct}" style="width:100%;min-height:44px;" onchange="setBrightness('${entityId}', this.value)" onclick="event.stopPropagation();"></div>` : ""}
+    ${active && !offline ? `<div class="panel-body" style="padding-top:0;"><input type="range" min="0" max="100" value="${pct}" style="width:100%;min-height:44px;" onchange="setBrightness('${entityId}', this.value)" onclick="event.stopPropagation();"></div>` : ""}
   </div>`;
 }
 
@@ -576,8 +577,9 @@ function renderMetricCard(entityId) {
   const state = states[entityId];
   if (!state) return "";
   const unit = state.attributes && state.attributes.unit_of_measurement ? state.attributes.unit_of_measurement : "";
+  const offline = isUnavailable(state) ? renderOfflineBadge() : "";
   return `<div class="terminal-panel" style="text-align:center;padding:8px;" data-entity-id="${entityId}">
-    <div style="font-family:var(--font-mono);font-size:1.4rem;color:var(--green);">${escapeHtml(state.state)}<span style="font-size:0.8rem;color:var(--text-muted);">${escapeHtml(unit)}</span></div>
+    <div style="font-family:var(--font-mono);font-size:1.4rem;color:var(--green);">${offline || escapeHtml(state.state)}<span style="font-size:0.8rem;color:var(--text-muted);">${offline ? "" : escapeHtml(unit)}</span></div>
     <div style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(friendlyName(entityId))}</div>
   </div>`;
 }
@@ -589,8 +591,9 @@ function renderEnvMetric(entityId) {
   const deviceClass = state.attributes && state.attributes.device_class;
   const labelMap = { temperature: "TEMP", humidity: "HUM", illuminance: "LIGHT" };
   const label = labelMap[deviceClass] || (deviceClass ? deviceClass.toUpperCase() : entityId.split("_").pop().toUpperCase());
+  const offline = isUnavailable(state) ? renderOfflineBadge() : "";
   return `<div class="terminal-panel" style="text-align:center;padding:10px 4px;" data-entity-id="${entityId}">
-    <div style="font-family:var(--font-mono);font-size:1.5rem;color:var(--green);">${escapeHtml(state.state)}<span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(unit)}</span></div>
+    <div style="font-family:var(--font-mono);font-size:1.5rem;color:var(--green);">${offline || escapeHtml(state.state)}<span style="font-size:0.75rem;color:var(--text-muted);">${offline ? "" : escapeHtml(unit)}</span></div>
     <div class="metric-label" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">${escapeHtml(label)}</div>
   </div>`;
 }
@@ -598,6 +601,7 @@ function renderEnvMetric(entityId) {
 function renderCameraFeed(entityId) {
   const name = friendlyName(entityId);
   const state = states[entityId];
+  const offline = isUnavailable(state) ? renderOfflineBadge() : "";
   let src = "";
   if (state && state.attributes && state.attributes.entity_picture) {
     src = state.attributes.entity_picture;
@@ -607,7 +611,7 @@ function renderCameraFeed(entityId) {
     src = `/api/camera_proxy_stream/${entityId}?token=${encodeURIComponent(token)}`;
   }
   return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
-    <div class="panel-title">${escapeHtml(name)}</div>
+    <div class="panel-title">${escapeHtml(name)}${offline}</div>
     <div class="panel-body" style="padding:0;">
       <img class="camera-feed" src="${src}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
     </div>
