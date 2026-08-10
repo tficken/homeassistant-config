@@ -314,13 +314,13 @@ async function refreshForecast() {
     if (currentScreen === "home") renderHomeScreen();
     return;
   }
-  // Primary: HA service call
-  const res = await apiCall("POST", "/api/services/weather/get_forecasts?return_response=true", {
+  // Primary: server-side forecast endpoint (uses the dashboard proxy's HA auth)
+  const res = await apiCall("POST", "/ai-dashboard/api/forecast", {
     entity_id: weatherId,
     type: "daily"
   });
-  if (res && res.service_response && res.service_response[weatherId] && Array.isArray(res.service_response[weatherId].forecast)) {
-    forecastCache.daily = res.service_response[weatherId].forecast.slice(0, 5);
+  if (res && res[weatherId] && Array.isArray(res[weatherId].forecast)) {
+    forecastCache.daily = res[weatherId].forecast.slice(0, 5);
     forecastCache.fetchedAt = Date.now();
     if (currentScreen === "home") renderHomeScreen();
     return;

@@ -246,11 +246,50 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     return ws
 
 
+async def forecast_handler(request: web.Request) -> web.StreamResponse:
+    """Server-side forecast fetch so the dashboard doesn't need its own HA token."""
+    try:
+        secret = request.app.get("ai_dashboard_secret")
+        if not _is_authorized(request, secret):
+            return web.Response(status=401, text="Unauthorized")
+
+        hass: HomeAssistant = request.app["hass"]
+        try:
+            body = await request.json()
+        except ValueError:
+            return web.Response(status=400, text="Invalid JSON")
+
+        entity_id = body.get("entity_id", "weather.forecast_home")
+        forecast_type = body.get("type", "daily")
+
+        try:
+            service_response = await hass.services.async_call(
+                "weather",
+                "get_forecasts",
+                {"entity_id": entity_id, "type": forecast_type},
+                blocking=True,
+                return_response=True,
+            )
+        except Exception as exc:
+            return web.Response(
+                status=500,
+                text=f"Forecast service failed: {exc}",
+            )
+
+        return web.json_response(service_response or {})
+    except Exception as e:
+        return web.Response(
+            status=500,
+            text=f"Dashboard proxy error: {e}\n{traceback.format_exc()}",
+        )
+
+
 async def async_setup_http(hass: HomeAssistant, secret: str | None) -> None:
     """Register the dashboard routes on the Home Assistant HTTP app."""
     app = hass.http.app
     app["ai_dashboard_secret"] = secret
     app["ai_dashboard_areas"] = await async_load_entity_areas(hass)
-    # Register the WebSocket route before the catch-all static route.
+    # Register specific routes before the catch-all static route.
     app.router.add_get("/ai-dashboard/ws", websocket_handler)
+    app.router.add_post("/ai-dashboard/api/forecast", forecast_handler)
     app.router.add_get("/ai-dashboard/{path:.*}", dashboard_handler)
