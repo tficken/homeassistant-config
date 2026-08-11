@@ -13,7 +13,8 @@ The intended reader of this file is an AI coding agent that has no prior context
 - **Primary Language**: English in comments and documentation.
 - **Configuration Language**: YAML, with Python used for custom integrations.
 - **No Top-Level Package Manager**: There is no `pyproject.toml`, `package.json`, `requirements.txt`, `Dockerfile`, `docker-compose.yml`, `Makefile`, or CI/CD pipeline at the repository root. Dependency management is handled by Home Assistant and HACS at runtime.
-- **Git Repository**: `/root/homeassistant/` (and `/root/config/`) is a git repository. Git commands are appropriate when the user approves them. The working branch is usually `master`.
+- **Git Repository**: `//HOMEASSISTANT/config/` is a git repository. Git commands are appropriate when the user approves them. The working branch is usually `master`.
+- **Agent Workflow**: This project uses the Superpowers skill system. Design docs live in `docs/superpowers/specs/` and implementation plans in `docs/superpowers/plans/`. Scratch workspace for plans is in `.superpowers/sdd/` (git-ignored).
 
 ---
 
@@ -36,17 +37,20 @@ The intended reader of this file is an AI coding agent that has no prior context
 /config/
 ├── configuration.yaml          # Main Home Assistant configuration
 ├── automations.yaml            # Automations (included from configuration.yaml)
-├── scripts.yaml                # Scripts (empty at time of writing)
-├── scenes.yaml                 # Scenes (empty at time of writing)
+├── scripts.yaml                # Scripts (loaded by configuration.yaml)
+├── scenes.yaml                 # Scenes (loaded by configuration.yaml)
 ├── secrets.yaml                # Secrets placeholder file
 ├── .HA_VERSION                 # Installed Home Assistant version
 ├── home-assistant_v2.db*       # Recorder SQLite database
 ├── zigbee.db*                  # Zigbee SQLite database
 ├── .storage/                   # Home Assistant runtime registries and auth
+├── .superpowers/               # Superpowers skill scratch workspace (git-ignored)
+├── .tools/                     # Local tooling (e.g. portable Node.js, git-ignored)
 ├── blueprints/                 # Reusable automation and script blueprints
 │   ├── automation/homeassistant/
 │   └── script/homeassistant/
 ├── custom_components/          # Custom integrations
+│   ├── ai_dashboard_proxy/     # Serves /ai-dashboard/ with server-side HA auth
 │   ├── bambu_lab/              # Bambu Lab 3D printer integration
 │   ├── hacs/                   # Home Assistant Community Store
 │   ├── pagerduty/              # PagerDuty integration
@@ -54,12 +58,13 @@ The intended reader of this file is an AI coding agent that has no prior context
 ├── themes/                     # Lovelace themes
 │   └── google_dark_theme/
 ├── www/                        # Static web assets served by Home Assistant
+│   ├── ai-dashboard/           # Custom retro-terminal wall dashboard
 │   ├── community/              # HACS-downloaded community cards
 │   └── media/                  # User media files
 ├── docs/superpowers/           # Design specs and implementation plans
 │   ├── specs/
 │   └── plans/
-├── ipad-wall-panel.yaml        # YAML-managed wall panel dashboard
+├── ipad-wall-panel.yaml        # YAML-managed Lovelace wall panel dashboard
 ├── dashboard-backup-*.json     # Backups of UI-managed dashboards
 ├── image/                      # Cached images
 └── tts/                        # Cached text-to-speech audio
@@ -118,18 +123,36 @@ Stored under `blueprints/`. These are Home Assistant-provided reusable templates
 
 ### Current Dashboards
 
-- **`ipad-wall-panel.yaml`**: YAML-managed dashboard for the wall-mounted iPad in the Living Room. Registered in `configuration.yaml` under `lovelace.dashboards.ipad-wall-panel`.
-- **Original UI dashboard**: Backed up as `dashboard-backup-2026-08-05.json` from `.storage/lovelace.dashboard_dashboard`.
+- **`www/ai-dashboard/`**: Custom retro-terminal wall dashboard served at `/ai-dashboard/`. Built as a standalone HTML/JS/CSS app proxied through `custom_components/ai_dashboard_proxy/`. Designed for landscape wall-mounted iPads / tablets.
+- **`ipad-wall-panel.yaml`**: YAML-managed Lovelace dashboard for the wall-mounted iPad in the Living Room. Registered in `configuration.yaml` under `lovelace.dashboards.ipad-wall-panel`.
+- **Original UI dashboard**: Backed up as `dashboard-backup-*.json` from `.storage/lovelace.dashboard_dashboard`.
 
 ### Dashboard Development Workflow
 
 1. Back up the current UI-managed dashboard from `.storage/lovelace.dashboard_dashboard` if migrating.
 2. Edit the YAML dashboard file directly.
-3. Validate YAML syntax with the local `yaml` npm package:
+3. Validate YAML syntax. A portable Node.js install lives in `.tools/node/`; use it with the local `yaml` package if installed, or use Python's stdlib parser as a fallback:
    ```bash
-   NODE_PATH=/root/.tools/node_modules node -e "const YAML = require('yaml'); YAML.parse(require('fs').readFileSync('/root/config/ipad-wall-panel.yaml', 'utf8')); console.log('valid')"
+   # Using local Node.js (Windows/Git Bash)
+   .tools/node/node.exe -e "const YAML = require('yaml'); YAML.parse(require('fs').readFileSync('ipad-wall-panel.yaml', 'utf8')); console.log('valid')"
+
+   # Fallback with Python
+   py -c "import yaml; yaml.safe_load(open('ipad-wall-panel.yaml', encoding='utf-8')); print('valid')"
    ```
 4. Reload Lovelace dashboards from **Developer Tools > YAML > Lovelace Dashboards > Reload**, or restart Home Assistant.
+
+### AI Dashboard Development Workflow
+
+1. Edit `www/ai-dashboard/index.html` and/or `www/ai-dashboard/config.json` directly.
+2. Validate HTML syntax with the local Node.js install or Python's `html.parser`:
+   ```bash
+   # Using local Node.js
+   .tools/node/node.exe -e "const HTMLParser = require('node-html-parser'); HTMLParser.parse(require('fs').readFileSync('www/ai-dashboard/index.html', 'utf8')); console.log('HTML parse OK')"
+
+   # Fallback with Python
+   py -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
+   ```
+3. Hard-refresh the dashboard in the browser (`Ctrl+Shift+R` / `Cmd+Shift+R`) to pick up the latest files. The proxy serves them directly from `www/ai-dashboard/`.
 
 ---
 
@@ -144,18 +167,25 @@ Common device families in this instance (entity IDs follow these prefixes):
 - **Motion / security**: `switch.front_door_motion_detection`, `switch.downstairs_motion_detection`, `event.front_door_*`, `event.downstairs_motion`, `siren.downstairs_siren*`
 - **Vacuums**: `vacuum.geordi_la_forge`, `vacuum.pooper_litter_box`
 - **Media players**: `media_player.living_room_fire_tv_living_room`, `media_player.travis_office_office_fire_tv`
-- **People / presence**: `person.woteg`, `person.wall_panel`, `device_tracker.traviss_iphone`
+- **People / presence**: `person.woteg` (Travis), `person.bobbie` (Bobbie). The iPhone device tracker is the same user as Travis and is not displayed separately in the AI dashboard.
 - **Weather**: `weather.forecast_home`
 - **Network**: `sensor.exos_router_*`, `binary_sensor.exos_router_wan_status`
 - **Host / add-on diagnostics**: `sensor.home_assistant_core_*`, `sensor.home_assistant_host_*`, `sensor.home_assistant_supervisor_*`, `sensor.*_cpu_percent`, `sensor.*_memory_percent`, `sensor.ha_disk_usage`
 
-For the full current entity list, parse `/root/config/.storage/core.entity_registry`.
+For the full current entity list, parse `//HOMEASSISTANT/config/.storage/core.entity_registry`.
 
 ---
 
 ## Custom Integrations (`custom_components/`)
 
 Each integration is a Home Assistant standard package with a `manifest.json`, `__init__.py`, and platform modules.
+
+### `ai_dashboard_proxy`
+
+- **Purpose**: Serves the custom `www/ai-dashboard/` app at `/ai-dashboard/` and handles Home Assistant authentication server-side so the dashboard can call HA APIs without exposing a long-lived token in the browser.
+- **Key Modules**:
+  - `__init__.py` — integration setup.
+  - `http.py` — HTTP view that proxies dashboard assets and exposes a forecast helper endpoint.
 
 ### `bambu_lab`
 
@@ -274,7 +304,9 @@ The runner script preloads the stdlib `select` module before importing Home Assi
 - **Reload YAML** (automations, scripts, scenes, themes, Lovelace dashboards) from Home Assistant's Developer Tools when only those files change.
 - **Validate YAML syntax** before restarting:
   ```bash
-  NODE_PATH=/root/.tools/node_modules node -e "const YAML = require('yaml'); YAML.parse(require('fs').readFileSync('/root/config/configuration.yaml', 'utf8')); console.log('configuration.yaml valid')"
+  .tools/node/node.exe -e "const YAML = require('yaml'); YAML.parse(require('fs').readFileSync('configuration.yaml', 'utf8')); console.log('configuration.yaml valid')"
+  # Fallback:
+  py -c "import yaml; yaml.safe_load(open('configuration.yaml', encoding='utf-8')); print('configuration.yaml valid')"
   ```
 - **Check Logs**: Use Home Assistant's logs to debug integration errors or configuration problems.
 - **Update Integrations**: Custom integrations under `custom_components/` are typically updated by replacing their directory contents (often via HACS or manual download). Preserve `manifest.json` and platform structure.
@@ -285,8 +317,10 @@ The runner script preloads the stdlib `select` module before importing Home Assi
 
 - This is a personal/single-instance Home Assistant configuration. Changes affect a live home automation system.
 - Always prefer minimal, targeted edits.
-- Verify any YAML changes with Home Assistant's configuration validation before restarting. The local `yaml` npm package is installed under `/root/.tools/node_modules` for syntax checks.
+- Verify any YAML changes with Home Assistant's configuration validation before restarting. Use the local Node.js in `.tools/node/` or the Python fallback for syntax checks.
+- When editing the AI dashboard (`www/ai-dashboard/`), validate HTML/JSON syntax and hard-refresh the browser to pick up changes.
 - When editing Python custom integrations, run the existing `bambu_lab` tests if the change touches `pybambu/`.
 - If you add a new custom integration, include a valid `manifest.json` and follow the Home Assistant integration platform pattern used by the existing components.
-- Dashboards can be UI-managed (stored in `.storage/lovelace.*`) or YAML-managed (registered in `configuration.yaml`). The current wall panel is YAML-managed; backup UI dashboards before migrating.
-- When the user asks for a dashboard change, default to the established pattern: `type: sections`, `max_columns: 3`, `theme: Google Dark Theme`, Mushroom cards for lights/switches/vacuums, and large touch targets for wall-mounted iPad use.
+- Dashboards can be UI-managed (stored in `.storage/lovelace.*`) or YAML-managed (registered in `configuration.yaml`). The current wall panel is YAML-managed; the AI dashboard is file-based under `www/ai-dashboard/`.
+- When the user asks for a Lovelace dashboard change, default to the established pattern: `type: sections`, `max_columns: 3`, `theme: Google Dark Theme`, Mushroom cards for lights/switches/vacuums, and large touch targets for wall-mounted iPad use.
+- For new features or significant changes, use the Superpowers skill workflow: brainstorm → design spec → implementation plan → subagent-driven execution. Keep specs in `docs/superpowers/specs/` and plans in `docs/superpowers/plans/`.
