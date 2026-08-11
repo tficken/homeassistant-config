@@ -749,6 +749,51 @@ function getAlerts() {
   return alerts;
 }
 
+function renderRoomMonitors() {
+  const environment = (config.sections && config.sections.environment && config.sections.environment.entities) || [];
+  if (!environment.length) return "<div style='color:var(--text-muted);font-family:var(--font-mono);'>NO ROOM DATA</div>";
+
+  const rooms = {};
+  const order = [];
+  for (const id of environment) {
+    const area = entityArea(id) || friendlyName(id);
+    if (!rooms[area]) {
+      rooms[area] = {};
+      order.push(area);
+    }
+    const state = states[id];
+    const deviceClass = state && state.attributes && state.attributes.device_class;
+    if (deviceClass === "temperature" || deviceClass === "humidity") {
+      rooms[area][deviceClass] = { id, state };
+    }
+  }
+
+  const cards = order.map(area => {
+    const temp = rooms[area].temperature;
+    const hum = rooms[area].humidity;
+    const tempOffline = temp && isUnavailable(temp.state);
+    const humOffline = hum && isUnavailable(hum.state);
+    const tempValue = temp ? (tempOffline ? renderOfflineBadge() : `${escapeHtml(temp.state.state)}<span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(temp.state.attributes && temp.state.attributes.unit_of_measurement || "")}</span>`) : "--";
+    const humValue = hum ? (humOffline ? renderOfflineBadge() : `${escapeHtml(hum.state.state)}<span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(hum.state.attributes && hum.state.attributes.unit_of_measurement || "")}</span>`) : "--";
+    return `
+      <div class="terminal-panel" style="padding:10px;" data-room="${escapeHtml(area)}">
+        <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--green);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">${escapeHtml(area)}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="text-align:center;">
+            <div style="font-family:var(--font-mono);font-size:1.4rem;color:var(--green);">${tempValue}</div>
+            <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">TEMP</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-family:var(--font-mono);font-size:1.4rem;color:var(--green);">${humValue}</div>
+            <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">HUM</div>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+
+  return `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${cards}</div>`;
+}
+
 function renderHomeScreen() {
   const weatherId = config.entities.weather || "weather.forecast_home";
   const weather = states[weatherId];
@@ -830,6 +875,7 @@ function renderHomeScreen() {
       <div style="display:flex;flex-direction:column;gap:14px;min-height:0;">
         <div style="flex:1;min-height:0;">${renderRadarFrame()}</div>
         <div>${renderTerminalPanel("PRESENCE", `<div style="display:flex;gap:10px;">${presence}</div>`)}</div>
+        <div>${renderTerminalPanel("ROOM MONITORS", renderRoomMonitors())}</div>
       </div>
     </div>
   `;
