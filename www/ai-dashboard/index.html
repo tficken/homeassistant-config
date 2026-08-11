@@ -798,14 +798,14 @@ function renderHomeScreen() {
     const label = presenceLabel(id);
     const initial = label.charAt(0).toUpperCase();
     return `
-      <div style="flex:1;min-width:120px;max-width:180px;" data-entity-id="${id}">
-        <div class="terminal-panel" style="display:flex;align-items:center;gap:14px;padding:14px;">
-          <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:1.6rem;color:var(--green);box-shadow:0 0 12px rgba(20,254,23,0.15);">${initial}</div>
-          <div style="flex:1;">
-            <div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text);">${escapeHtml(label)}</div>
+      <div style="flex:1;min-width:0;" data-entity-id="${id}">
+        <div class="terminal-panel" style="display:flex;align-items:center;gap:12px;padding:14px;height:100%;">
+          <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:1.6rem;color:var(--green);box-shadow:0 0 12px rgba(20,254,23,0.15);flex-shrink:0;">${initial}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(label)}</div>
             <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
               ${renderStatusLed(home ? "home" : "off")}
-              <span style="font-family:var(--font-mono);font-size:0.85rem;color:${home ? 'var(--green)' : 'var(--text-muted)'}">${home ? "HOME" : "AWAY"}</span>
+              <span style="font-family:var(--font-mono);font-size:0.85rem;color:${home ? 'var(--green)' : 'var(--text-muted)'};">${home ? "HOME" : "AWAY"}</span>
             </div>
           </div>
         </div>
@@ -829,7 +829,7 @@ function renderHomeScreen() {
       </div>
       <div style="display:flex;flex-direction:column;gap:14px;min-height:0;">
         <div style="flex:1;min-height:0;">${renderRadarFrame()}</div>
-        <div>${renderTerminalPanel("PRESENCE", `<div style="display:flex;flex-direction:column;gap:10px;">${presence}</div>`)}</div>
+        <div>${renderTerminalPanel("PRESENCE", `<div style="display:flex;gap:10px;">${presence}</div>`)}</div>
       </div>
     </div>
   `;
