@@ -872,10 +872,10 @@ function renderHomeScreen() {
       <div style="display:flex;flex-direction:column;gap:14px;min-height:0;">
         ${weatherPanel}
       </div>
-      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;">
+      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
         <div style="flex:1;min-height:0;">${renderRadarFrame()}</div>
-        <div>${renderTerminalPanel("PRESENCE", `<div style="display:flex;gap:10px;">${presence}</div>`)}</div>
-        <div>${renderTerminalPanel("ROOM MONITORS", renderRoomMonitors())}</div>
+        <div style="flex-shrink:0;">${renderTerminalPanel("PRESENCE", `<div style="display:flex;gap:10px;">${presence}</div>`)}</div>
+        <div style="flex-shrink:0;max-height:35%;overflow-y:auto;">${renderTerminalPanel("ROOM MONITORS", renderRoomMonitors())}</div>
       </div>
     </div>
   `;
