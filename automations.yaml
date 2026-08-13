@@ -312,7 +312,7 @@
   - action: notify.alexa_media
     target:
       entity_id:
-      - media_player.everywhere
+      - media_player.master_bedroom_echo_dot
     data:
       message: "{{ message }}"
       data:
