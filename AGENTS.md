@@ -54,6 +54,7 @@ The intended reader of this file is an AI coding agent that has no prior context
 │   ├── bambu_lab/              # Bambu Lab 3D printer integration
 │   ├── hacs/                   # Home Assistant Community Store
 │   ├── pagerduty/              # PagerDuty integration
+│   ├── alexa_media/            # Alexa Media Player (HACS)
 │   └── uix/                    # UI extension for Lovelace
 ├── themes/                     # Lovelace themes
 │   └── google_dark_theme/
@@ -170,6 +171,7 @@ Common device families in this instance (entity IDs follow these prefixes):
 - **Door / window sensors**: `binary_sensor.living_room_front_door`, `binary_sensor.backdoor`
 - **Vacuums**: `vacuum.geordi_la_forge`, `vacuum.pooper_litter_box`
 - **Media players**: `media_player.living_room_fire_tv_living_room`, `media_player.travis_office_office_fire_tv`
+- **Alexa Media Player devices**: `media_player.master_bedroom_echo_dot`, `media_player.everywhere`, `media_player.travis_s_fire_tv`, `media_player.office_fire`, etc.
 - **People / presence**: `person.woteg` (Travis), `person.bobbie` (Bobbie). The iPhone device tracker is the same user as Travis and is not displayed separately in the AI dashboard.
 - **Weather**: `weather.forecast_home`
 - **Network**: `sensor.exos_router_*`, `binary_sensor.exos_router_wan_status`
@@ -233,6 +235,13 @@ Each integration is a Home Assistant standard package with a `manifest.json`, `_
   - `coordinator.py` — data polling coordinator.
   - `config_flow.py` — UI configuration flow.
 - **Services**: `send_notification` defined in `services.yaml`.
+
+### `alexa_media`
+
+- **Purpose**: Alexa Media Player integration (HACS-installed). Enables announcements and TTS on Amazon Echo/Fire TV devices.
+- **Version**: `5.15.7`.
+- **Platforms**: media_player, sensor, switch, alarm_control_panel, binary_sensor, light.
+- **Key usage for agents**: Echo announcements use `notify.alexa_media_<device_name>` with `data: {type: announce}`. Fire TV devices do not reliably support `type: announce`; use Echo devices for spoken announcements.
 
 ### `uix`
 
@@ -350,5 +359,6 @@ There is no automated deployment to the live Home Assistant instance; deploy man
 - When editing Python custom integrations, run the existing `bambu_lab` tests if the change touches `pybambu/`.
 - If you add a new custom integration, include a valid `manifest.json` and follow the Home Assistant integration platform pattern used by the existing components.
 - Dashboards can be UI-managed (stored in `.storage/lovelace.*`) or YAML-managed (registered in `configuration.yaml`). The current wall panel is YAML-managed; the AI dashboard is file-based under `www/ai-dashboard/`.
+- For Alexa announcements, use per-device `notify.alexa_media_<entity>` services with `data: {type: announce}`. The `media_player.everywhere` group and Fire TV devices are unreliable for announcements; prefer individual Echo devices.
 - When the user asks for a Lovelace dashboard change, default to the established pattern: `type: sections`, `max_columns: 3`, `theme: Google Dark Theme`, Mushroom cards for lights/switches/vacuums, and large touch targets for wall-mounted iPad use.
 - For new features or significant changes, use the Superpowers skill workflow: brainstorm → design spec → implementation plan → subagent-driven execution. Keep specs in `docs/superpowers/specs/` and plans in `docs/superpowers/plans/`.

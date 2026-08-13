@@ -16,6 +16,8 @@ Personal Home Assistant configuration running on Home Assistant OS `2026.8.1`. T
 
 **`pagerduty`** — Custom PagerDuty integration. Bridges home automation alerting with the same incident management platform I use professionally at NRC Health.
 
+**`alexa_media`** — Alexa Media Player integration (via HACS). Enables announcements and TTS on Amazon Echo devices through `notify.alexa_media_*` services.
+
 **`hacs`** — Home Assistant Community Store for managing community components.
 
 ---
@@ -30,6 +32,8 @@ Event-driven automations written in YAML with Jinja2 templating:
 - **Disk health**: Threshold-based alerting when HA disk usage exceeds 85%, with mobile push notification
 - **Automated backups**: Weekly full backup via shell command + Python script; nightly cleanup of backups older than 14 days
 - **Wall panel**: MQTT-based backlight control with day/night brightness scheduling and startup page-push on HA boot
+- **PagerDuty alerting**: New incident flashes the office ceiling fan red 3 times and restores its prior state
+- **Door/window announcements**: Door or window opening is announced over Alexa devices; phone notification is sent only when no one is home
 
 ---
 
@@ -46,6 +50,7 @@ A Node.js script that programmatically builds Lovelace dashboards by reading the
 - **Log level management**: Per-integration log suppression for noisy components (Bambu MQTT, Bluetooth, Litter Robot transport)
 - **OpenHASP**: YAML-managed physical wall panel dashboard with MQTT control surface
 - **Custom Lovelace dashboard**: Separate iPad wall panel layout managed in YAML
+- **Alexa exposure**: Home Assistant Cloud filter exposes useful entities to Alexa while excluding diagnostic/noisy sensors
 
 ---
 
@@ -66,4 +71,5 @@ This repo includes `AGENTS.md` — a structured guide I maintain so that AI codi
 | Protocols | MQTT, WebSocket, HTTP, Zigbee |
 | Hardware | Bambu Lab P1S × 2, OpenHASP wall panel, Zigbee sensors, Z-Wave devices |
 | Monitoring | PagerDuty integration, mobile push, persistent notifications |
+| Voice assistants | Alexa via Home Assistant Cloud + Alexa Media Player |
 | AI tooling | Extended OpenAI Conversation, Claude Code, agent-guided development |
