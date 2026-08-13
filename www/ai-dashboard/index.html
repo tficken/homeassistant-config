@@ -869,13 +869,13 @@ function renderHomeScreen() {
         <div id="clock" style="font-family:var(--font-mono);font-size:clamp(4rem,9vw,6.5rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);">${timeStrMarked}</div>
         <div id="date" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;">
+      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
         ${weatherPanel}
+        <div style="flex:1;min-height:0;overflow-y:auto;">${renderTerminalPanel("ROOM MONITORS", renderRoomMonitors())}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
         <div style="flex:1;min-height:0;">${renderRadarFrame()}</div>
         <div style="flex-shrink:0;">${renderTerminalPanel("PRESENCE", `<div style="display:flex;gap:10px;">${presence}</div>`)}</div>
-        <div style="flex-shrink:0;max-height:35%;overflow-y:auto;">${renderTerminalPanel("ROOM MONITORS", renderRoomMonitors())}</div>
       </div>
     </div>
   `;
