@@ -275,6 +275,7 @@ const DEFAULT_CONFIG = {
     quickControls: { title: "Quick Controls", icon: "🎛️", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan", "media_player.living_room_fire_tv_living_room"] },
     cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.downstairs_live_view"] },
     security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2"] },
+    doors: { title: "Doors", icon: "🚪", entities: ["binary_sensor.living_room_front_door", "binary_sensor.backdoor"] },
     environment: { title: "Environment", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_illuminance", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2", "sensor.hobeian_zg_204zx_illuminance_2"] },
     presence: { title: "Presence", icon: "👤", entities: ["binary_sensor.hobeian_zg_204zx", "binary_sensor.hobeian_zg_204zx_2"] },
     system: { title: "System", icon: "⚙️", entities: ["sensor.home_assistant_core_cpu_percent", "sensor.home_assistant_core_memory_percent", "sensor.ha_disk_usage", "vacuum.geordi_la_forge", "vacuum.pooper_litter_box", "update.home_assistant_core_update", "update.home_assistant_operating_system_update", "update.home_assistant_supervisor_update"] }
@@ -794,6 +795,31 @@ function renderRoomMonitors() {
   return `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${cards}</div>`;
 }
 
+function renderDoors() {
+  const doorIds = (config.sections && config.sections.doors && config.sections.doors.entities) || [];
+  if (!doorIds.length) return "<div style='color:var(--text-muted);font-family:var(--font-mono);'>NO DOOR DATA</div>";
+
+  const cards = doorIds.map(id => {
+    const state = states[id];
+    const offline = isUnavailable(state);
+    const open = state && String(state.state).toLowerCase() === "on";
+    const label = friendlyName(id);
+    const statusText = offline ? "OFFLINE" : (open ? "OPEN" : "CLOSED");
+    const statusColor = offline ? "var(--text-muted)" : (open ? "var(--danger)" : "var(--green)");
+    const ledState = offline ? "off" : (open ? "danger" : "on");
+    return `
+      <div class="terminal-panel" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;" data-entity-id="${id}">
+        <div style="display:flex;align-items:center;gap:10px;">
+          ${renderStatusLed(ledState)}
+          <span style="font-family:var(--font-mono);font-size:1rem;color:var(--text);">${escapeHtml(label)}</span>
+        </div>
+        <span style="font-family:var(--font-mono);font-size:1.1rem;color:${statusColor};">${statusText}</span>
+      </div>`;
+  }).join("");
+
+  return `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${cards}</div>`;
+}
+
 function renderHomeScreen() {
   const weatherId = config.entities.weather || "weather.forecast_home";
   const weather = states[weatherId];
@@ -876,6 +902,7 @@ function renderHomeScreen() {
       <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
         <div style="flex:1;min-height:0;">${renderRadarFrame()}</div>
         <div style="flex-shrink:0;">${renderTerminalPanel("PRESENCE", `<div style="display:flex;gap:10px;">${presence}</div>`)}</div>
+        <div style="flex-shrink:0;">${renderTerminalPanel("DOORS", renderDoors())}</div>
       </div>
     </div>
   `;

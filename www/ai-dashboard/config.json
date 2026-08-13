@@ -79,6 +79,14 @@
         "siren.downstairs_siren_2"
       ]
     },
+    "doors": {
+      "title": "Doors",
+      "icon": "🚪",
+      "entities": [
+        "binary_sensor.living_room_front_door",
+        "binary_sensor.backdoor"
+      ]
+    },
     "environment": {
       "title": "Environment",
       "icon": "🌡️",
