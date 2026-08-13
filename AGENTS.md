@@ -314,6 +314,31 @@ The runner script preloads the stdlib `select` module before importing Home Assi
 
 ---
 
+## CI/CD
+
+GitHub Actions validation runs on every push/PR via `.github/workflows/validate.yml`:
+
+- **YAML lint** — `yamllint -c .yamllint.yaml .` (GitHub workflow files only; HA custom tags break standard parsers).
+- **HA YAML syntax** — `python scripts/validate_ha_yaml.py` registers `!include`, `!secret`, etc. as no-ops and parses `configuration.yaml`, `automations.yaml`, `scripts.yaml`, `scenes.yaml`, and `ipad-wall-panel.yaml`.
+- **JSON** — `python -m json.tool www/ai-dashboard/config.json`.
+- **HTML** — Python `html.parser` sanity check on `www/ai-dashboard/index.html`.
+- **Python** — `flake8 custom_components` and `python -m compileall custom_components`.
+
+Run the same checks locally before committing:
+```bash
+pip install yamllint pyyaml flake8
+yamllint -c .yamllint.yaml .
+python scripts/validate_ha_yaml.py
+python -m json.tool www/ai-dashboard/config.json > /dev/null
+python -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
+flake8 custom_components --max-line-length=120 --extend-ignore=E501,W503 --exclude=deps
+python -m compileall custom_components -q
+```
+
+There is no automated deployment to the live Home Assistant instance; deploy manually after validation.
+
+---
+
 ## Notes for Future Agents
 
 - This is a personal/single-instance Home Assistant configuration. Changes affect a live home automation system.

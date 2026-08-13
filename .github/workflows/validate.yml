@@ -1,0 +1,48 @@
+name: Validate Config
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  lint-yaml:
+    name: Lint YAML
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install yamllint
+      - run: yamllint -c .yamllint.yaml .
+
+  validate-config:
+    name: Validate HA YAML / JSON / HTML
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install pyyaml
+      - name: Validate Home Assistant YAML files
+        run: python scripts/validate_ha_yaml.py
+      - name: Validate AI dashboard config JSON
+        run: python -m json.tool www/ai-dashboard/config.json > /dev/null
+      - name: Validate AI dashboard HTML
+        run: python -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
+
+  lint-python:
+    name: Lint Python integrations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - run: pip install flake8
+      - run: flake8 custom_components --max-line-length=120 --extend-ignore=E501,W503 --exclude=deps
+      - name: Compile Python files
+        run: python -m compileall custom_components -q
