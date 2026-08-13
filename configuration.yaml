@@ -5,6 +5,49 @@ homeassistant:
 # Loads default set of integrations. Do not remove.
 default_config:
 
+# Home Assistant Cloud - Alexa entity exposure filter
+cloud:
+  alexa:
+    filter:
+      include_domains:
+        - alarm_control_panel
+        - binary_sensor
+        - button
+        - camera
+        - climate
+        - cover
+        - fan
+        - group
+        - input_boolean
+        - light
+        - lock
+        - media_player
+        - scene
+        - script
+        - sensor
+        - switch
+        - vacuum
+      exclude_domains:
+        - automation
+        - update
+        - weather
+      exclude_entity_globs:
+        - sensor.*_battery
+        - sensor.*_cpu_percent
+        - sensor.*_memory_percent
+        - sensor.ha_disk_usage
+        - sensor.home_assistant_*
+        - sensor.exos_router_*
+        - sensor.p1s_*_temperature
+        - sensor.p1s_*_fan_speed
+        - sensor.p1s_*_speed
+        - binary_sensor.p1s_*_firmware
+        - binary_sensor.p1s_*_developer_lan_mode
+        - binary_sensor.p1s_*_mqtt_encryption
+        - binary_sensor.p1s_*_hybrid_mqtt_control_blocked
+        - sensor.sun_*
+        - sensor.backup_*
+
 # Load frontend themes from the themes folder
 frontend:
   themes: !include_dir_merge_named themes
