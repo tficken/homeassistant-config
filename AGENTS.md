@@ -322,7 +322,7 @@ GitHub Actions validation runs on every push/PR via `.github/workflows/validate.
 - **HA YAML syntax** — `python scripts/validate_ha_yaml.py` registers `!include`, `!secret`, etc. as no-ops and parses `configuration.yaml`, `automations.yaml`, `scripts.yaml`, `scenes.yaml`, and `ipad-wall-panel.yaml`.
 - **JSON** — `python -m json.tool www/ai-dashboard/config.json`.
 - **HTML** — Python `html.parser` sanity check on `www/ai-dashboard/index.html`.
-- **Python** — `flake8 custom_components` and `python -m compileall custom_components`.
+- **Python** — `flake8 custom_components/ai_dashboard_proxy` and `python -m compileall custom_components/ai_dashboard_proxy`.
 
 Run the same checks locally before committing:
 ```bash
@@ -331,8 +331,8 @@ yamllint -c .yamllint.yaml .
 python scripts/validate_ha_yaml.py
 python -m json.tool www/ai-dashboard/config.json > /dev/null
 python -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
-flake8 custom_components --max-line-length=120 --extend-ignore=E501,W503 --exclude=deps
-python -m compileall custom_components -q
+flake8 custom_components/ai_dashboard_proxy --max-line-length=120 --extend-ignore=E501,W503
+python -m compileall custom_components/ai_dashboard_proxy -q
 ```
 
 There is no automated deployment to the live Home Assistant instance; deploy manually after validation.

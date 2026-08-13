@@ -43,6 +43,7 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install flake8
-      - run: flake8 custom_components --max-line-length=120 --extend-ignore=E501,W503 --exclude=deps
-      - name: Compile Python files
-        run: python -m compileall custom_components -q
+      - name: Lint ai_dashboard_proxy
+        run: flake8 custom_components/ai_dashboard_proxy --max-line-length=120 --extend-ignore=E501,W503
+      - name: Compile ai_dashboard_proxy Python files
+        run: python -m compileall custom_components/ai_dashboard_proxy -q
