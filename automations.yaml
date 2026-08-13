@@ -309,7 +309,10 @@
   - variables:
       name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) }}"
       message: "{{ name }} is open"
-  - action: notify.alexa_media_everywhere
+  - action: notify.alexa_media
+    target:
+      entity_id:
+      - media_player.everywhere
     data:
       message: "{{ message }}"
       data:
