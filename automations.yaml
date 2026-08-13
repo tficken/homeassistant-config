@@ -304,18 +304,16 @@
     - binary_sensor.living_room_front_door
     - binary_sensor.backdoor
     to: 'on'
-    from: 'off'
   conditions: []
   actions:
   - variables:
       name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) }}"
       message: "{{ name }} is open"
-  - action: media_player.play_media
-    target:
-      entity_id: media_player.everywhere
+  - action: notify.alexa_media_everywhere
     data:
-      media_content_type: announce
-      media_content_id: "{{ message }}"
+      message: "{{ message }}"
+      data:
+        type: announce
   - choose:
     - conditions:
       - condition: template
