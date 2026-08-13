@@ -1,6 +1,6 @@
 # homeassistant-config
 
-Personal Home Assistant configuration running on Home Assistant OS `2026.7.4`. This isn't a typical smart home config — it's a platform I've built and maintained over time, including custom Python integrations, event-driven automation logic, production monitoring integrations, and a programmatically generated dashboard system.
+Personal Home Assistant configuration running on Home Assistant OS `2026.8.1`. This isn't a typical smart home config — it's a platform I've built and maintained over time, including custom Python integrations, event-driven automation logic, production monitoring integrations, and a programmatically generated dashboard system. Validation runs through a GitHub Actions workflow in `.github/workflows/validate.yml`.
 
 ---
 
@@ -59,7 +59,7 @@ This repo includes `AGENTS.md` — a structured guide I maintain so that AI codi
 
 | Layer | Technology |
 |---|---|
-| Platform | Home Assistant OS 2026.7.4 |
+| Platform | Home Assistant OS 2026.8.1 |
 | Config language | YAML + Jinja2 |
 | Custom integrations | Python (async, HA component API) |
 | Dashboard tooling | Node.js |

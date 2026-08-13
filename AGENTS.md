@@ -9,10 +9,10 @@ The intended reader of this file is an AI coding agent that has no prior context
 ## Project Overview
 
 - **Type**: Home Assistant configuration + custom integrations.
-- **Home Assistant Version**: `2026.7.4` (recorded in `.HA_VERSION`).
+- **Home Assistant Version**: `2026.8.1` (recorded in `.HA_VERSION`; update this if the version changes).
 - **Primary Language**: English in comments and documentation.
 - **Configuration Language**: YAML, with Python used for custom integrations.
-- **No Top-Level Package Manager**: There is no `pyproject.toml`, `package.json`, `requirements.txt`, `Dockerfile`, `docker-compose.yml`, `Makefile`, or CI/CD pipeline at the repository root. Dependency management is handled by Home Assistant and HACS at runtime.
+- **No Top-Level Package Manager**: There is no `pyproject.toml`, `package.json`, `requirements.txt`, `Dockerfile`, `docker-compose.yml`, or `Makefile` at the repository root. Dependency management is handled by Home Assistant and HACS at runtime. A GitHub Actions validation workflow lives in `.github/workflows/validate.yml`.
 - **Git Repository**: `//HOMEASSISTANT/config/` is a git repository. Git commands are appropriate when the user approves them. The working branch is usually `master`.
 - **Agent Workflow**: This project uses the Superpowers skill system. Design docs live in `docs/superpowers/specs/` and implementation plans in `docs/superpowers/plans/`. Scratch workspace for plans is in `.superpowers/sdd/` (git-ignored).
 
@@ -78,7 +78,7 @@ The intended reader of this file is an AI coding agent that has no prior context
 
 - Loads the default integration set via `default_config:`.
 - Merges themes from `themes/` using `!include_dir_merge_named themes`.
-- Configures the `recorder` to purge data after 7 days and excludes noisy diagnostic entities.
+- Configures the `recorder` to purge data after 30 days and excludes noisy diagnostic entities.
 - Defines a `command_line` sensor for disk usage (`HA disk usage`).
 - Includes:
   - `automations.yaml`
@@ -88,7 +88,9 @@ The intended reader of this file is an AI coding agent that has no prior context
 ### Automations, Scripts, and Scenes
 
 - `automations.yaml`: Contains user automations (e.g., motion-activated siren, low-battery notifications).
-- `scripts.yaml` and `scenes.yaml`: Empty at time of writing but loaded by `configuration.yaml`.
+- `scripts.yaml`: Contains user scripts for lighting/media presets and HA actions (e.g., `all_lights_off`, `goodnight`, `movie_mode`).
+- `scenes.yaml`: Contains user scenes for lighting presets (e.g., `movie_mode`, `focus_mode`, `relax_mode`).
+
 
 ### Blueprints
 
@@ -295,7 +297,7 @@ The runner script preloads the stdlib `select` module before importing Home Assi
 - **`.storage/`**: Contains Home Assistant authentication, registry, and state files (e.g., `auth`, `core.config_entries`, `core.entity_registry`). These are runtime-sensitive and should not be edited manually unless you know exactly what you are doing.
 - **Database Files**: `home-assistant_v2.db*` and `zigbee.db*` contain runtime data. Avoid deleting or modifying them while Home Assistant is running.
 - **Custom Integrations**: They execute with the same privileges as Home Assistant. Review any changes carefully, especially network calls, shell commands, or file-system access.
-- **No CI/CD**: There are no automated checks in this repository. Manual review and local validation are the only safety nets.
+
 
 ---
 
