@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **Implementation note:** During execution, the layout was refined from this original plan. Room monitors were moved to the center column (under weather) and a `DOORS` panel was added to the right column (under presence). The current design is documented in `docs/superpowers/specs/2026-08-11-ai-dashboard-home-layout-design.md`.
+
 **Goal:** Tighten the AI dashboard Home screen so presence is compact, room monitors fill the right column, and the layout stays balanced across different landscape wall-panel sizes.
 
 **Architecture:** Keep the existing single-page `www/ai-dashboard/index.html` structure. Modify the `renderHomeScreen()` function and add a `renderRoomMonitors()` helper. Re-use existing CSS classes and registry helpers (`entityArea`, `friendlyName`, `isUnavailable`). The 3-column grid remains in landscape; font sizes and gaps scale with `clamp()` and viewport units.

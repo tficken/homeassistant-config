@@ -123,7 +123,7 @@ Stored under `blueprints/`. These are Home Assistant-provided reusable templates
 
 ### Current Dashboards
 
-- **`www/ai-dashboard/`**: Custom retro-terminal wall dashboard served at `/ai-dashboard/`. Built as a standalone HTML/JS/CSS app proxied through `custom_components/ai_dashboard_proxy/`. Designed for landscape wall-mounted iPads / tablets.
+- **`www/ai-dashboard/`**: Custom retro-terminal wall dashboard served at `/ai-dashboard/`. Built as a standalone HTML/JS/CSS app proxied through `custom_components/ai_dashboard_proxy/`. Designed for landscape wall-mounted iPads / tablets. Home screen layout: clock (left), weather + room monitors (center), radar + presence + doors (right).
 - **`ipad-wall-panel.yaml`**: YAML-managed Lovelace dashboard for the wall-mounted iPad in the Living Room. Registered in `configuration.yaml` under `lovelace.dashboards.ipad-wall-panel`.
 - **Original UI dashboard**: Backed up as `dashboard-backup-*.json` from `.storage/lovelace.dashboard_dashboard`.
 
@@ -165,6 +165,7 @@ Common device families in this instance (entity IDs follow these prefixes):
 - **Cameras**: `camera.front_door_live_view`, `camera.downstairs_live_view`, `camera.p1s_*_camera`
 - **Environmental sensors**: `sensor.hobeian_zg_204zx_*`, `binary_sensor.hobeian_zg_204zx*`
 - **Motion / security**: `switch.front_door_motion_detection`, `switch.downstairs_motion_detection`, `event.front_door_*`, `event.downstairs_motion`, `siren.downstairs_siren*`
+- **Door / window sensors**: `binary_sensor.living_room_front_door`, `binary_sensor.backdoor`
 - **Vacuums**: `vacuum.geordi_la_forge`, `vacuum.pooper_litter_box`
 - **Media players**: `media_player.living_room_fire_tv_living_room`, `media_player.travis_office_office_fire_tv`
 - **People / presence**: `person.woteg` (Travis), `person.bobbie` (Bobbie). The iPhone device tracker is the same user as Travis and is not displayed separately in the AI dashboard.
