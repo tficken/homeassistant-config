@@ -309,7 +309,25 @@
   - variables:
       name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) }}"
       message: "{{ name }} is open"
+  - action: media_player.volume_set
+    target:
+      entity_id:
+      - media_player.master_bedroom_echo_dot
+      - media_player.office_fire
+      - media_player.travis_s_fire_tv
+    data:
+      volume_level: 0.7
   - action: notify.alexa_media_master_bedroom_echo_dot
+    data:
+      message: "{{ message }}"
+      data:
+        type: announce
+  - action: notify.alexa_media_office_fire
+    data:
+      message: "{{ message }}"
+      data:
+        type: announce
+  - action: notify.alexa_media_travis_s_fire_tv
     data:
       message: "{{ message }}"
       data:
