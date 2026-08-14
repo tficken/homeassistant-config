@@ -267,12 +267,13 @@ const DEFAULT_CONFIG = {
     temperatures: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_temperature_2"],
     summaryChips: [],
     mediaPlayer: "media_player.living_room_fire_tv_living_room",
-    quickControls: ["scene.all_lights_off", "scene.living_room_lights_on", "script.goodnight", "light.living_room_ceiling_fan"]
+    quickControls: ["scene.all_lights_off", "script.living_room_lights_on", "script.goodnight", "light.living_room_ceiling_fan"]
   },
   sections: {
     home: { title: "Home", icon: "🏠", entities: ["person.woteg", "person.bobbie", "weather.forecast_home"] },
-    scenes: { title: "Scenes", icon: "🎨", entities: ["scene.all_lights_off", "scene.living_room_lights_on", "scene.relax_mode", "scene.movie_mode", "script.goodnight", "script.focus_mode"] },
-    quickControls: { title: "Quick Controls", icon: "🎛️", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan", "media_player.living_room_fire_tv_living_room"] },
+    scenes: { title: "Scenes", icon: "🎨", entities: ["scene.all_lights_off", "scene.relax_mode", "scene.movie_mode", "scene.focus_mode", "scene.living_room_focus_mode", "scene.living_room_relax_mode", "scene.living_room_all_lights_off"] },
+    scripts: { title: "Scripts", icon: "▶️", entities: ["script.goodnight", "script.focus_mode", "script.movie_mode", "script.relax_mode", "script.pause_all_media", "script.living_room_lights_on", "script.living_room_lights_off", "script.travis_office_lights_on", "script.travis_office_lights_off", "script.goodnight_door_check", "script.goodnight_dim_lights", "script.goodnight_enable_security"] },
+    quickControls: { title: "Quick Controls", icon: "🎛️", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan", "light.third_reality_inc_3rcb01057z", "light.third_reality_inc_3rcb01057z_2", "light.third_reality_inc_3rcb01057z_3", "light.third_reality_inc_3rcb01057z_4", "light.third_reality_inc_3rcb01057z_5", "light.third_reality_inc_3rcb01057z_6", "light.p1s_01p00a412300832_chamber_light", "light.travis_office_p1s_uno_chamber_light"] },
     cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.downstairs_live_view"] },
     security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2"] },
     doors: { title: "Doors", icon: "🚪", entities: ["binary_sensor.living_room_front_door", "binary_sensor.backdoor"] },
@@ -913,27 +914,30 @@ function renderHomeScreen() {
 
 function renderControlScreen() {
   const scenes = (config.sections && config.sections.scenes && config.sections.scenes.entities) || [];
+  const scripts = (config.sections && config.sections.scripts && config.sections.scripts.entities) || [];
   const quick = (config.sections && config.sections.quickControls && config.sections.quickControls.entities) || [];
   const mediaId = config.entities.mediaPlayer || "media_player.living_room_fire_tv_living_room";
 
   const sceneButtons = scenes.map(id => renderSceneButton(id)).join("");
+  const scriptButtons = scripts.map(id => renderSceneButton(id)).join("");
   const lightIds = quick.filter(id => id.startsWith("light."));
   const lightCards = lightIds.map(id => renderLightCard(id)).join("");
-  const quickButtons = scenes.slice(0, 2).map(id => renderSceneButton(id)).join("");
 
   const main = `
     <div style="display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:14px;flex:1;min-height:0;">
       <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
-        ${renderTerminalPanel("SCENES", `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${sceneButtons}</div>`)}
+        ${renderTerminalPanel("SCENES", `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${sceneButtons || "<div style='color:var(--text-muted)'>NO SCENES</div>"}</div>`)}
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
         ${renderTerminalPanel("LIGHTS", lightCards || "<div style='color:var(--text-muted)'>NO LIGHTS</div>")}
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
-        <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;">
+          ${renderTerminalPanel("SCRIPTS", `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${scriptButtons || "<div style='color:var(--text-muted)'>NO SCRIPTS</div>"}</div>`)}
+        </div>
+        <div style="flex-shrink:0;">
           ${renderMediaCard(mediaId)}
         </div>
-        ${renderTerminalPanel("QUICK", `<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">${quickButtons}</div>`)}
       </div>
     </div>
   `;
@@ -1044,6 +1048,7 @@ function entityBelongsToScreen(entityId, screen) {
     home: [config.entities.weather, ...getPresenceEntities()],
     control: [
       ...((config.sections.scenes && config.sections.scenes.entities) || []),
+      ...((config.sections.scripts && config.sections.scripts.entities) || []),
       ...((config.sections.quickControls && config.sections.quickControls.entities) || []),
       config.entities.mediaPlayer
     ],

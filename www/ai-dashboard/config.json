@@ -23,7 +23,7 @@
     "mediaPlayer": "media_player.living_room_fire_tv_living_room",
     "quickControls": [
       "scene.all_lights_off",
-      "scene.living_room_lights_on",
+      "script.living_room_lights_on",
       "script.goodnight",
       "light.living_room_ceiling_fan"
     ]
@@ -43,11 +43,30 @@
       "icon": "🎨",
       "entities": [
         "scene.all_lights_off",
-        "scene.living_room_lights_on",
         "scene.relax_mode",
         "scene.movie_mode",
+        "scene.focus_mode",
+        "scene.living_room_focus_mode",
+        "scene.living_room_relax_mode",
+        "scene.living_room_all_lights_off"
+      ]
+    },
+    "scripts": {
+      "title": "Scripts",
+      "icon": "▶️",
+      "entities": [
         "script.goodnight",
-        "script.focus_mode"
+        "script.focus_mode",
+        "script.movie_mode",
+        "script.relax_mode",
+        "script.pause_all_media",
+        "script.living_room_lights_on",
+        "script.living_room_lights_off",
+        "script.travis_office_lights_on",
+        "script.travis_office_lights_off",
+        "script.goodnight_door_check",
+        "script.goodnight_dim_lights",
+        "script.goodnight_enable_security"
       ]
     },
     "quickControls": {
@@ -56,7 +75,14 @@
       "entities": [
         "light.ceiling_fan",
         "light.living_room_ceiling_fan",
-        "media_player.living_room_fire_tv_living_room"
+        "light.third_reality_inc_3rcb01057z",
+        "light.third_reality_inc_3rcb01057z_2",
+        "light.third_reality_inc_3rcb01057z_3",
+        "light.third_reality_inc_3rcb01057z_4",
+        "light.third_reality_inc_3rcb01057z_5",
+        "light.third_reality_inc_3rcb01057z_6",
+        "light.p1s_01p00a412300832_chamber_light",
+        "light.travis_office_p1s_uno_chamber_light"
       ]
     },
     "cameras": {
