@@ -297,7 +297,7 @@
 
 - id: '1786780000001'
   alias: Door/window open announcement
-  description: Announce door/window openings over Alexa and notify phone only when no one is home
+  description: Announce door/window openings over Alexa and notify phone when no one is home or night mode is on
   triggers:
   - trigger: state
     entity_id:
@@ -322,10 +322,36 @@
   - choose:
     - conditions:
       - condition: template
-        value_template: "{{ is_state('person.woteg', 'not_home') and is_state('person.bobbie', 'not_home') }}"
+        value_template: "{{ (is_state('person.woteg', 'not_home') and is_state('person.bobbie', 'not_home')) or is_state('input_boolean.night_mode', 'on') }}"
       sequence:
       - action: notify.mobile_app_traviss_iphone
         data:
           title: Door/Window Open
           message: "{{ message }}"
+  mode: single
+
+- id: goodnight_morning_reset
+  alias: Goodnight morning reset
+  description: Turn off night_mode, disable motion detection, and stop brown noise at sunrise
+  triggers:
+    - trigger: sun
+      event: sunrise
+  conditions:
+    - condition: state
+      entity_id: input_boolean.night_mode
+      state: "on"
+  actions:
+    - action: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.night_mode
+    - action: switch.turn_off
+      target:
+        entity_id:
+          - switch.front_door_motion_detection
+          - switch.downstairs_motion_detection
+      continue_on_error: true
+    - action: media_player.media_stop
+      target:
+        entity_id: media_player.master_bedroom_echo_dot
+      continue_on_error: true
   mode: single

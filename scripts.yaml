@@ -12,18 +12,31 @@ all_lights_off:
 goodnight:
   alias: Goodnight
   sequence:
-    - action: light.turn_off
-      target:
-        entity_id: all
-      data:
-        transition: 3
+    - action: script.goodnight_door_check
+    - action: script.goodnight_dim_lights
     - action: media_player.media_stop
       target:
         entity_id: all
+      continue_on_error: true
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.master_bedroom_echo_dot
+      data:
+        volume_level: 0.2
+      continue_on_error: true
+    - action: media_player.play_media
+      target:
+        entity_id: media_player.master_bedroom_echo_dot
+      data:
+        media_content_id: "https://files.noise-foundation.com/brown-noise-528-8h-v2.mp3"
+        media_content_type: audio/mpeg
+      continue_on_error: true
+    - action: script.goodnight_enable_security
     - action: notify.mobile_app_traviss_iphone
       data:
         title: Goodnight
-        message: All lights and media are off.
+        message: Security armed and brown noise playing. Sleep well.
+      continue_on_error: true
   mode: single
   icon: mdi:weather-night
 
@@ -127,3 +140,79 @@ living_room_lights_off:
         transition: 2
   mode: single
   icon: mdi:lightbulb-off
+
+goodnight_door_check:
+  alias: Goodnight door/window check
+  sequence:
+    - variables:
+        any_open: >-
+          {{ is_state('binary_sensor.living_room_front_door', 'on')
+             or is_state('binary_sensor.backdoor', 'on') }}
+        open_names: >
+          {% set open = [] %}
+          {% if is_state('binary_sensor.living_room_front_door', 'on') %}
+            {% set open = open + ['Front door'] %}
+          {% endif %}
+          {% if is_state('binary_sensor.backdoor', 'on') %}
+            {% set open = open + ['Back door'] %}
+          {% endif %}
+          {{ open | join(', ') }}
+    - if:
+        - condition: template
+          value_template: "{{ any_open }}"
+      then:
+        - action: persistent_notification.create
+          data:
+            title: Goodnight warning
+            message: "Left open: {{ open_names }}"
+            notification_id: goodnight_door_check
+          continue_on_error: true
+        - action: media_player.volume_set
+          target:
+            entity_id: media_player.master_bedroom_echo_dot
+          data:
+            volume_level: 0.7
+          continue_on_error: true
+        - action: notify.alexa_media_master_bedroom_echo_dot
+          data:
+            message: "Goodnight warning: {{ open_names }} left open."
+            data:
+              type: announce
+          continue_on_error: true
+  mode: single
+  icon: mdi:door-open
+
+goodnight_dim_lights:
+  alias: Goodnight dim lights
+  sequence:
+    - variables:
+        lights_on: "{{ states.light | selectattr('state', 'eq', 'on') | map(attribute='entity_id') | list }}"
+    - condition: template
+      value_template: "{{ lights_on | length > 0 }}"
+    - action: light.turn_on
+      data:
+        entity_id: "{{ lights_on }}"
+        brightness_pct: 1
+        transition: 10
+    - delay: "00:00:11"
+    - action: light.turn_off
+      data:
+        entity_id: "{{ lights_on }}"
+        transition: 2
+  mode: single
+  icon: mdi:brightness-6
+
+goodnight_enable_security:
+  alias: Goodnight enable security
+  sequence:
+    - action: switch.turn_on
+      target:
+        entity_id:
+          - switch.front_door_motion_detection
+          - switch.downstairs_motion_detection
+      continue_on_error: true
+    - action: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.night_mode
+  mode: single
+  icon: mdi:shield-home

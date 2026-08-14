@@ -105,6 +105,11 @@ input_boolean:
     icon: mdi:microphone-off
     initial: false
 
+  night_mode:
+    name: Night mode
+    icon: mdi:weather-night
+    initial: false
+
 # Remove backups older than 14 days via the Supervisor API.
 # The backup.remove service used by the previous automation does not exist.
 shell_command:
