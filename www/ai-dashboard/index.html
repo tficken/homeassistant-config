@@ -275,8 +275,8 @@ const DEFAULT_CONFIG = {
     scripts: { title: "Scripts", icon: "▶️", entities: ["script.goodnight", "script.focus_mode", "script.movie_mode", "script.relax_mode", "script.pause_all_media", "script.living_room_lights_on", "script.living_room_lights_off", "script.travis_office_lights_on", "script.travis_office_lights_off", "script.goodnight_door_check", "script.goodnight_dim_lights", "script.goodnight_enable_security"] },
     quickControls: { title: "Quick Controls", icon: "🎛️", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan", "light.third_reality_inc_3rcb01057z", "light.third_reality_inc_3rcb01057z_2", "light.third_reality_inc_3rcb01057z_3", "light.third_reality_inc_3rcb01057z_4", "light.third_reality_inc_3rcb01057z_5", "light.third_reality_inc_3rcb01057z_6", "light.p1s_01p00a412300832_chamber_light", "light.travis_office_p1s_uno_chamber_light"] },
     cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.downstairs_live_view"] },
-    security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2"] },
-    doors: { title: "Doors", icon: "🚪", entities: ["binary_sensor.living_room_front_door", "binary_sensor.backdoor"] },
+    security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2", "event.front_door_ding", "event.front_door_motion", "event.downstairs_motion", "sensor.front_door_last_activity", "sensor.downstairs_last_activity"] },
+    doors: { title: "Doors", icon: "🚪", entities: ["binary_sensor.living_room_front_door", "binary_sensor.backdoor"], lastActivity: { "binary_sensor.living_room_front_door": "sensor.front_door_last_activity", "binary_sensor.backdoor": "sensor.downstairs_last_activity" } },
     environment: { title: "Environment", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_illuminance", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2", "sensor.hobeian_zg_204zx_illuminance_2"] },
     presence: { title: "Presence", icon: "👤", entities: ["binary_sensor.hobeian_zg_204zx", "binary_sensor.hobeian_zg_204zx_2"] },
     system: { title: "System", icon: "⚙️", entities: ["sensor.home_assistant_core_cpu_percent", "sensor.home_assistant_core_memory_percent", "sensor.ha_disk_usage", "vacuum.geordi_la_forge", "vacuum.pooper_litter_box", "update.home_assistant_core_update", "update.home_assistant_operating_system_update", "update.home_assistant_supervisor_update"] }
@@ -462,6 +462,20 @@ function escapeHtml(s) {
 function formatTemp(v) {
   if (v == null || v === "unknown" || v === "unavailable") return "--";
   return `${Math.round(v)}°`;
+}
+
+function relativeTime(isoString) {
+  if (!isoString || isoString === "unknown" || isoString === "unavailable") return "";
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return "";
+  const diff = Date.now() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
 }
 
 function setStatus(cls) {
@@ -741,6 +755,16 @@ function getAlerts() {
       const val = parseFloat(state.state);
       if (!isNaN(val) && val < 20) alerts.push(`${friendlyName(id)} low`);
     }
+    if (domain === "event" && !isUnavailable(state)) {
+      const label = friendlyName(id);
+      const when = relativeTime(state.state);
+      alerts.push(when ? `${label} · ${when}` : label);
+    }
+    if (domain === "sensor" && id.includes("last_activity") && !isUnavailable(state)) {
+      const label = friendlyName(id);
+      const when = relativeTime(state.state);
+      if (when) alerts.push(`${label} · ${when}`);
+    }
   }
   const sys = config.sections && config.sections.system ? config.sections.system.entities : [];
   for (const id of sys) {
@@ -800,6 +824,8 @@ function renderDoors() {
   const doorIds = (config.sections && config.sections.doors && config.sections.doors.entities) || [];
   if (!doorIds.length) return "<div style='color:var(--text-muted);font-family:var(--font-mono);'>NO DOOR DATA</div>";
 
+  const lastActivityMap = (config.sections && config.sections.doors && config.sections.doors.lastActivity) || {};
+
   const cards = doorIds.map(id => {
     const state = states[id];
     const offline = isUnavailable(state);
@@ -808,11 +834,21 @@ function renderDoors() {
     const statusText = offline ? "OFFLINE" : (open ? "OPEN" : "CLOSED");
     const statusColor = offline ? "var(--text-muted)" : (open ? "var(--danger)" : "var(--green)");
     const ledState = offline ? "off" : (open ? "danger" : "on");
+
+    const lastActivityId = lastActivityMap[id];
+    const lastActivityState = lastActivityId && states[lastActivityId];
+    const lastActivity = lastActivityState && !isUnavailable(lastActivityState)
+      ? relativeTime(lastActivityState.state)
+      : "";
+
     return `
       <div class="terminal-panel" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;" data-entity-id="${id}">
         <div style="display:flex;align-items:center;gap:10px;">
           ${renderStatusLed(ledState)}
-          <span style="font-family:var(--font-mono);font-size:1rem;color:var(--text);">${escapeHtml(label)}</span>
+          <div>
+            <div style="font-family:var(--font-mono);font-size:1rem;color:var(--text);">${escapeHtml(label)}</div>
+            ${lastActivity ? `<div style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(lastActivity)}</div>` : ""}
+          </div>
         </div>
         <span style="font-family:var(--font-mono);font-size:1.1rem;color:${statusColor};">${statusText}</span>
       </div>`;

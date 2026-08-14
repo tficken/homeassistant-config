@@ -102,7 +102,12 @@
         "sensor.front_door_battery",
         "sensor.downstairs_battery",
         "siren.downstairs_siren",
-        "siren.downstairs_siren_2"
+        "siren.downstairs_siren_2",
+        "event.front_door_ding",
+        "event.front_door_motion",
+        "event.downstairs_motion",
+        "sensor.front_door_last_activity",
+        "sensor.downstairs_last_activity"
       ]
     },
     "doors": {
@@ -111,7 +116,11 @@
       "entities": [
         "binary_sensor.living_room_front_door",
         "binary_sensor.backdoor"
-      ]
+      ],
+      "lastActivity": {
+        "binary_sensor.living_room_front_door": "sensor.front_door_last_activity",
+        "binary_sensor.backdoor": "sensor.downstairs_last_activity"
+      }
     },
     "environment": {
       "title": "Environment",
