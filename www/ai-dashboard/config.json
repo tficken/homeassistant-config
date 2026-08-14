@@ -103,9 +103,6 @@
         "sensor.downstairs_battery",
         "siren.downstairs_siren",
         "siren.downstairs_siren_2",
-        "event.front_door_ding",
-        "event.front_door_motion",
-        "event.downstairs_motion",
         "sensor.front_door_last_activity",
         "sensor.downstairs_last_activity"
       ]

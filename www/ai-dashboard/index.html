@@ -275,7 +275,7 @@ const DEFAULT_CONFIG = {
     scripts: { title: "Scripts", icon: "▶️", entities: ["script.goodnight", "script.focus_mode", "script.movie_mode", "script.relax_mode", "script.pause_all_media", "script.living_room_lights_on", "script.living_room_lights_off", "script.travis_office_lights_on", "script.travis_office_lights_off", "script.goodnight_door_check", "script.goodnight_dim_lights", "script.goodnight_enable_security"] },
     quickControls: { title: "Quick Controls", icon: "🎛️", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan", "light.third_reality_inc_3rcb01057z", "light.third_reality_inc_3rcb01057z_2", "light.third_reality_inc_3rcb01057z_3", "light.third_reality_inc_3rcb01057z_4", "light.third_reality_inc_3rcb01057z_5", "light.third_reality_inc_3rcb01057z_6", "light.p1s_01p00a412300832_chamber_light", "light.travis_office_p1s_uno_chamber_light"] },
     cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.downstairs_live_view"] },
-    security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2", "event.front_door_ding", "event.front_door_motion", "event.downstairs_motion", "sensor.front_door_last_activity", "sensor.downstairs_last_activity"] },
+    security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2", "sensor.front_door_last_activity", "sensor.downstairs_last_activity"] },
     doors: { title: "Doors", icon: "🚪", entities: ["binary_sensor.living_room_front_door", "binary_sensor.backdoor"], lastActivity: { "binary_sensor.living_room_front_door": "sensor.front_door_last_activity", "binary_sensor.backdoor": "sensor.downstairs_last_activity" } },
     environment: { title: "Environment", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_illuminance", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2", "sensor.hobeian_zg_204zx_illuminance_2"] },
     presence: { title: "Presence", icon: "👤", entities: ["binary_sensor.hobeian_zg_204zx", "binary_sensor.hobeian_zg_204zx_2"] },
@@ -754,11 +754,6 @@ function getAlerts() {
     if (domain === "sensor" && deviceClass === "battery") {
       const val = parseFloat(state.state);
       if (!isNaN(val) && val < 20) alerts.push(`${friendlyName(id)} low`);
-    }
-    if (domain === "event" && !isUnavailable(state)) {
-      const label = friendlyName(id);
-      const when = relativeTime(state.state);
-      alerts.push(when ? `${label} · ${when}` : label);
     }
     if (domain === "sensor" && id.includes("last_activity") && !isUnavailable(state)) {
       const label = friendlyName(id);
