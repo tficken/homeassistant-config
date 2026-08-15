@@ -438,6 +438,20 @@ function presenceLabel(entityId) {
   return friendlyName(entityId);
 }
 
+function sectionTitle(key, fallback) {
+  const s = config.sections && config.sections[key];
+  const t = s && s.title ? String(s.title) : (fallback || key);
+  return t.toUpperCase();
+}
+
+function orderedSectionKeys(keys) {
+  const order = Array.isArray(config.sectionOrder) ? config.sectionOrder : [];
+  return keys.slice().sort((a, b) => {
+    const ia = order.indexOf(a), ib = order.indexOf(b);
+    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+  });
+}
+
 function entityArea(entityId) {
   return (window.HA_AREAS && window.HA_AREAS[entityId]) || "";
 }
@@ -974,6 +988,14 @@ function renderHomeScreen() {
   const timeStrMarked = escapeHtml(timeStr).replace(/:/g, '<span class="colon">:</span>');
   const dateStr = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
 
+  const homeSectionPanels = {
+    presence: renderTerminalPanel(sectionTitle("presence"), `<div style="display:flex;gap:10px;">${presence}</div>`),
+    doors: renderTerminalPanel(sectionTitle("doors"), renderDoors())
+  };
+  const homeRightSections = orderedSectionKeys(["presence", "doors"])
+    .map(k => `<div style="flex-shrink:0;">${homeSectionPanels[k]}</div>`)
+    .join("");
+
   const main = `
     ${renderAlertBanner(getAlerts())}
     <div style="display:grid;grid-template-columns:0.9fr 1.2fr 1fr;gap:14px;flex:1;min-height:0;">
@@ -987,8 +1009,7 @@ function renderHomeScreen() {
       </div>
       <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
         <div style="flex:1;min-height:0;">${renderRadarFrame()}</div>
-        <div style="flex-shrink:0;">${renderTerminalPanel("PRESENCE", `<div style="display:flex;gap:10px;">${presence}</div>`)}</div>
-        <div style="flex-shrink:0;">${renderTerminalPanel("DOORS", renderDoors())}</div>
+        ${homeRightSections}
       </div>
     </div>
   `;
@@ -1011,14 +1032,14 @@ function renderControlScreen() {
   const main = `
     <div style="display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:14px;flex:1;min-height:0;">
       <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
-        ${renderTerminalPanel("SCENES", `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${sceneButtons || "<div style='color:var(--text-muted)'>NO SCENES</div>"}</div>`)}
+        ${renderTerminalPanel(sectionTitle("scenes"), `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${sceneButtons || "<div style='color:var(--text-muted)'>NO SCENES</div>"}</div>`)}
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
-        ${renderTerminalPanel("LIGHTS", lightCards || "<div style='color:var(--text-muted)'>NO LIGHTS</div>")}
+        ${renderTerminalPanel(sectionTitle("quickControls"), lightCards || "<div style='color:var(--text-muted)'>NO LIGHTS</div>")}
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
         <div style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;">
-          ${renderTerminalPanel("SCRIPTS", `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${scriptButtons || "<div style='color:var(--text-muted)'>NO SCRIPTS</div>"}</div>`)}
+          ${renderTerminalPanel(sectionTitle("scripts"), `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${scriptButtons || "<div style='color:var(--text-muted)'>NO SCRIPTS</div>"}</div>`)}
         </div>
         <div style="flex-shrink:0;">
           ${renderMediaCard(mediaId)}
@@ -1093,8 +1114,8 @@ async function renderStatusScreen() {
 
   const main = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0;overflow:hidden;">
-      <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel("ENVIRONMENT", envMetrics)}</div>
-      <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel("SYSTEM", sysMetrics + vacuumCards + printerCards)}</div>
+      <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel(sectionTitle("environment"), envMetrics)}</div>
+      <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel(sectionTitle("system"), sysMetrics + vacuumCards + printerCards)}</div>
     </div>
   `;
   document.getElementById("status-screen").innerHTML = main;
@@ -1117,7 +1138,7 @@ function renderSecurityScreen() {
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;min-height:0;overflow:hidden;">
       ${cameraFeeds}
     </div>
-    <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel("DOOR & MOTION STATUS", `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;">${securityCards}</div>`)}</div>
+    <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel(sectionTitle("security"), `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;">${securityCards}</div>`)}</div>
   `;
   document.getElementById("security-screen").innerHTML = main;
 }
