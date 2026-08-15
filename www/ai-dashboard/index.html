@@ -1227,7 +1227,7 @@ function closeSettings() {
   document.getElementById("settings-overlay").style.display = "none";
 }
 
-const SETTINGS_TABS = ["Appearance", "Sections", "Data"];
+const SETTINGS_TABS = ["Appearance", "Sections", "New Devices", "Data"];
 let settingsTab = "Appearance";
 
 function switchSettingsTab(name) {
@@ -1253,6 +1253,8 @@ function buildSettings() {
   } else if (settingsTab === "Sections") {
     body.innerHTML = renderSectionsTab();
     initSectionsEditor();
+  } else if (settingsTab === "New Devices") {
+    body.innerHTML = renderNewDevicesTab();
   } else {
     body.innerHTML = renderDataTab();
   }
@@ -1485,6 +1487,108 @@ function initEditorDrag() {
       config.sectionOrder = order;
     }
   }
+}
+
+const NEW_DEVICE_DOMAINS = ["light", "switch", "scene", "script", "fan", "sensor", "binary_sensor", "camera", "media_player", "vacuum", "lock", "cover", "siren", "update"];
+
+function collectReferencedIds() {
+  const ids = new Set();
+  if (config.entities) {
+    if (config.entities.weather) ids.add(config.entities.weather);
+    if (config.entities.mediaPlayer) ids.add(config.entities.mediaPlayer);
+    for (const t of (config.entities.temperatures || [])) ids.add(t);
+    for (const t of (config.entities.summaryChips || [])) ids.add(t);
+  }
+  for (const key of Object.keys(config.sections || {})) {
+    const sec = config.sections[key];
+    for (const id of (sec.entities || [])) ids.add(id);
+    if (sec.lastActivity) for (const v of Object.values(sec.lastActivity)) ids.add(v);
+  }
+  for (const item of (config.dock && config.dock.items) || []) {
+    if (item.entityId) ids.add(item.entityId);
+  }
+  return ids;
+}
+
+function computeNewEntities() {
+  const referenced = collectReferencedIds();
+  return Object.values(states)
+    .map(s => s.entity_id)
+    .filter(id => NEW_DEVICE_DOMAINS.includes(id.split(".")[0]) && !referenced.has(id))
+    .sort((a, b) => friendlyName(a).localeCompare(friendlyName(b)));
+}
+
+function computeMissingEntities() {
+  const referenced = collectReferencedIds();
+  const missing = [];
+  for (const id of referenced) {
+    if (!states[id] && !entityById[id]) missing.push(id);
+  }
+  return missing.sort();
+}
+
+function renderNewDevicesTab() {
+  const fresh = computeNewEntities();
+  const missing = computeMissingEntities();
+  const sectionOpts = Object.keys(config.sections || {})
+    .map(k => `<option value="${k}">${escapeHtml(config.sections[k].title || k)}</option>`).join("");
+  const freshRows = fresh.map(id =>
+    `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
+       <span style="flex:1;min-width:180px;font-size:0.85rem;">${escapeHtml(friendlyName(id))} <span style="color:var(--text-muted);">${id}</span></span>
+       <span style="color:var(--text-muted);font-size:0.8rem;">${escapeHtml(entityArea(id) || "")}</span>
+       <select data-newtarget="${escapeHtml(id)}">${sectionOpts}</select>
+       <button class="btn" onclick="addNewEntity('${escapeHtml(id)}')">Add</button>
+     </div>`).join("");
+  const missingRows = missing.map(id =>
+    `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
+       <span style="flex:1;font-size:0.85rem;color:var(--danger);">${escapeHtml(id)}</span>
+       <button class="btn" onclick="removeMissingEntity('${escapeHtml(id)}')">Remove</button>
+     </div>`).join("");
+  return `
+    <div class="settings-section" style="margin-bottom:22px;">
+      <h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">New Entities (${fresh.length})</h3>
+      <p style="color:var(--text-muted);font-size:0.8rem;margin:0 0 8px;">Entities that exist in Home Assistant but are not on the dashboard. Pick a section and tap Add.</p>
+      ${freshRows || "<p style='color:var(--text-muted);font-size:0.85rem;'>Nothing new — every entity is on the dashboard.</p>"}
+    </div>
+    <div class="settings-section">
+      <h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">Missing Entities (${missing.length})</h3>
+      <p style="color:var(--text-muted);font-size:0.8rem;margin:0 0 8px;">Config entries whose entity no longer exists in Home Assistant.</p>
+      ${missingRows || "<p style='color:var(--text-muted);font-size:0.85rem;'>No stale entries in the config.</p>"}
+    </div>`;
+}
+
+function addNewEntity(id) {
+  const sel = document.querySelector(`[data-newtarget="${id}"]`);
+  const key = sel ? sel.value : null;
+  if (!key || !config.sections[key]) return;
+  const sec = config.sections[key];
+  sec.entities = sec.entities || [];
+  if (!sec.entities.includes(id)) sec.entities.push(id);
+  renderAll();
+  buildSettings();
+}
+
+function removeMissingEntity(id) {
+  for (const key of Object.keys(config.sections || {})) {
+    const sec = config.sections[key];
+    if (Array.isArray(sec.entities)) sec.entities = sec.entities.filter(x => x !== id);
+    if (sec.lastActivity) {
+      for (const k of Object.keys(sec.lastActivity)) {
+        if (k === id || sec.lastActivity[k] === id) delete sec.lastActivity[k];
+      }
+    }
+  }
+  if (config.entities) {
+    if (config.entities.weather === id) config.entities.weather = "";
+    if (config.entities.mediaPlayer === id) config.entities.mediaPlayer = "";
+    config.entities.temperatures = (config.entities.temperatures || []).filter(x => x !== id);
+    config.entities.summaryChips = (config.entities.summaryChips || []).filter(x => x !== id);
+  }
+  if (config.dock && Array.isArray(config.dock.items)) {
+    config.dock.items = config.dock.items.filter(i => i.entityId !== id);
+  }
+  renderAll();
+  buildSettings();
 }
 
 async function saveSettings() {
