@@ -1380,6 +1380,111 @@ function initSectionsEditor() {
       if (sel && sel.value) addSectionEntity(key, sel.value);
     });
   });
+  initEditorDrag();
+}
+
+function initEditorDrag() {
+  const body = document.getElementById("settings-body");
+  if (!body) return;
+  let drag = null;
+
+  body.querySelectorAll("[data-drag-chip]").forEach(h => {
+    h.addEventListener("pointerdown", ev => startDrag(ev, "chip", h.closest(".entity-chip")));
+  });
+  body.querySelectorAll("[data-drag-section]").forEach(h => {
+    h.addEventListener("pointerdown", ev => startDrag(ev, "section", h.closest(".editor-section")));
+  });
+
+  function startDrag(ev, kind, el) {
+    if (!el) return;
+    ev.preventDefault();
+    drag = {
+      kind,
+      el,
+      key: kind === "chip" ? el.getAttribute("data-section") : el.getAttribute("data-section-key"),
+      id: kind === "chip" ? el.getAttribute("data-entity") : null,
+      pointerId: ev.pointerId,
+      startY: ev.clientY,
+      moved: false
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp, { once: true });
+  }
+
+  function onMove(ev) {
+    if (!drag || ev.pointerId !== drag.pointerId) return;
+    if (!drag.moved && Math.abs(ev.clientY - drag.startY) < 6) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      drag.el.classList.add("dragging");
+    }
+    clearIndicators();
+    const target = findDropTarget(ev);
+    if (target) target.classList.add("drop-before");
+  }
+
+  function onUp(ev) {
+    document.removeEventListener("pointermove", onMove);
+    if (!drag) return;
+    const target = drag.moved ? findDropTarget(ev) : null;
+    drag.el.classList.remove("dragging");
+    clearIndicators();
+    const d = drag;
+    drag = null;
+    if (d.moved && target) {
+      applyDrop(d, target);
+      renderAll();
+      buildSettings();
+    }
+  }
+
+  function findDropTarget(ev) {
+    const el = document.elementFromPoint(ev.clientX, ev.clientY);
+    if (!el) return null;
+    if (drag.kind === "chip") {
+      const chip = el.closest(".entity-chip");
+      if (chip && chip !== drag.el) return chip;
+      const list = el.closest("[data-chip-list]");
+      if (list) return list;
+      return null;
+    }
+    const sec = el.closest(".editor-section");
+    if (sec && sec !== drag.el) return sec;
+    return null;
+  }
+
+  function clearIndicators() {
+    document.querySelectorAll(".drop-before").forEach(x => x.classList.remove("drop-before"));
+  }
+
+  function applyDrop(d, target) {
+    if (d.kind === "chip") {
+      const id = d.id;
+      const fromKey = d.key;
+      let toKey, beforeId = null;
+      if (target.classList.contains("entity-chip")) {
+        toKey = target.getAttribute("data-section");
+        beforeId = target.getAttribute("data-entity");
+      } else {
+        toKey = target.getAttribute("data-chip-list");
+      }
+      const from = (config.sections[fromKey].entities || []).filter(x => x !== id);
+      config.sections[fromKey].entities = from;
+      const to = fromKey === toKey ? from : (config.sections[toKey].entities || []).filter(x => x !== id);
+      let index = beforeId ? to.indexOf(beforeId) : -1;
+      if (index === -1) index = to.length;
+      to.splice(index, 0, id);
+      config.sections[toKey].entities = to;
+    } else {
+      const key = d.key;
+      const beforeKey = target.getAttribute("data-section-key");
+      const order = (Array.isArray(config.sectionOrder) ? config.sectionOrder : []).filter(k => k !== key);
+      let index = beforeKey ? order.indexOf(beforeKey) : -1;
+      if (index === -1) index = order.length;
+      order.splice(index, 0, key);
+      config.sectionOrder = order;
+    }
+  }
 }
 
 async function saveSettings() {
