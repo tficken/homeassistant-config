@@ -547,6 +547,31 @@ function relativeTime(isoString) {
   return `${days}d ago`;
 }
 
+const DOOR_RECENT_WINDOW_MS = 10 * 60 * 1000;
+
+function recentDoorIds() {
+  const map = (config.sections && config.sections.doors && config.sections.doors.lastActivity) || {};
+  const recent = [];
+  for (const doorId of Object.keys(map)) {
+    const s = states[map[doorId]];
+    if (!s || isUnavailable(s)) continue;
+    const t = new Date(s.state).getTime();
+    if (!isNaN(t) && Date.now() - t < DOOR_RECENT_WINDOW_MS) recent.push(doorId);
+  }
+  return recent;
+}
+
+let lastRecentDoorKey = "";
+function refreshDoorRecency() {
+  const key = recentDoorIds().join(",");
+  if (key === lastRecentDoorKey) return;
+  lastRecentDoorKey = key;
+  const el = document.getElementById("doors-panel");
+  if (el && currentScreen === "home") {
+    el.innerHTML = renderTerminalPanel(sectionTitle("doors"), renderDoors());
+  }
+}
+
 function setStatus(cls) {
   const led = document.getElementById("status-led");
   const text = document.getElementById("status-text");
@@ -907,6 +932,7 @@ function renderDoors() {
   if (!doorIds.length) return "<div style='color:var(--text-muted);font-family:var(--font-mono);'>NO DOOR DATA</div>";
 
   const lastActivityMap = (config.sections && config.sections.doors && config.sections.doors.lastActivity) || {};
+  const recentDoors = recentDoorIds();
 
   const cards = doorIds.map(id => {
     const state = states[id];
@@ -922,14 +948,15 @@ function renderDoors() {
     const lastActivity = lastActivityState && !isUnavailable(lastActivityState)
       ? relativeTime(lastActivityState.state)
       : "";
+    const isRecent = recentDoors.includes(id);
 
     return `
-      <div class="terminal-panel" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;" data-entity-id="${id}">
+      <div class="terminal-panel" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;${isRecent ? "border-left:3px solid var(--amber);" : ""}" data-entity-id="${id}">
         <div style="display:flex;align-items:center;gap:10px;">
           ${renderStatusLed(ledState)}
           <div>
             <div style="font-family:var(--font-mono);font-size:1rem;color:var(--text);">${escapeHtml(label)}</div>
-            ${lastActivity ? `<div style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(lastActivity)}</div>` : ""}
+            ${lastActivity ? `<div style="font-size:0.75rem;color:var(--text-muted);">${isRecent ? '<span style="color:var(--amber);font-family:var(--font-mono);">RECENT&nbsp;</span>' : ""}${escapeHtml(lastActivity)}</div>` : ""}
           </div>
         </div>
         <span style="font-family:var(--font-mono);font-size:1.1rem;color:${statusColor};">${statusText}</span>
@@ -1027,7 +1054,7 @@ function renderHomeScreen() {
   const dateStr = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
 
   const presencePanel = renderTerminalPanel(sectionTitle("presence"), `<div style="display:flex;flex-direction:column;gap:10px;height:100%;justify-content:space-evenly;">${presence}</div>`, "fill");
-  const doorsPanel = renderTerminalPanel(sectionTitle("doors"), renderDoors());
+  const doorsPanel = `<div id="doors-panel">${renderTerminalPanel(sectionTitle("doors"), renderDoors())}</div>`;
 
   const calStates = Object.keys(states).filter(id => id.startsWith("calendar.")).map(id => states[id]).filter(Boolean);
   const cal = calStates.find(s => s.state === "on") || calStates.find(s => s.attributes && s.attributes.message);
@@ -1073,6 +1100,7 @@ function renderHomeScreen() {
 
   document.getElementById("home-screen").innerHTML = main;
   initRadarMap();
+  lastRecentDoorKey = recentDoorIds().join(",");
 }
 
 function renderControlScreen() {
@@ -1783,6 +1811,7 @@ async function init() {
     if (token) connect();
   }
   setInterval(updateClock, 1000);
+  setInterval(refreshDoorRecency, 30000);
 }
 
 document.addEventListener("DOMContentLoaded", init);
