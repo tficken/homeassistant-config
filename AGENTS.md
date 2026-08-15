@@ -151,6 +151,7 @@ Stored under `blueprints/`. These are Home Assistant-provided reusable templates
 
 ### AI Dashboard Development Workflow
 
+0. **Prefer the built-in Settings editor for content changes.** Click `[ SETTINGS ]` (top-right) on the dashboard: the **Sections** tab edits/reorders section titles, icons, and tiles with drag-and-drop, and the **New Devices** tab lists entities not yet on the dashboard for one-tap placement. Save & Apply persists to `config.json` on the server via `POST /ai-dashboard/api/config` (a timestamped `config.json.bak.*` backup is created on every save), so changes are shared by all devices. Only edit `config.json` by hand for structural changes the editor doesn't cover.
 1. Edit `www/ai-dashboard/index.html` and/or `www/ai-dashboard/config.json` directly.
 2. Validate HTML syntax with the local Node.js install or Python's `html.parser`:
    ```bash
@@ -197,7 +198,7 @@ Each integration is a Home Assistant standard package with a `manifest.json`, `_
 - **Version**: `1.0.0`.
 - **Key Modules**:
   - `__init__.py` — integration setup.
-  - `http.py` — HTTP/WebSocket views: serves dashboard assets with registry-derived area names injected, proxies HA state events and service calls over `/ai-dashboard/ws`, and exposes helper endpoints `POST /ai-dashboard/api/forecast` (weather forecast) and `POST /ai-dashboard/api/history` (recorder state history for sparklines, via `homeassistant.components.recorder.history.get_significant_states` run in the recorder executor).
+  - `http.py` — HTTP/WebSocket views: serves dashboard assets with registry-derived area names injected, proxies HA state events and service calls over `/ai-dashboard/ws`, and exposes helper endpoints `POST /ai-dashboard/api/forecast` (weather forecast), `POST /ai-dashboard/api/history` (recorder state history for sparklines, via `homeassistant.components.recorder.history.get_significant_states` run in the recorder executor), and `POST /ai-dashboard/api/config` (persists the dashboard config to `www/ai-dashboard/config.json` with a timestamped backup and atomic write).
 - **Restart Required**: Any change to this component's Python requires a Home Assistant restart to take effect.
 
 ### `bambu_lab`
