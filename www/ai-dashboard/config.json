@@ -13,6 +13,7 @@
     "right": ["scenes", "quickControls", "security", "system", "cameras"],
     "clock24h": false
   },
+  "sectionOrder": ["home", "scenes", "scripts", "quickControls", "cameras", "security", "doors", "environment", "presence", "system"],
   "entities": {
     "weather": "weather.forecast_home",
     "temperatures": [
@@ -20,13 +21,7 @@
       "sensor.hobeian_zg_204zx_temperature_2"
     ],
     "summaryChips": [],
-    "mediaPlayer": "media_player.living_room_fire_tv_living_room",
-    "quickControls": [
-      "scene.all_lights_off",
-      "script.living_room_lights_on",
-      "script.goodnight",
-      "light.living_room_ceiling_fan"
-    ]
+    "mediaPlayer": "media_player.living_room_fire_tv_living_room"
   },
   "sections": {
     "home": {
