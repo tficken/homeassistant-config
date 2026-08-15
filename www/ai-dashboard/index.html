@@ -250,9 +250,8 @@ input[type="range"] { accent-color: var(--green); }
       <button class="settings-close" onclick="closeSettings()">Close</button>
     </div>
     <div id="settings-body"></div>
-    <div class="settings-row" style="display:flex;gap:12px;justify-content:flex-end;margin-top:16px;">
-      <button class="btn" onclick="exportConfig()">Export JSON</button>
-      <button class="btn" onclick="importConfig()">Import JSON</button>
+    <div id="settings-status" style="color:var(--amber);font-family:var(--font-mono);font-size:0.8rem;margin-top:12px;min-height:1em;"></div>
+    <div class="settings-row" style="display:flex;gap:12px;justify-content:flex-end;margin-top:10px;">
       <button class="btn btn-primary" onclick="saveSettings()">Save & Apply</button>
     </div>
   </div>
@@ -266,8 +265,7 @@ const DEFAULT_CONFIG = {
     weather: "weather.forecast_home",
     temperatures: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_temperature_2"],
     summaryChips: [],
-    mediaPlayer: "media_player.living_room_fire_tv_living_room",
-    quickControls: ["scene.all_lights_off", "script.living_room_lights_on", "script.goodnight", "light.living_room_ceiling_fan"]
+    mediaPlayer: "media_player.living_room_fire_tv_living_room"
   },
   sections: {
     home: { title: "Home", icon: "🏠", entities: ["person.woteg", "person.bobbie", "weather.forecast_home"] },
@@ -281,6 +279,7 @@ const DEFAULT_CONFIG = {
     presence: { title: "Presence", icon: "👤", entities: ["binary_sensor.hobeian_zg_204zx", "binary_sensor.hobeian_zg_204zx_2"] },
     system: { title: "System", icon: "⚙️", entities: ["sensor.home_assistant_core_cpu_percent", "sensor.home_assistant_core_memory_percent", "sensor.ha_disk_usage", "vacuum.geordi_la_forge", "vacuum.pooper_litter_box", "update.home_assistant_core_update", "update.home_assistant_operating_system_update", "update.home_assistant_supervisor_update"] }
   },
+  sectionOrder: ["home", "scenes", "scripts", "quickControls", "cameras", "security", "doors", "environment", "presence", "system"],
   dock: { items: [{ icon: "💡", entityId: "scene.all_lights_off", label: "All off" }, { icon: "🌙", entityId: "script.goodnight", label: "Goodnight" }, { icon: "⚙️", action: "settings", label: "Settings" }] }
 };
 
@@ -388,16 +387,37 @@ async function loadConfig() {
     const r = await fetch("config.json", { cache: "no-store" });
     if (r.ok) fileConfig = await r.json();
   } catch (e) {}
-  let lsConfig = {};
-  try {
-    const raw = localStorage.getItem("ha_dashboard_config");
-    if (raw) lsConfig = JSON.parse(raw);
-  } catch (e) {}
-  return deepMerge(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), fileConfig, lsConfig);
+  const cfg = deepMerge(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), fileConfig);
+  migrateConfig(cfg);
+  return cfg;
 }
 
-function saveConfig() {
-  localStorage.setItem("ha_dashboard_config", JSON.stringify(config));
+function migrateConfig(cfg) {
+  if (cfg.entities && Array.isArray(cfg.entities.quickControls)) {
+    const legacy = cfg.entities.quickControls;
+    if (legacy.length &&
+        (!cfg.sections.quickControls || !Array.isArray(cfg.sections.quickControls.entities) || !cfg.sections.quickControls.entities.length)) {
+      cfg.sections.quickControls = cfg.sections.quickControls || { title: "Quick Controls", icon: "🎛️", entities: [] };
+      cfg.sections.quickControls.entities = legacy;
+    }
+    delete cfg.entities.quickControls;
+  }
+  const keys = Object.keys(cfg.sections || {});
+  if (!Array.isArray(cfg.sectionOrder)) cfg.sectionOrder = [];
+  cfg.sectionOrder = cfg.sectionOrder.filter(k => keys.includes(k));
+  for (const k of keys) if (!cfg.sectionOrder.includes(k)) cfg.sectionOrder.push(k);
+}
+
+async function saveConfig() {
+  const res = await apiCall("POST", "/ai-dashboard/api/config", config);
+  if (res && res.success === true) return true;
+  setSettingsStatus("SAVE FAILED — changes are live but not persisted. Use Data > Export JSON as a backup.");
+  return false;
+}
+
+function setSettingsStatus(msg) {
+  const el = document.getElementById("settings-status");
+  if (el) el.textContent = msg || "";
 }
 
 function applyTheme() {
@@ -1222,15 +1242,22 @@ function removeQuick(id) {
   buildSettings();
 }
 
-function saveSettings() {
-  config.theme.accentColor = document.getElementById("cfg-accent").value;
-  config.layout.clock24h = document.getElementById("cfg-24h").checked;
-  config.entities.weather = document.getElementById("cfg-weather").value || "";
-  config.entities.mediaPlayer = document.getElementById("cfg-media").value || "";
-  saveConfig();
+async function saveSettings() {
+  const accentEl = document.getElementById("cfg-accent");
+  if (accentEl) config.theme.accentColor = accentEl.value;
+  const clockEl = document.getElementById("cfg-24h");
+  if (clockEl) config.layout.clock24h = clockEl.checked;
+  const weatherEl = document.getElementById("cfg-weather");
+  if (weatherEl) config.entities.weather = weatherEl.value || "";
+  const mediaEl = document.getElementById("cfg-media");
+  if (mediaEl) config.entities.mediaPlayer = mediaEl.value || "";
   applyTheme();
-  renderAll();
-  closeSettings();
+  await renderAll();
+  const ok = await saveConfig();
+  if (ok) {
+    setSettingsStatus("");
+    closeSettings();
+  }
 }
 
 function exportConfig() {
@@ -1250,7 +1277,7 @@ function importConfig() {
       const txt = await file.text();
       const data = JSON.parse(txt);
       config = deepMerge(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), data);
-      saveConfig();
+      migrateConfig(config);
       applyTheme();
       renderAll();
       buildSettings();
