@@ -244,12 +244,13 @@ input[type="range"] { accent-color: var(--green); }
 </div>
 
 <div id="settings-overlay" style="position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.75);display:none;align-items:center;justify-content:center;">
-  <div id="settings-panel" class="terminal-panel" style="width:min(760px,92vw);max-height:88vh;overflow-y:auto;">
-    <div class="settings-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+  <div id="settings-panel" class="terminal-panel" style="width:min(860px,94vw);max-height:88vh;display:flex;flex-direction:column;">
+    <div class="settings-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <h2 class="settings-title" style="font-size:1.2rem;font-weight:700;margin:0;font-family:var(--font-mono);">Dashboard Settings</h2>
       <button class="settings-close" onclick="closeSettings()">Close</button>
     </div>
-    <div id="settings-body"></div>
+    <div id="settings-tabs" style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;"></div>
+    <div id="settings-body" style="overflow-y:auto;flex:1;min-height:0;"></div>
     <div id="settings-status" style="color:var(--amber);font-family:var(--font-mono);font-size:0.8rem;margin-top:12px;min-height:1em;"></div>
     <div class="settings-row" style="display:flex;gap:12px;justify-content:flex-end;margin-top:10px;">
       <button class="btn btn-primary" onclick="saveSettings()">Save & Apply</button>
@@ -1222,45 +1223,63 @@ function closeSettings() {
   document.getElementById("settings-overlay").style.display = "none";
 }
 
+const SETTINGS_TABS = ["Appearance", "Data"];
+let settingsTab = "Appearance";
+
+function switchSettingsTab(name) {
+  settingsTab = name;
+  buildSettings();
+}
+
+function entityOptionTags(domainFilter) {
+  let list = Object.values(states);
+  if (domainFilter) list = list.filter(s => domainFilter.includes(s.entity_id.split(".")[0]));
+  return list.map(s => `<option value="${s.entity_id}">${escapeHtml(friendlyName(s.entity_id))} (${s.entity_id})</option>`).join("");
+}
+
 function buildSettings() {
-  const body = document.getElementById("settings-body");
-  const entityOptions = (domainFilter) => {
-    let list = Object.values(states);
-    if (domainFilter) list = list.filter(s => domainFilter.includes(s.entity_id.split(".")[0]));
-    return list.map(s => `<option value="${s.entity_id}" ${s.entity_id === config.entities.weather ? "selected" : ""}>${escapeHtml(friendlyName(s.entity_id))} (${s.entity_id})</option>`).join("");
-  };
-  const quickChips = (config.entities.quickControls || []).map(id =>
-    `<span class="entity-chip">${escapeHtml(friendlyName(id))} <button onclick="removeQuick('${id}')">×</button></span>`
+  const tabsEl = document.getElementById("settings-tabs");
+  tabsEl.innerHTML = SETTINGS_TABS.map(t =>
+    `<button class="btn" style="${t === settingsTab ? "border-color:var(--accent);color:var(--accent);" : ""}" onclick="switchSettingsTab('${t}')">${t}</button>`
   ).join("");
-  body.innerHTML = `
+  const body = document.getElementById("settings-body");
+  if (settingsTab === "Appearance") {
+    body.innerHTML = renderAppearanceTab();
+    wireAppearanceTab();
+  } else {
+    body.innerHTML = renderDataTab();
+  }
+}
+
+function renderAppearanceTab() {
+  return `
     <div class="settings-section" style="margin-bottom:22px;"><h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">Appearance</h3>
       <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">Accent color</label><input id="cfg-accent" type="color" value="${config.theme.accentColor}"></div>
       <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">24-hour clock</label><input id="cfg-24h" type="checkbox" ${config.layout.clock24h ? "checked" : ""}></div>
     </div>
     <div class="settings-section" style="margin-bottom:22px;"><h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">Layout</h3>
-      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">Weather entity</label><select id="cfg-weather"><option value="">-- none --</option>${entityOptions(["weather"])}</select></div>
-      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">Media player</label><select id="cfg-media"><option value="">-- none --</option>${entityOptions(["media_player"])}</select></div>
-    </div>
-    <div class="settings-section" style="margin-bottom:22px;"><h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">Quick Controls</h3><div id="quick-list">${quickChips}</div>
-      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><select id="cfg-add-quick"><option value="">Add entity...</option>${entityOptions(["light","switch","scene","script","fan","input_boolean","button"])}</select></div>
-    </div>
-    <div class="settings-section" style="margin-bottom:22px;"><h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">Data</h3>
-      <p style="color:var(--text-muted);font-size:0.85rem;">Settings are saved in this browser. Use Export to get a JSON file you can save as <code>config.json</code> in this folder.</p>
-      <button class="btn" onclick="logout()" style="background:rgba(248,113,113,0.15);border-color:rgba(248,113,113,0.3);">Clear token & reload</button>
+      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">Weather entity</label><select id="cfg-weather"><option value="">-- none --</option>${entityOptionTags(["weather"])}</select></div>
+      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">Media player</label><select id="cfg-media"><option value="">-- none --</option>${entityOptionTags(["media_player"])}</select></div>
     </div>
   `;
-  document.getElementById("cfg-weather").value = config.entities.weather || "";
-  document.getElementById("cfg-media").value = config.entities.mediaPlayer || "";
-  document.getElementById("cfg-add-quick").addEventListener("change", e => { if(e.target.value) addQuick(e.target.value); e.target.value=""; });
 }
 
-function addQuick(id) {
-  if (!config.entities.quickControls.includes(id)) config.entities.quickControls.push(id);
-  buildSettings();
+function wireAppearanceTab() {
+  document.getElementById("cfg-weather").value = config.entities.weather || "";
+  document.getElementById("cfg-media").value = config.entities.mediaPlayer || "";
 }
-function removeQuick(id) {
-  config.entities.quickControls = config.entities.quickControls.filter(x => x !== id);
-  buildSettings();
+
+function renderDataTab() {
+  return `
+    <div class="settings-section" style="margin-bottom:22px;">
+      <p style="color:var(--text-muted);font-size:0.85rem;">Settings are saved to <code>config.json</code> on the server when you press Save &amp; Apply, and shared by every device that opens this dashboard. Export keeps a local backup file.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+        <button class="btn" onclick="exportConfig()">Export JSON</button>
+        <button class="btn" onclick="importConfig()">Import JSON</button>
+      </div>
+      <button class="btn" onclick="logout()" style="background:rgba(248,113,113,0.15);border-color:rgba(248,113,113,0.3);">Clear token &amp; reload</button>
+    </div>
+  `;
 }
 
 async function saveSettings() {
