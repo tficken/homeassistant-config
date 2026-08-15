@@ -303,6 +303,7 @@ let areaMap = {};
 let entityById = {};
 let haConfig = null;
 let forecastCache = { daily: [], fetchedAt: null };
+let historyCache = {};
 let currentScreen = "home";
 
 async function apiFetch(path) {
@@ -351,6 +352,19 @@ async function refreshForecast() {
     return;
   }
   forecastCache.daily = [];
+}
+
+async function fetchHistory(entityIds, hours = 24) {
+  const missing = entityIds.filter(id => !historyCache[id]);
+  if (!missing.length) return;
+  const res = await apiCall("POST", "/ai-dashboard/api/history", {
+    entity_ids: missing,
+    hours: hours
+  });
+  if (!res) return;
+  for (const id of missing) {
+    if (Array.isArray(res[id])) historyCache[id] = res[id];
+  }
 }
 
 function deepMerge(target, ...sources) {
@@ -592,6 +606,22 @@ function renderMetricCard(entityId) {
   </div>`;
 }
 
+function renderSparkline(entityId, width = 100, height = 20) {
+  const data = historyCache[entityId];
+  if (!data || data.length < 2) return "";
+  const values = data.map(d => parseFloat(d.state)).filter(v => !isNaN(v));
+  if (values.length < 2) return "";
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * width;
+    const y = height - ((v - min) / range) * height;
+    return `${x},${y}`;
+  }).join(" ");
+  return `<svg width="${width}" height="${height}" style="display:block;margin:4px auto 0;"><polyline points="${points}" fill="none" stroke="rgba(20,254,23,0.45)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
 function renderEnvMetric(entityId) {
   const state = states[entityId];
   if (!state) return "";
@@ -600,9 +630,13 @@ function renderEnvMetric(entityId) {
   const labelMap = { temperature: "TEMP", humidity: "HUM", illuminance: "LIGHT" };
   const label = labelMap[deviceClass] || (deviceClass ? deviceClass.toUpperCase() : entityId.split("_").pop().toUpperCase());
   const offline = isUnavailable(state) ? renderOfflineBadge() : "";
+  const sparkline = (deviceClass === "temperature" || deviceClass === "humidity")
+    ? renderSparkline(entityId)
+    : "";
   return `<div class="terminal-panel" style="text-align:center;padding:10px 4px;" data-entity-id="${entityId}">
     <div style="font-family:var(--font-mono);font-size:1.5rem;color:var(--green);">${offline || escapeHtml(state.state)}<span style="font-size:0.75rem;color:var(--text-muted);">${offline ? "" : escapeHtml(unit)}</span></div>
     <div class="metric-label" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">${escapeHtml(label)}</div>
+    ${sparkline}
   </div>`;
 }
 
@@ -975,9 +1009,16 @@ function renderControlScreen() {
   document.getElementById("control-screen").innerHTML = main;
 }
 
-function renderStatusScreen() {
+async function renderStatusScreen() {
   const environment = (config.sections && config.sections.environment && config.sections.environment.entities) || [];
   const system = (config.sections && config.sections.system && config.sections.system.entities) || [];
+
+  const historyIds = environment.filter(id => {
+    const s = states[id];
+    const dc = s && s.attributes && s.attributes.device_class;
+    return dc === "temperature" || dc === "humidity";
+  });
+  await fetchHistory(historyIds, 24);
 
   const envGroups = {};
   const envOrder = [];
@@ -1061,7 +1102,7 @@ function renderSecurityScreen() {
   document.getElementById("security-screen").innerHTML = main;
 }
 
-function showScreen(name) {
+async function showScreen(name) {
   document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
   const target = document.getElementById(name + "-screen");
   if (!target) return;
@@ -1071,7 +1112,7 @@ function showScreen(name) {
   if (name === "home") renderHomeScreen();
   else if (name === "control") renderControlScreen();
   else if (name === "security") renderSecurityScreen();
-  else if (name === "status") renderStatusScreen();
+  else if (name === "status") await renderStatusScreen();
 }
 
 function entityBelongsToScreen(entityId, screen) {
@@ -1102,19 +1143,19 @@ function entityBelongsToScreen(entityId, screen) {
   return false;
 }
 
-function updateCard(state) {
+async function updateCard(state) {
   if (!entityBelongsToScreen(state.entity_id, currentScreen)) return;
   if (currentScreen === "home") renderHomeScreen();
   else if (currentScreen === "control") renderControlScreen();
   else if (currentScreen === "security") renderSecurityScreen();
-  else if (currentScreen === "status") renderStatusScreen();
+  else if (currentScreen === "status") await renderStatusScreen();
 }
 
-function renderAll() {
+async function renderAll() {
   if (currentScreen === "home") renderHomeScreen();
   else if (currentScreen === "control") renderControlScreen();
   else if (currentScreen === "security") renderSecurityScreen();
-  else if (currentScreen === "status") renderStatusScreen();
+  else if (currentScreen === "status") await renderStatusScreen();
   updateClock();
 }
 

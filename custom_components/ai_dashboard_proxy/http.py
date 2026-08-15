@@ -7,14 +7,18 @@ import json
 import mimetypes
 import os
 import traceback
+from datetime import timedelta
 from typing import Any
 
 from aiohttp import web
 
 from homeassistant.components.http.const import KEY_AUTHENTICATED
+from homeassistant.components.recorder import get_instance
+from homeassistant.components.recorder import history as recorder_history
 from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.json import json_dumps
+from homeassistant.util import dt as dt_util
 
 
 def _is_local_ip(ip: str | None) -> bool:
@@ -284,6 +288,62 @@ async def forecast_handler(request: web.Request) -> web.StreamResponse:
         )
 
 
+async def history_handler(request: web.Request) -> web.StreamResponse:
+    """Return state history for requested entity IDs."""
+    try:
+        secret = request.app.get("ai_dashboard_secret")
+        if not _is_authorized(request, secret):
+            return web.Response(status=401, text="Unauthorized")
+
+        hass: HomeAssistant = request.app["hass"]
+        try:
+            body = await request.json()
+        except ValueError:
+            return web.Response(status=400, text="Invalid JSON")
+
+        entity_ids = body.get("entity_ids", [])
+        hours = body.get("hours", 24)
+        if not isinstance(entity_ids, list) or not entity_ids:
+            return web.Response(status=400, text="entity_ids must be a non-empty list")
+        if not isinstance(hours, int) or hours < 1 or hours > 168:
+            return web.Response(status=400, text="hours must be an integer between 1 and 168")
+
+        end_time = dt_util.utcnow()
+        start_time = end_time - timedelta(hours=hours)
+
+        try:
+            # get_significant_states is synchronous and opens its own DB
+            # session, so it must run in the executor. Defaults (no
+            # minimal_response) return LazyState objects for every row.
+            history_data = await get_instance(hass).async_add_executor_job(
+                recorder_history.get_significant_states,
+                hass,
+                start_time,
+                end_time,
+                entity_ids,
+            )
+        except Exception as exc:
+            return web.Response(status=500, text=f"History query failed: {exc}")
+
+        result: dict[str, list[dict[str, str]]] = {}
+        for entity_id, states in history_data.items():
+            result[entity_id] = [
+                {
+                    "state": s.state,
+                    "last_changed": s.last_changed.isoformat(),
+                }
+                for s in states
+                if s.state not in ("unknown", "unavailable")
+            ]
+
+        return web.json_response(result)
+    except Exception as e:
+        return web.Response(
+            status=500,
+            text=f"Dashboard proxy error: {e}\n{traceback.format_exc()}",
+        )
+
+
 async def async_setup_http(hass: HomeAssistant, secret: str | None) -> None:
     """Register the dashboard routes on the Home Assistant HTTP app."""
     app = hass.http.app
@@ -292,4 +352,5 @@ async def async_setup_http(hass: HomeAssistant, secret: str | None) -> None:
     # Register specific routes before the catch-all static route.
     app.router.add_get("/ai-dashboard/ws", websocket_handler)
     app.router.add_post("/ai-dashboard/api/forecast", forecast_handler)
+    app.router.add_post("/ai-dashboard/api/history", history_handler)
     app.router.add_get("/ai-dashboard/{path:.*}", dashboard_handler)
