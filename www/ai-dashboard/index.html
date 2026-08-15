@@ -293,7 +293,7 @@ const DEFAULT_CONFIG = {
     scenes: { title: "Scenes", icon: "🎨", entities: ["scene.all_lights_off", "scene.relax_mode", "scene.movie_mode", "scene.focus_mode", "scene.living_room_focus_mode", "scene.living_room_relax_mode", "scene.living_room_all_lights_off"] },
     scripts: { title: "Scripts", icon: "▶️", entities: ["script.goodnight", "script.focus_mode", "script.movie_mode", "script.relax_mode", "script.pause_all_media", "script.living_room_lights_on", "script.living_room_lights_off", "script.travis_office_lights_on", "script.travis_office_lights_off", "script.goodnight_door_check", "script.goodnight_dim_lights", "script.goodnight_enable_security"] },
     quickControls: { title: "Quick Controls", icon: "🎛️", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan", "light.p1s_01p00a412300832_chamber_light", "light.travis_office_p1s_uno_chamber_light"] },
-    cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.downstairs_live_view"] },
+    cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.downstairs_live_view"], snapshot: { "camera.front_door_live_view": { preferEntity: "camera.front_door_last_recording", activityEntities: ["event.front_door_motion", "event.front_door_ding", "sensor.front_door_last_activity"] } } },
     security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2", "sensor.front_door_last_activity", "sensor.downstairs_last_activity"] },
     doors: { title: "Doors", icon: "🚪", entities: ["binary_sensor.living_room_front_door", "binary_sensor.backdoor"], lastActivity: { "binary_sensor.living_room_front_door": "sensor.front_door_last_activity", "binary_sensor.backdoor": "sensor.downstairs_last_activity" } },
     environment: { title: "Environment", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_illuminance", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2", "sensor.hobeian_zg_204zx_illuminance_2"] },
@@ -572,6 +572,70 @@ function refreshDoorRecency() {
   }
 }
 
+const SNAPSHOT_EVENT_REFRESH_DELAY_MS = 20000;
+const SNAPSHOT_IDLE_EVENT_WINDOW_MS = 60 * 60 * 1000;
+const SNAPSHOT_IDLE_POLL_MS = 30 * 60 * 1000;
+const SNAPSHOT_CHECK_MS = 5 * 60 * 1000;
+
+const snapshotRefreshTimers = {};
+const snapshotLastRefresh = {};
+
+function cameraSnapshotConfig(cameraId) {
+  const cams = (config.sections && config.sections.cameras) || {};
+  return (cams.snapshot && cams.snapshot[cameraId]) || null;
+}
+
+function snapshotSourceEntity(cameraId) {
+  const snap = cameraSnapshotConfig(cameraId);
+  if (!snap) return cameraId;
+  const pref = snap.preferEntity;
+  if (pref && states[pref] && !isUnavailable(states[pref])) return pref;
+  return cameraId;
+}
+
+function snapshotLastActivityMs(snap) {
+  let latest = 0;
+  for (const id of (snap.activityEntities || [])) {
+    const s = states[id];
+    if (!s || isUnavailable(s)) continue;
+    const t = new Date(s.state).getTime();
+    if (!isNaN(t) && t > latest) latest = t;
+  }
+  return latest;
+}
+
+function snapshotImgUrl(srcEntity) {
+  const st = states[srcEntity];
+  let base;
+  if (st && st.attributes && st.attributes.entity_picture) {
+    base = st.attributes.entity_picture;
+  } else if (window.HA_INTEGRATION_PROXY) {
+    base = `/api/camera_proxy/${srcEntity}`;
+  } else {
+    base = `/api/camera_proxy/${srcEntity}?token=${encodeURIComponent(token)}`;
+  }
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}ts=${Date.now()}`;
+}
+
+function refreshCameraSnapshot(cameraId) {
+  const img = document.querySelector(`img.camera-feed[data-snapshot-camera="${cameraId}"]`);
+  if (!img) return;
+  snapshotLastRefresh[cameraId] = Date.now();
+  img.src = snapshotImgUrl(snapshotSourceEntity(cameraId));
+}
+
+function scheduleSnapshotRefresh(changedId) {
+  const cams = (config.sections && config.sections.cameras) || {};
+  const snapMap = cams.snapshot || {};
+  for (const cameraId of Object.keys(snapMap)) {
+    const acts = snapMap[cameraId].activityEntities || [];
+    if (!acts.includes(changedId)) continue;
+    clearTimeout(snapshotRefreshTimers[cameraId]);
+    snapshotRefreshTimers[cameraId] = setTimeout(() => refreshCameraSnapshot(cameraId), SNAPSHOT_EVENT_REFRESH_DELAY_MS);
+  }
+}
+
 function setStatus(cls) {
   const led = document.getElementById("status-led");
   const text = document.getElementById("status-text");
@@ -725,7 +789,9 @@ function renderEnvMetric(entityId) {
 
 function renderCameraFeed(entityId) {
   const name = friendlyName(entityId);
-  const state = states[entityId];
+  const snap = cameraSnapshotConfig(entityId);
+  const srcEntity = snap ? snapshotSourceEntity(entityId) : entityId;
+  const state = states[srcEntity];
   const offline = isUnavailable(state);
   if (offline) {
     return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
@@ -736,17 +802,25 @@ function renderCameraFeed(entityId) {
     </div>`;
   }
   let src = "";
-  if (state && state.attributes && state.attributes.entity_picture) {
+  if (snap) {
+    src = snapshotImgUrl(srcEntity);
+    snapshotLastRefresh[entityId] = Date.now();
+  } else if (state && state.attributes && state.attributes.entity_picture) {
     src = state.attributes.entity_picture;
   } else if (window.HA_INTEGRATION_PROXY) {
     src = `/api/camera_proxy_stream/${entityId}`;
   } else {
     src = `/api/camera_proxy_stream/${entityId}?token=${encodeURIComponent(token)}`;
   }
+  const lastEventMs = snap ? snapshotLastActivityMs(snap) : 0;
+  const lastEventLabel = lastEventMs ? relativeTime(new Date(lastEventMs).toISOString()) : "";
+  const titleSuffix = snap && lastEventLabel
+    ? ` <span style="color:var(--text-muted);font-size:0.75rem;">· LAST EVENT ${escapeHtml(lastEventLabel)}</span>`
+    : "";
   return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
-    <div class="panel-title">${escapeHtml(name)}</div>
+    <div class="panel-title">${escapeHtml(name)}${titleSuffix}</div>
     <div class="panel-body" style="padding:0;">
-      <img class="camera-feed" src="${src}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
+      <img class="camera-feed" ${snap ? `data-snapshot-camera="${entityId}"` : ""} src="${src}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
     </div>
   </div>`;
 }
@@ -1745,7 +1819,7 @@ function connectProxy() {
     }
     if (msg.type === "event" && msg.event && msg.event.event_type === "state_changed") {
       const s = msg.event.data.new_state;
-      if (s) { states[s.entity_id] = s; updateCard(s); }
+      if (s) { states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
     }
   };
   ws.onclose = () => {
@@ -1778,7 +1852,7 @@ function connect() {
     }
     if (msg.type === "event" && msg.event && msg.event.event_type === "state_changed") {
       const s = msg.event.data.new_state;
-      if (s) { states[s.entity_id] = s; updateCard(s); }
+      if (s) { states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
     }
   };
   ws.onclose = () => {
@@ -1812,6 +1886,16 @@ async function init() {
   }
   setInterval(updateClock, 1000);
   setInterval(refreshDoorRecency, 30000);
+  setInterval(() => {
+    const cams = (config.sections && config.sections.cameras) || {};
+    const snapMap = cams.snapshot || {};
+    for (const cameraId of Object.keys(snapMap)) {
+      const lastEvent = snapshotLastActivityMs(snapMap[cameraId]);
+      const idleLongEnough = !lastEvent || (Date.now() - lastEvent) > SNAPSHOT_IDLE_EVENT_WINDOW_MS;
+      const stale = (Date.now() - (snapshotLastRefresh[cameraId] || 0)) >= SNAPSHOT_IDLE_POLL_MS;
+      if (idleLongEnough && stale) refreshCameraSnapshot(cameraId);
+    }
+  }, SNAPSHOT_CHECK_MS);
 }
 
 document.addEventListener("DOMContentLoaded", init);
