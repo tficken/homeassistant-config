@@ -93,6 +93,11 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
   text-shadow: 0 0 8px rgba(20, 254, 23, 0.45);
 }
 .panel-body { padding: 10px 14px 14px; }
+.terminal-panel.fill { height: 100%; display: flex; flex-direction: column; box-sizing: border-box; }
+.terminal-panel.fill > .panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
+.terminal-panel.fill > .panel-body > * { flex: 1; min-height: 0; }
+.stretch-btns .scene-btn { flex: 1; }
+.stretch-cards > .terminal-panel { flex: 1; display: flex; flex-direction: column; justify-content: center; box-sizing: border-box; margin-bottom: 0; }
 @keyframes ledPulse {
   0%, 100% { box-shadow: 0 0 8px var(--green); }
   50% { box-shadow: 0 0 16px var(--green); }
@@ -595,8 +600,8 @@ async function fetchHAConfig() {
 
 // ---- Component renderers ----
 
-function renderTerminalPanel(title, bodyHtml) {
-  return `<div class="terminal-panel">
+function renderTerminalPanel(title, bodyHtml, cls) {
+  return `<div class="terminal-panel${cls ? " " + cls : ""}">
     <div class="panel-title">${escapeHtml(title)}</div>
     <div class="panel-body">${bodyHtml}</div>
   </div>`;
@@ -627,7 +632,7 @@ function renderLightCard(entityId) {
   const active = state ? isActive(state.state) : false;
   const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
   const pct = Math.round((brightness / 255) * 100);
-  return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
+  return `<div class="terminal-panel" data-entity-id="${entityId}">
     <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;" onclick="toggleEntity('${entityId}')">
       <div>${renderStatusLed(offline ? "unavailable" : (active ? "on" : "off"))} <span style="font-family:var(--font-mono);">${escapeHtml(friendlyName(entityId))}</span></div>
       <div style="color:var(--text-muted);font-family:var(--font-mono);">${offline ? "OFFLINE" : (active ? "ON" : "OFF")}</div>
@@ -639,10 +644,13 @@ function renderLightCard(entityId) {
 function renderMetricCard(entityId) {
   const state = states[entityId];
   if (!state) return "";
+  const deviceClass = state.attributes && state.attributes.device_class;
+  const isTimestamp = deviceClass === "timestamp";
   const unit = state.attributes && state.attributes.unit_of_measurement ? state.attributes.unit_of_measurement : "";
   const offline = isUnavailable(state) ? renderOfflineBadge() : "";
-  return `<div class="terminal-panel" style="text-align:center;padding:8px;" data-entity-id="${entityId}">
-    <div style="font-family:var(--font-mono);font-size:1.4rem;color:var(--green);">${offline || escapeHtml(state.state)}<span style="font-size:0.8rem;color:var(--text-muted);">${offline ? "" : escapeHtml(unit)}</span></div>
+  const value = isTimestamp ? escapeHtml(relativeTime(state.state) || state.state) : escapeHtml(state.state);
+  return `<div class="terminal-panel" style="text-align:center;padding:8px;display:flex;flex-direction:column;justify-content:center;" data-entity-id="${entityId}">
+    <div style="font-family:var(--font-mono);font-size:1.4rem;color:var(--green);">${offline || value}<span style="font-size:0.8rem;color:var(--text-muted);">${offline || isTimestamp ? "" : escapeHtml(unit)}</span></div>
     <div style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(friendlyName(entityId))}</div>
   </div>`;
 }
@@ -674,7 +682,7 @@ function renderEnvMetric(entityId) {
   const sparkline = (deviceClass === "temperature" || deviceClass === "humidity")
     ? renderSparkline(entityId)
     : "";
-  return `<div class="terminal-panel" style="text-align:center;padding:10px 4px;" data-entity-id="${entityId}">
+  return `<div class="terminal-panel" style="text-align:center;padding:10px 4px;display:flex;flex-direction:column;justify-content:center;" data-entity-id="${entityId}">
     <div style="font-family:var(--font-mono);font-size:1.5rem;color:var(--green);">${offline || escapeHtml(state.state)}<span style="font-size:0.75rem;color:var(--text-muted);">${offline ? "" : escapeHtml(unit)}</span></div>
     <div class="metric-label" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">${escapeHtml(label)}</div>
     ${sparkline}
@@ -872,7 +880,7 @@ function renderRoomMonitors() {
     const tempValue = temp ? (tempOffline ? renderOfflineBadge() : `${escapeHtml(temp.state.state)}<span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(temp.state.attributes && temp.state.attributes.unit_of_measurement || "")}</span>`) : "--";
     const humValue = hum ? (humOffline ? renderOfflineBadge() : `${escapeHtml(hum.state.state)}<span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(hum.state.attributes && hum.state.attributes.unit_of_measurement || "")}</span>`) : "--";
     return `
-      <div class="terminal-panel" style="padding:10px;" data-room="${escapeHtml(area)}">
+      <div class="terminal-panel" style="padding:10px;display:flex;flex-direction:column;justify-content:center;" data-room="${escapeHtml(area)}">
         <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--green);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">${escapeHtml(area)}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
           <div style="text-align:center;">
@@ -887,7 +895,7 @@ function renderRoomMonitors() {
       </div>`;
   }).join("");
 
-  return `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${cards}</div>`;
+  return `<div style="display:grid;grid-template-columns:1fr;gap:10px;grid-auto-rows:1fr;height:100%;">${cards}</div>`;
 }
 
 function renderDoors() {
@@ -937,7 +945,8 @@ function renderHomeScreen() {
 
   const weatherAttr = weather ? weather.attributes || {} : {};
   const high = formatTemp(weatherAttr.temperature);
-  const low = formatTemp(weatherAttr.templow);
+  const todayForecast = forecastCache.daily && forecastCache.daily[0];
+  const low = formatTemp(weatherAttr.templow != null ? weatherAttr.templow : (todayForecast ? todayForecast.templow : null));
   const wind = weatherAttr.wind_speed != null ? `${Math.round(weatherAttr.wind_speed)} ${weatherAttr.wind_speed_unit || ""}`.trim() : "--";
 
   const forecastHtml = forecastCache.daily.length
@@ -995,28 +1004,26 @@ function renderHomeScreen() {
   const timeStrMarked = escapeHtml(timeStr).replace(/:/g, '<span class="colon">:</span>');
   const dateStr = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
 
-  const homeSectionPanels = {
-    presence: renderTerminalPanel(sectionTitle("presence"), `<div style="display:flex;gap:10px;">${presence}</div>`),
-    doors: renderTerminalPanel(sectionTitle("doors"), renderDoors())
-  };
-  const homeRightSections = orderedSectionKeys(["presence", "doors"])
-    .map(k => `<div style="flex-shrink:0;">${homeSectionPanels[k]}</div>`)
-    .join("");
+  const presencePanel = renderTerminalPanel(sectionTitle("presence"), `<div style="display:flex;gap:10px;height:100%;align-items:center;">${presence}</div>`, "fill");
+  const doorsPanel = renderTerminalPanel(sectionTitle("doors"), renderDoors());
 
   const main = `
     ${renderAlertBanner(getAlerts())}
     <div style="display:grid;grid-template-columns:0.9fr 1.2fr 1fr;gap:14px;flex:1;min-height:0;">
-      <div style="display:flex;flex-direction:column;justify-content:center;align-items:flex-start;height:100%;padding-left:8px;">
-        <div id="clock" style="font-family:var(--font-mono);font-size:clamp(4rem,9vw,6.5rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);">${timeStrMarked}</div>
-        <div id="date" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
+      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
+        <div style="flex-shrink:0;padding:8px 0 0 8px;">
+          <div id="clock" style="font-family:var(--font-mono);font-size:clamp(4rem,9vw,6.5rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);">${timeStrMarked}</div>
+          <div id="date" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
+        </div>
+        <div style="flex:1;min-height:0;">${presencePanel}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
         ${weatherPanel}
-        <div style="flex:1;min-height:0;overflow-y:auto;">${renderTerminalPanel("ROOM MONITORS", renderRoomMonitors())}</div>
+        <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;">${renderTerminalPanel("ROOM MONITORS", renderRoomMonitors(), "fill")}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
         <div style="flex:1;min-height:0;">${renderRadarFrame()}</div>
-        ${homeRightSections}
+        <div style="flex-shrink:0;">${doorsPanel}</div>
       </div>
     </div>
   `;
@@ -1039,18 +1046,18 @@ function renderControlScreen() {
   const main = `
     <div style="display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:14px;flex:1;min-height:0;">
       <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
-        ${renderTerminalPanel(sectionTitle("scenes"), `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${sceneButtons || "<div style='color:var(--text-muted)'>NO SCENES</div>"}</div>`)}
+        ${renderTerminalPanel(sectionTitle("scenes"), `<div class="stretch-btns" style="display:flex;flex-direction:column;gap:10px;height:100%;">${sceneButtons || "<div style='color:var(--text-muted)'>NO SCENES</div>"}</div>`, "fill")}
       </div>
-      <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
-        ${renderTerminalPanel(sectionTitle("quickControls"), lightCards || "<div style='color:var(--text-muted)'>NO LIGHTS</div>")}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
-        <div style="flex:1;min-height:0;display:flex;flex-direction:column;overflow-y:auto;">
-          ${renderTerminalPanel(sectionTitle("scripts"), `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${scriptButtons || "<div style='color:var(--text-muted)'>NO SCRIPTS</div>"}</div>`)}
+      <div style="display:flex;flex-direction:column;gap:10px;min-height:0;">
+        <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;">
+          ${renderTerminalPanel(sectionTitle("quickControls"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${lightCards || "<div style='color:var(--text-muted)'>NO LIGHTS</div>"}</div>`, "fill")}
         </div>
         <div style="flex-shrink:0;">
           ${renderMediaCard(mediaId)}
         </div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
+        ${renderTerminalPanel(sectionTitle("scripts"), `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${scriptButtons || "<div style='color:var(--text-muted)'>NO SCRIPTS</div>"}</div>`)}
       </div>
     </div>
   `;
@@ -1078,20 +1085,20 @@ async function renderStatusScreen() {
     }
     envGroups[area].push(id);
   }
-  const envMetrics = envOrder.map(area => {
+  const envMetrics = `<div style="display:flex;flex-direction:column;gap:12px;height:100%;">` + envOrder.map(area => {
     const metrics = envGroups[area].map(id => renderEnvMetric(id)).join("");
-    return `<div style="margin-bottom:12px;">
+    return `<div style="flex:1;display:flex;flex-direction:column;min-height:0;">
       <div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--green);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">${escapeHtml(area)}</div>
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">${metrics}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex:1;grid-auto-rows:1fr;">${metrics}</div>
     </div>`;
-  }).join("");
+  }).join("") + `</div>`;
 
   const sysMetrics = system.filter(id => id.startsWith("sensor.")).map(id => renderMetricCard(id)).join("");
 
   const vacuumIds = system.filter(id => id.startsWith("vacuum."));
   const vacuumCards = vacuumIds.map(id => {
     const state = states[id];
-    return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${id}">
+    return `<div class="terminal-panel" data-entity-id="${id}">
       <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;font-family:var(--font-mono);">
         <span>${escapeHtml(friendlyName(id))}</span>
         <span style="color:var(--green);">${state ? escapeHtml(state.state) : "--"}</span>
@@ -1110,7 +1117,7 @@ async function renderStatusScreen() {
     const progressBar = progress != null && !isNaN(progress)
       ? `<div style="width:100%;height:8px;background:var(--green-dim);border-radius:4px;margin:8px 0;"><div style="width:${Math.min(100, Math.max(0, progress))}%;height:100%;background:var(--green);border-radius:4px;"></div></div><div style="color:var(--text-muted);font-size:0.75rem;">${progress}% ${remaining ? "· " + escapeHtml(remaining) + " left" : ""}</div>`
       : "";
-    return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${id}">
+    return `<div class="terminal-panel" data-entity-id="${id}">
       <div class="panel-body" style="font-family:var(--font-mono);">
         <div style="color:var(--green);">${state ? escapeHtml(state.state) : "--"}</div>
         ${progressBar}
@@ -1121,8 +1128,8 @@ async function renderStatusScreen() {
 
   const main = `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0;overflow:hidden;">
-      <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel(sectionTitle("environment"), envMetrics)}</div>
-      <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel(sectionTitle("system"), sysMetrics + vacuumCards + printerCards)}</div>
+      <div style="min-height:0;overflow-y:auto;display:flex;flex-direction:column;">${renderTerminalPanel(sectionTitle("environment"), envMetrics, "fill")}</div>
+      <div style="min-height:0;overflow-y:auto;display:flex;flex-direction:column;">${renderTerminalPanel(sectionTitle("system"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${sysMetrics + vacuumCards + printerCards}</div>`, "fill")}</div>
     </div>
   `;
   document.getElementById("status-screen").innerHTML = main;
@@ -1145,7 +1152,7 @@ function renderSecurityScreen() {
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;min-height:0;overflow:hidden;">
       ${cameraFeeds}
     </div>
-    <div style="min-height:0;overflow-y:auto;">${renderTerminalPanel(sectionTitle("security"), `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;">${securityCards}</div>`)}</div>
+    <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;">${renderTerminalPanel(sectionTitle("security"), `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;grid-auto-rows:1fr;height:100%;">${securityCards}</div>`, "fill")}</div>
   `;
   document.getElementById("security-screen").innerHTML = main;
 }
