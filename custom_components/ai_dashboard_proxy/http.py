@@ -344,6 +344,54 @@ async def history_handler(request: web.Request) -> web.StreamResponse:
         )
 
 
+CONFIG_KEYS = {"theme", "layout", "entities", "sections", "sectionOrder", "dock", "presenceLabels"}
+
+
+async def config_save_handler(request: web.Request) -> web.StreamResponse:
+    """Save the dashboard config to www/ai-dashboard/config.json."""
+    try:
+        secret = request.app.get("ai_dashboard_secret")
+        if not _is_authorized(request, secret):
+            return web.Response(status=401, text="Unauthorized")
+
+        hass: HomeAssistant = request.app["hass"]
+        try:
+            body = await request.json()
+        except ValueError:
+            return web.Response(status=400, text="Invalid JSON")
+
+        if not isinstance(body, dict) or not (set(body) & CONFIG_KEYS):
+            return web.Response(
+                status=400,
+                text="Body must be a JSON object with known config keys",
+            )
+
+        config_path = os.path.join(
+            hass.config.config_dir, "www", "ai-dashboard", "config.json"
+        )
+
+        def write_file() -> None:
+            if os.path.isfile(config_path):
+                stamp = dt_util.now().strftime("%Y%m%d_%H%M%S")
+                with open(config_path, "rb") as src:
+                    data = src.read()
+                with open(f"{config_path}.bak.{stamp}", "wb") as dst:
+                    dst.write(data)
+            tmp_path = config_path + ".tmp"
+            with open(tmp_path, "w", encoding="utf-8") as f:
+                json.dump(body, f, indent=2, ensure_ascii=False)
+                f.write("\n")
+            os.replace(tmp_path, config_path)
+
+        await hass.async_add_executor_job(write_file)
+        return web.json_response({"success": True})
+    except Exception as e:
+        return web.Response(
+            status=500,
+            text=f"Config save failed: {e}\n{traceback.format_exc()}",
+        )
+
+
 async def async_setup_http(hass: HomeAssistant, secret: str | None) -> None:
     """Register the dashboard routes on the Home Assistant HTTP app."""
     app = hass.http.app
@@ -353,4 +401,5 @@ async def async_setup_http(hass: HomeAssistant, secret: str | None) -> None:
     app.router.add_get("/ai-dashboard/ws", websocket_handler)
     app.router.add_post("/ai-dashboard/api/forecast", forecast_handler)
     app.router.add_post("/ai-dashboard/api/history", history_handler)
+    app.router.add_post("/ai-dashboard/api/config", config_save_handler)
     app.router.add_get("/ai-dashboard/{path:.*}", dashboard_handler)
