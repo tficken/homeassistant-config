@@ -184,6 +184,10 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
   border-radius: 999px; padding: 5px 10px; font-size: 0.8rem; margin: 4px 4px 0 0;
 }
 .entity-chip button { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; }
+.drag-handle { cursor: grab; color: var(--text-muted); padding: 0 6px; user-select: none; touch-action: none; font-family: var(--font-mono); }
+.entity-chip.dragging, .editor-section.dragging { opacity: 0.4; }
+.entity-chip.drop-before, .editor-section.drop-before { box-shadow: 0 -2px 0 var(--accent); }
+[data-chip-list].drop-before { outline: 1px dashed var(--accent); outline-offset: 2px; }
 input, select {
   background: rgba(255,255,255,0.07); border: 1px solid var(--border); border-radius: 4px;
   padding: 8px 10px; color: var(--text); font-size: 0.9rem;
@@ -1223,7 +1227,7 @@ function closeSettings() {
   document.getElementById("settings-overlay").style.display = "none";
 }
 
-const SETTINGS_TABS = ["Appearance", "Data"];
+const SETTINGS_TABS = ["Appearance", "Sections", "Data"];
 let settingsTab = "Appearance";
 
 function switchSettingsTab(name) {
@@ -1246,6 +1250,9 @@ function buildSettings() {
   if (settingsTab === "Appearance") {
     body.innerHTML = renderAppearanceTab();
     wireAppearanceTab();
+  } else if (settingsTab === "Sections") {
+    body.innerHTML = renderSectionsTab();
+    initSectionsEditor();
   } else {
     body.innerHTML = renderDataTab();
   }
@@ -1280,6 +1287,99 @@ function renderDataTab() {
       <button class="btn" onclick="logout()" style="background:rgba(248,113,113,0.15);border-color:rgba(248,113,113,0.3);">Clear token &amp; reload</button>
     </div>
   `;
+}
+
+const SCREEN_SECTION_GROUPS = [
+  { screen: "HOME", sections: ["home", "doors", "environment"] },
+  { screen: "CONTROL HUB", sections: ["scenes", "scripts", "quickControls"] },
+  { screen: "SECURITY", sections: ["cameras", "security"] },
+  { screen: "STATUS MONITOR", sections: ["system"] }
+];
+
+function renderSectionsTab() {
+  return SCREEN_SECTION_GROUPS.map(g => {
+    const keys = orderedSectionKeys(g.sections.filter(k => config.sections && config.sections[k]));
+    const rows = keys.map(key => {
+      const sec = config.sections[key];
+      const chips = (sec.entities || []).map(id =>
+        `<span class="entity-chip" data-section="${key}" data-entity="${escapeHtml(id)}"><span class="drag-handle" data-drag-chip title="Drag to reorder or move">⠿</span>${escapeHtml(friendlyName(id))} <button onclick="removeSectionEntity('${key}','${escapeHtml(id)}')">×</button></span>`
+      ).join("");
+      return `
+        <div class="editor-section" data-section-key="${key}" style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span class="drag-handle" data-drag-section="${key}" title="Drag to reorder section">⠿</span>
+            <input value="${escapeHtml(sec.icon || "")}" onchange="setSectionProp('${key}','icon',this.value)" style="width:48px;text-align:center;" title="Section icon">
+            <input value="${escapeHtml(sec.title || key)}" onchange="setSectionProp('${key}','title',this.value)" style="flex:1;min-width:120px;" title="Section title">
+          </div>
+          <div class="chip-list" data-chip-list="${key}" style="display:flex;flex-wrap:wrap;gap:6px;min-height:30px;">${chips || "<span style='color:var(--text-muted);font-size:0.8rem;'>No entities</span>"}</div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+            <input placeholder="Filter by name, id, or area..." data-filter="${key}" style="flex:1;min-width:140px;">
+            <select data-picker="${key}" style="flex:2;min-width:200px;"></select>
+            <button class="btn" data-add="${key}">Add</button>
+          </div>
+        </div>`;
+    }).join("");
+    return `<div class="settings-section" style="margin-bottom:18px;">
+      <h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">${g.screen}</h3>
+      ${rows || "<p style='color:var(--text-muted);font-size:0.85rem;'>No sections on this screen.</p>"}
+    </div>`;
+  }).join("");
+}
+
+function setSectionProp(key, prop, value) {
+  if (!config.sections[key]) return;
+  config.sections[key][prop] = value;
+  renderAll();
+}
+
+function removeSectionEntity(key, id) {
+  const sec = config.sections[key];
+  if (!sec) return;
+  sec.entities = (sec.entities || []).filter(x => x !== id);
+  renderAll();
+  buildSettings();
+}
+
+function addSectionEntity(key, id) {
+  const sec = config.sections[key];
+  if (!sec) return;
+  sec.entities = sec.entities || [];
+  if (!sec.entities.includes(id)) sec.entities.push(id);
+  renderAll();
+  buildSettings();
+}
+
+function populateEntityPicker(sel, filterText) {
+  const f = (filterText || "").toLowerCase();
+  const opts = Object.values(states)
+    .map(s => s.entity_id)
+    .filter(id => {
+      if (!f) return true;
+      return id.toLowerCase().includes(f) ||
+        friendlyName(id).toLowerCase().includes(f) ||
+        (entityArea(id) || "").toLowerCase().includes(f);
+    })
+    .sort()
+    .slice(0, 200)
+    .map(id => `<option value="${id}">${escapeHtml(friendlyName(id))} — ${id}${entityArea(id) ? " · " + escapeHtml(entityArea(id)) : ""}</option>`)
+    .join("");
+  sel.innerHTML = `<option value="">Pick entity...</option>` + opts;
+}
+
+function initSectionsEditor() {
+  document.querySelectorAll("[data-picker]").forEach(sel => {
+    const key = sel.getAttribute("data-picker");
+    populateEntityPicker(sel, "");
+    const filter = document.querySelector(`[data-filter="${key}"]`);
+    if (filter) filter.addEventListener("input", () => populateEntityPicker(sel, filter.value));
+  });
+  document.querySelectorAll("[data-add]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const key = btn.getAttribute("data-add");
+      const sel = document.querySelector(`[data-picker="${key}"]`);
+      if (sel && sel.value) addSectionEntity(key, sel.value);
+    });
+  });
 }
 
 async function saveSettings() {
