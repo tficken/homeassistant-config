@@ -847,11 +847,6 @@ function getAlerts() {
       const val = parseFloat(state.state);
       if (!isNaN(val) && val < 20) alerts.push(`${friendlyName(id)} low`);
     }
-    if (domain === "sensor" && id.includes("last_activity") && !isUnavailable(state)) {
-      const label = friendlyName(id);
-      const when = relativeTime(state.state);
-      if (when) alerts.push(`${label} · ${when}`);
-    }
   }
   const sys = config.sections && config.sections.system ? config.sections.system.entities : [];
   for (const id of sys) {
