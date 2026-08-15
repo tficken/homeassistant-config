@@ -1106,7 +1106,7 @@ async function renderStatusScreen() {
     </div>`;
   }).join("");
 
-  const printerIds = Object.keys(states).filter(id => id.startsWith("sensor.p1s_") && id.includes("print_status"));
+  const printerIds = Object.keys(states).filter(id => id.startsWith("sensor.") && id.endsWith("_print_status"));
   const printerCards = printerIds.map(id => {
     const state = states[id];
     const base = id.replace("print_status", "").replace(/_+$/, "");
