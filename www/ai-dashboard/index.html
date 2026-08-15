@@ -1030,14 +1030,18 @@ function renderHomeScreen() {
   let oncallPanel = "";
   if (cal) {
     const isOn = cal.state === "on";
-    const msg = cal.attributes && cal.attributes.message ? cal.attributes.message : "";
-    const end = cal.attributes && cal.attributes.end_time ? new Date(cal.attributes.end_time) : null;
-    const until = isOn && end && !isNaN(end.getTime())
-      ? end.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }) : "";
+    const who = (cal.attributes && (cal.attributes.location || cal.attributes.message)) || "";
+    const fmtWhen = d => d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const end = cal.attributes && cal.attributes.end_time ? new Date(cal.attributes.end_time.replace(" ", "T")) : null;
+    const start = cal.attributes && cal.attributes.start_time ? new Date(cal.attributes.start_time.replace(" ", "T")) : null;
+    const label = isOn ? (who || "ACTIVE SHIFT") : (who ? `NEXT: ${who}` : "NO UPCOMING SHIFT");
+    const when = isOn
+      ? (end && !isNaN(end.getTime()) ? `until ${fmtWhen(end)}` : "")
+      : (start && !isNaN(start.getTime()) ? `starts ${fmtWhen(start)}` : "");
     oncallPanel = renderTerminalPanel("ON CALL", `
       <div style="display:flex;align-items:center;justify-content:space-between;font-family:var(--font-mono);gap:10px;">
-        <span style="color:${isOn ? 'var(--green)' : 'var(--text-muted)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${isOn ? escapeHtml(msg) : "NO ACTIVE SHIFT"}</span>
-        ${until ? `<span style="color:var(--text-muted);font-size:0.8rem;flex-shrink:0;">until ${escapeHtml(until)}</span>` : ""}
+        <span style="color:${isOn ? 'var(--green)' : 'var(--text-muted)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(label)}</span>
+        ${when ? `<span style="color:var(--text-muted);font-size:0.8rem;flex-shrink:0;">${escapeHtml(when)}</span>` : ""}
       </div>`);
   }
 
