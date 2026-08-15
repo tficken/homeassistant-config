@@ -151,7 +151,7 @@ Stored under `blueprints/`. These are Home Assistant-provided reusable templates
 
 ### AI Dashboard Development Workflow
 
-0. **Prefer the built-in Settings editor for content changes.** Click `[ SETTINGS ]` (top-right) on the dashboard: the **Sections** tab edits/reorders section titles, icons, and tiles with drag-and-drop, and the **New Devices** tab lists entities not yet on the dashboard for one-tap placement. Save & Apply persists to `config.json` on the server via `POST /ai-dashboard/api/config` (a timestamped `config.json.bak.*` backup is created on every save), so changes are shared by all devices. Only edit `config.json` by hand for structural changes the editor doesn't cover.
+0. **Prefer the built-in Settings editor for content changes.** Click `[ SETTINGS ]` (top-right) on the dashboard: the **Layout** tab shows an entity palette (filterable, grouped by area, with a "not on dashboard" toggle and a missing-entity cleanup block) next to a drag board of all four screens — drag entities from the palette onto a section to add them, drag chips between sections to move them, and drag a chip back to the palette to remove it. Section titles/icons are editable inline and sections reorder by drag. The **Appearance** tab holds accent color, clock format, and weather/media entity picks. Save & Apply persists to `config.json` on the server via `POST /ai-dashboard/api/config` (a timestamped `config.json.bak.*` backup is created on every save), so changes are shared by all devices. Only edit `config.json` by hand for structural changes the editor doesn't cover.
 1. Edit `www/ai-dashboard/index.html` and/or `www/ai-dashboard/config.json` directly.
 2. Validate HTML syntax with the local Node.js install or Python's `html.parser`:
    ```bash

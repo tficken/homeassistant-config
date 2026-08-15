@@ -194,6 +194,15 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
 .entity-chip.dragging, .editor-section.dragging { opacity: 0.4; }
 .entity-chip.drop-before, .editor-section.drop-before { box-shadow: 0 -2px 0 var(--accent); }
 [data-chip-list].drop-before { outline: 1px dashed var(--accent); outline-offset: 2px; }
+.palette-chip {
+  display: flex; align-items: center; gap: 4px;
+  background: rgba(255,255,255,0.07); border: 1px solid var(--border);
+  border-radius: 4px; padding: 4px 6px; font-size: 0.8rem; margin-top: 4px;
+  color: var(--text);
+}
+.palette-chip.on-board { opacity: 0.55; }
+.palette-chip.dragging { opacity: 0.4; }
+#palette.drop-before { outline: 1px dashed var(--danger); outline-offset: 2px; }
 input, select {
   background: rgba(255,255,255,0.07); border: 1px solid var(--border); border-radius: 4px;
   padding: 8px 10px; color: var(--text); font-size: 0.9rem;
@@ -255,7 +264,7 @@ input[type="range"] { accent-color: var(--green); }
 </div>
 
 <div id="settings-overlay" style="position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.75);display:none;align-items:center;justify-content:center;">
-  <div id="settings-panel" class="terminal-panel" style="width:min(860px,94vw);max-height:88vh;display:flex;flex-direction:column;">
+  <div id="settings-panel" class="terminal-panel" style="width:min(1440px,96vw);height:88vh;display:flex;flex-direction:column;">
     <div class="settings-header" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
       <h2 class="settings-title" style="font-size:1.2rem;font-weight:700;margin:0;font-family:var(--font-mono);">Dashboard Settings</h2>
       <button class="settings-close" onclick="closeSettings()">Close</button>
@@ -1275,8 +1284,8 @@ function closeSettings() {
   document.getElementById("settings-overlay").style.display = "none";
 }
 
-const SETTINGS_TABS = ["Appearance", "Sections", "New Devices", "Data"];
-let settingsTab = "Appearance";
+const SETTINGS_TABS = ["Layout", "Appearance", "Data"];
+let settingsTab = "Layout";
 
 function switchSettingsTab(name) {
   settingsTab = name;
@@ -1295,14 +1304,12 @@ function buildSettings() {
     `<button class="btn" style="${t === settingsTab ? "border-color:var(--accent);color:var(--accent);" : ""}" onclick="switchSettingsTab('${t}')">${t}</button>`
   ).join("");
   const body = document.getElementById("settings-body");
-  if (settingsTab === "Appearance") {
+  if (settingsTab === "Layout") {
+    body.innerHTML = renderLayoutTab();
+    initLayoutEditor();
+  } else if (settingsTab === "Appearance") {
     body.innerHTML = renderAppearanceTab();
     wireAppearanceTab();
-  } else if (settingsTab === "Sections") {
-    body.innerHTML = renderSectionsTab();
-    initSectionsEditor();
-  } else if (settingsTab === "New Devices") {
-    body.innerHTML = renderNewDevicesTab();
   } else {
     body.innerHTML = renderDataTab();
   }
@@ -1346,34 +1353,106 @@ const SCREEN_SECTION_GROUPS = [
   { screen: "STATUS MONITOR", sections: ["system"] }
 ];
 
-function renderSectionsTab() {
-  return SCREEN_SECTION_GROUPS.map(g => {
+let paletteFilter = "";
+let paletteNewOnly = false;
+
+function sectionOfEntity(id) {
+  for (const key of Object.keys(config.sections || {})) {
+    const ents = config.sections[key].entities || [];
+    if (ents.includes(id)) return key;
+  }
+  return null;
+}
+
+function renderPaletteList() {
+  const f = (paletteFilter || "").toLowerCase();
+  const referenced = collectReferencedIds();
+  const ids = Object.values(states)
+    .map(s => s.entity_id)
+    .filter(id => NEW_DEVICE_DOMAINS.includes(id.split(".")[0]))
+    .filter(id => !paletteNewOnly || !referenced.has(id))
+    .filter(id => !f || id.toLowerCase().includes(f) ||
+      friendlyName(id).toLowerCase().includes(f) ||
+      (entityArea(id) || "").toLowerCase().includes(f))
+    .sort((a, b) => friendlyName(a).localeCompare(friendlyName(b)));
+  const groups = {};
+  for (const id of ids) {
+    const area = entityArea(id) || "No area";
+    (groups[area] = groups[area] || []).push(id);
+  }
+  const html = Object.keys(groups).sort().map(area => `
+    <div style="margin-bottom:8px;">
+      <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--green);margin:6px 0 2px;">${escapeHtml(area)}</div>
+      ${groups[area].map(id => `
+        <div class="palette-chip${referenced.has(id) ? " on-board" : ""}" data-entity="${escapeHtml(id)}" title="${escapeHtml(id)}">
+          <span class="drag-handle" data-drag-palette title="Drag onto a section">⠿</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(friendlyName(id))}</span>
+          ${referenced.has(id) ? '<span style="color:var(--green);font-size:0.65rem;flex-shrink:0;" title="On dashboard">●</span>' : ""}
+        </div>`).join("")}
+    </div>`).join("");
+  return html || "<p style='color:var(--text-muted);font-size:0.85rem;'>No matching entities.</p>";
+}
+
+function renderLayoutTab() {
+  const missing = computeMissingEntities();
+  const missingBlock = missing.length ? `
+    <div style="border:1px solid rgba(255,51,51,0.4);border-radius:6px;padding:8px;margin-bottom:8px;flex-shrink:0;">
+      <div style="color:var(--danger);font-size:0.72rem;margin-bottom:4px;letter-spacing:0.06em;">MISSING (${missing.length}) — no longer in Home Assistant</div>
+      ${missing.map(id => `<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:0.78rem;padding:2px 0;">
+        <span style="color:var(--danger);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(id)}</span>
+        <button class="btn" style="padding:1px 8px;" onclick="removeMissingEntity('${escapeHtml(id)}')" title="Remove from config">×</button>
+      </div>`).join("")}
+    </div>` : "";
+  const board = SCREEN_SECTION_GROUPS.map(g => {
     const keys = orderedSectionKeys(g.sections.filter(k => config.sections && config.sections[k]));
-    const rows = keys.map(key => {
+    const cards = keys.map(key => {
       const sec = config.sections[key];
       const chips = (sec.entities || []).map(id =>
-        `<span class="entity-chip" data-section="${key}" data-entity="${escapeHtml(id)}"><span class="drag-handle" data-drag-chip title="Drag to reorder or move">⠿</span>${escapeHtml(friendlyName(id))} <button onclick="removeSectionEntity('${key}','${escapeHtml(id)}')">×</button></span>`
+        `<span class="entity-chip" data-section="${key}" data-entity="${escapeHtml(id)}" title="${escapeHtml(id)}"><span class="drag-handle" data-drag-chip title="Drag to reorder, move, or drag back to the palette to remove">⠿</span>${escapeHtml(friendlyName(id))} <button onclick="removeSectionEntity('${key}','${escapeHtml(id)}')">×</button></span>`
       ).join("");
       return `
-        <div class="editor-section" data-section-key="${key}" style="border:1px solid var(--border);border-radius:6px;padding:10px;margin-bottom:10px;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div class="editor-section" data-section-key="${key}" style="border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
             <span class="drag-handle" data-drag-section="${key}" title="Drag to reorder section">⠿</span>
-            <input value="${escapeHtml(sec.icon || "")}" onchange="setSectionProp('${key}','icon',this.value)" style="width:48px;text-align:center;" title="Section icon">
-            <input value="${escapeHtml(sec.title || key)}" onchange="setSectionProp('${key}','title',this.value)" style="flex:1;min-width:120px;" title="Section title">
+            <input value="${escapeHtml(sec.icon || "")}" onchange="setSectionProp('${key}','icon',this.value)" style="width:42px;text-align:center;padding:4px;" title="Section icon">
+            <input value="${escapeHtml(sec.title || key)}" onchange="setSectionProp('${key}','title',this.value)" style="flex:1;min-width:80px;padding:4px 8px;" title="Section title">
           </div>
-          <div class="chip-list" data-chip-list="${key}" style="display:flex;flex-wrap:wrap;gap:6px;min-height:30px;">${chips || "<span style='color:var(--text-muted);font-size:0.8rem;'>No entities</span>"}</div>
-          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
-            <input placeholder="Filter by name, id, or area..." data-filter="${key}" style="flex:1;min-width:140px;">
-            <select data-picker="${key}" style="flex:2;min-width:200px;"></select>
-            <button class="btn" data-add="${key}">Add</button>
-          </div>
+          <div class="chip-list" data-chip-list="${key}" style="display:flex;flex-wrap:wrap;gap:2px;min-height:34px;border-radius:4px;">${chips || "<span style='color:var(--text-muted);font-size:0.75rem;padding:6px;'>Drop entities here</span>"}</div>
         </div>`;
     }).join("");
-    return `<div class="settings-section" style="margin-bottom:18px;">
-      <h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">${g.screen}</h3>
-      ${rows || "<p style='color:var(--text-muted);font-size:0.85rem;'>No sections on this screen.</p>"}
+    return `<div style="min-width:0;">
+      <h3 style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 8px;">${g.screen}</h3>
+      ${cards || "<p style='color:var(--text-muted);font-size:0.8rem;'>No sections on this screen.</p>"}
     </div>`;
   }).join("");
+  return `
+    <div style="display:flex;gap:14px;height:100%;min-height:0;">
+      <div id="palette" style="width:290px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;border:1px solid var(--border);border-radius:6px;padding:10px;">
+        <input id="palette-filter" placeholder="Filter by name, id, or area..." value="${escapeHtml(paletteFilter)}" style="margin-bottom:8px;flex-shrink:0;">
+        <label style="font-size:0.78rem;color:var(--text-muted);display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-shrink:0;cursor:pointer;">
+          <input type="checkbox" id="palette-newonly" ${paletteNewOnly ? "checked" : ""}> only entities not on dashboard
+        </label>
+        ${missingBlock}
+        <div id="palette-list" style="overflow-y:auto;flex:1;min-height:0;">${renderPaletteList()}</div>
+        <p style="color:var(--text-muted);font-size:0.72rem;margin:8px 0 0;flex-shrink:0;">Drag an entity onto a section to add it. Drag a chip back here to remove it.</p>
+      </div>
+      <div id="board" style="flex:1;min-width:0;overflow-y:auto;display:grid;grid-template-columns:repeat(4,minmax(210px,1fr));gap:12px;align-content:start;">${board}</div>
+    </div>`;
+}
+
+function initLayoutEditor() {
+  const filterEl = document.getElementById("palette-filter");
+  const newOnlyEl = document.getElementById("palette-newonly");
+  const refresh = () => {
+    paletteFilter = filterEl ? filterEl.value : "";
+    paletteNewOnly = newOnlyEl ? newOnlyEl.checked : false;
+    const list = document.getElementById("palette-list");
+    if (list) list.innerHTML = renderPaletteList();
+    initEditorDrag();
+  };
+  if (filterEl) filterEl.addEventListener("input", refresh);
+  if (newOnlyEl) newOnlyEl.addEventListener("change", refresh);
+  initEditorDrag();
 }
 
 function setSectionProp(key, prop, value) {
@@ -1399,40 +1478,6 @@ function addSectionEntity(key, id) {
   buildSettings();
 }
 
-function populateEntityPicker(sel, filterText) {
-  const f = (filterText || "").toLowerCase();
-  const opts = Object.values(states)
-    .map(s => s.entity_id)
-    .filter(id => {
-      if (!f) return true;
-      return id.toLowerCase().includes(f) ||
-        friendlyName(id).toLowerCase().includes(f) ||
-        (entityArea(id) || "").toLowerCase().includes(f);
-    })
-    .sort()
-    .slice(0, 200)
-    .map(id => `<option value="${id}">${escapeHtml(friendlyName(id))} — ${id}${entityArea(id) ? " · " + escapeHtml(entityArea(id)) : ""}</option>`)
-    .join("");
-  sel.innerHTML = `<option value="">Pick entity...</option>` + opts;
-}
-
-function initSectionsEditor() {
-  document.querySelectorAll("[data-picker]").forEach(sel => {
-    const key = sel.getAttribute("data-picker");
-    populateEntityPicker(sel, "");
-    const filter = document.querySelector(`[data-filter="${key}"]`);
-    if (filter) filter.addEventListener("input", () => populateEntityPicker(sel, filter.value));
-  });
-  document.querySelectorAll("[data-add]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      const key = btn.getAttribute("data-add");
-      const sel = document.querySelector(`[data-picker="${key}"]`);
-      if (sel && sel.value) addSectionEntity(key, sel.value);
-    });
-  });
-  initEditorDrag();
-}
-
 function initEditorDrag() {
   const body = document.getElementById("settings-body");
   if (!body) return;
@@ -1441,6 +1486,9 @@ function initEditorDrag() {
   body.querySelectorAll("[data-drag-chip]").forEach(h => {
     h.addEventListener("pointerdown", ev => startDrag(ev, "chip", h.closest(".entity-chip")));
   });
+  body.querySelectorAll("[data-drag-palette]").forEach(h => {
+    h.addEventListener("pointerdown", ev => startDrag(ev, "palette", h.closest(".palette-chip")));
+  });
   body.querySelectorAll("[data-drag-section]").forEach(h => {
     h.addEventListener("pointerdown", ev => startDrag(ev, "section", h.closest(".editor-section")));
   });
@@ -1448,11 +1496,14 @@ function initEditorDrag() {
   function startDrag(ev, kind, el) {
     if (!el) return;
     ev.preventDefault();
+    const id = kind === "section" ? null : el.getAttribute("data-entity");
     drag = {
       kind,
       el,
-      key: kind === "chip" ? el.getAttribute("data-section") : el.getAttribute("data-section-key"),
-      id: kind === "chip" ? el.getAttribute("data-entity") : null,
+      key: kind === "chip" ? el.getAttribute("data-section")
+        : kind === "palette" ? sectionOfEntity(id)
+        : el.getAttribute("data-section-key"),
+      id,
       pointerId: ev.pointerId,
       startY: ev.clientY,
       moved: false
@@ -1491,11 +1542,13 @@ function initEditorDrag() {
   function findDropTarget(ev) {
     const el = document.elementFromPoint(ev.clientX, ev.clientY);
     if (!el) return null;
-    if (drag.kind === "chip") {
+    if (drag.kind === "chip" || drag.kind === "palette") {
       const chip = el.closest(".entity-chip");
       if (chip && chip !== drag.el) return chip;
       const list = el.closest("[data-chip-list]");
       if (list) return list;
+      const palette = el.closest("#palette");
+      if (palette) return palette;
       return null;
     }
     const sec = el.closest(".editor-section");
@@ -1508,9 +1561,15 @@ function initEditorDrag() {
   }
 
   function applyDrop(d, target) {
-    if (d.kind === "chip") {
+    if (d.kind === "chip" || d.kind === "palette") {
       const id = d.id;
       const fromKey = d.key;
+      if (target.id === "palette") {
+        if (fromKey && config.sections[fromKey]) {
+          config.sections[fromKey].entities = (config.sections[fromKey].entities || []).filter(x => x !== id);
+        }
+        return;
+      }
       let toKey, beforeId = null;
       if (target.classList.contains("entity-chip")) {
         toKey = target.getAttribute("data-section");
@@ -1518,9 +1577,11 @@ function initEditorDrag() {
       } else {
         toKey = target.getAttribute("data-chip-list");
       }
-      const from = (config.sections[fromKey].entities || []).filter(x => x !== id);
-      config.sections[fromKey].entities = from;
-      const to = fromKey === toKey ? from : (config.sections[toKey].entities || []).filter(x => x !== id);
+      if (!config.sections[toKey]) return;
+      if (fromKey && config.sections[fromKey]) {
+        config.sections[fromKey].entities = (config.sections[fromKey].entities || []).filter(x => x !== id);
+      }
+      const to = (config.sections[toKey].entities || []).filter(x => x !== id);
       let index = beforeId ? to.indexOf(beforeId) : -1;
       if (index === -1) index = to.length;
       to.splice(index, 0, id);
@@ -1558,14 +1619,6 @@ function collectReferencedIds() {
   return ids;
 }
 
-function computeNewEntities() {
-  const referenced = collectReferencedIds();
-  return Object.values(states)
-    .map(s => s.entity_id)
-    .filter(id => NEW_DEVICE_DOMAINS.includes(id.split(".")[0]) && !referenced.has(id))
-    .sort((a, b) => friendlyName(a).localeCompare(friendlyName(b)));
-}
-
 function computeMissingEntities() {
   const referenced = collectReferencedIds();
   const missing = [];
@@ -1573,47 +1626,6 @@ function computeMissingEntities() {
     if (!states[id] && !entityById[id]) missing.push(id);
   }
   return missing.sort();
-}
-
-function renderNewDevicesTab() {
-  const fresh = computeNewEntities();
-  const missing = computeMissingEntities();
-  const sectionOpts = Object.keys(config.sections || {})
-    .map(k => `<option value="${k}">${escapeHtml(config.sections[k].title || k)}</option>`).join("");
-  const freshRows = fresh.map(id =>
-    `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
-       <span style="flex:1;min-width:180px;font-size:0.85rem;">${escapeHtml(friendlyName(id))} <span style="color:var(--text-muted);">${id}</span></span>
-       <span style="color:var(--text-muted);font-size:0.8rem;">${escapeHtml(entityArea(id) || "")}</span>
-       <select data-newtarget="${escapeHtml(id)}">${sectionOpts}</select>
-       <button class="btn" onclick="addNewEntity('${escapeHtml(id)}')">Add</button>
-     </div>`).join("");
-  const missingRows = missing.map(id =>
-    `<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);">
-       <span style="flex:1;font-size:0.85rem;color:var(--danger);">${escapeHtml(id)}</span>
-       <button class="btn" onclick="removeMissingEntity('${escapeHtml(id)}')">Remove</button>
-     </div>`).join("");
-  return `
-    <div class="settings-section" style="margin-bottom:22px;">
-      <h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">New Entities (${fresh.length})</h3>
-      <p style="color:var(--text-muted);font-size:0.8rem;margin:0 0 8px;">Entities that exist in Home Assistant but are not on the dashboard. Pick a section and tap Add.</p>
-      ${freshRows || "<p style='color:var(--text-muted);font-size:0.85rem;'>Nothing new — every entity is on the dashboard.</p>"}
-    </div>
-    <div class="settings-section">
-      <h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">Missing Entities (${missing.length})</h3>
-      <p style="color:var(--text-muted);font-size:0.8rem;margin:0 0 8px;">Config entries whose entity no longer exists in Home Assistant.</p>
-      ${missingRows || "<p style='color:var(--text-muted);font-size:0.85rem;'>No stale entries in the config.</p>"}
-    </div>`;
-}
-
-function addNewEntity(id) {
-  const sel = document.querySelector(`[data-newtarget="${id}"]`);
-  const key = sel ? sel.value : null;
-  if (!key || !config.sections[key]) return;
-  const sec = config.sections[key];
-  sec.entities = sec.entities || [];
-  if (!sec.entities.includes(id)) sec.entities.push(id);
-  renderAll();
-  buildSettings();
 }
 
 function removeMissingEntity(id) {
