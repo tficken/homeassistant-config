@@ -19,4 +19,5 @@ secrets.yaml
 .superpowers/
 image/
 tts/
+www/alexa_tts/
 www/media/
