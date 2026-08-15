@@ -49,12 +49,15 @@ The intended reader of this file is an AI coding agent that has no prior context
 ├── blueprints/                 # Reusable automation and script blueprints
 │   ├── automation/homeassistant/
 │   └── script/homeassistant/
+├── .github/workflows/          # CI validation (validate.yml)
 ├── custom_components/          # Custom integrations
 │   ├── ai_dashboard_proxy/     # Serves /ai-dashboard/ with server-side HA auth
-│   ├── bambu_lab/              # Bambu Lab 3D printer integration
-│   ├── hacs/                   # Home Assistant Community Store
-│   ├── pagerduty/              # PagerDuty integration
 │   ├── alexa_media/            # Alexa Media Player (HACS)
+│   ├── bambu_lab/              # Bambu Lab 3D printer integration
+│   ├── extended_openai_conversation/  # OpenAI conversation integration (HACS)
+│   ├── hacs/                   # Home Assistant Community Store
+│   ├── openhasp/               # openHASP wall plate integration (HACS)
+│   ├── pagerduty/              # PagerDuty integration
 │   └── uix/                    # UI extension for Lovelace
 ├── themes/                     # Lovelace themes
 │   └── google_dark_theme/
@@ -65,6 +68,8 @@ The intended reader of this file is an AI coding agent that has no prior context
 ├── docs/superpowers/           # Design specs and implementation plans
 │   ├── specs/
 │   └── plans/
+├── openhasp/                   # openHASP plate definition (wall_panel.yaml)
+├── scripts/                    # Maintenance and validation scripts (backups, HA YAML validation)
 ├── ipad-wall-panel.yaml        # YAML-managed Lovelace wall panel dashboard
 ├── dashboard-backup-*.json     # Backups of UI-managed dashboards
 ├── image/                      # Cached images
@@ -126,7 +131,7 @@ Stored under `blueprints/`. These are Home Assistant-provided reusable templates
 
 ### Current Dashboards
 
-- **`www/ai-dashboard/`**: Custom retro-terminal wall dashboard served at `/ai-dashboard/`. Built as a standalone HTML/JS/CSS app proxied through `custom_components/ai_dashboard_proxy/`. Designed for landscape wall-mounted iPads / tablets. Home screen layout: clock (left), weather + room monitors (center), radar + presence + doors (right).
+- **`www/ai-dashboard/`**: Custom retro-terminal wall dashboard served at `/ai-dashboard/`. Built as a standalone HTML/JS/CSS app proxied through `custom_components/ai_dashboard_proxy/`. Designed for landscape wall-mounted iPads / tablets. Four screens are switched via a bottom dock: **HOME** (clock, weather + room monitors, radar + presence + doors), **CONTROL HUB** (scenes, scripts, lights, cameras), **SECURITY** (alarm-related sensors and events), and **STATUS MONITOR** (per-area environment sensors with 24-hour sparklines for temperature/humidity, plus host/system metrics).
 - **`ipad-wall-panel.yaml`**: YAML-managed Lovelace dashboard for the wall-mounted iPad in the Living Room. Registered in `configuration.yaml` under `lovelace.dashboards.ipad-wall-panel`.
 - **Original UI dashboard**: Backed up as `dashboard-backup-*.json` from `.storage/lovelace.dashboard_dashboard`.
 
@@ -156,6 +161,7 @@ Stored under `blueprints/`. These are Home Assistant-provided reusable templates
    py -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
    ```
 3. Hard-refresh the dashboard in the browser (`Ctrl+Shift+R` / `Cmd+Shift+R`) to pick up the latest files. The proxy serves them directly from `www/ai-dashboard/`.
+4. If you changed anything under `custom_components/ai_dashboard_proxy/` (Python), a **Home Assistant restart** is required — a browser refresh is not enough.
 
 ---
 
@@ -188,9 +194,11 @@ Each integration is a Home Assistant standard package with a `manifest.json`, `_
 ### `ai_dashboard_proxy`
 
 - **Purpose**: Serves the custom `www/ai-dashboard/` app at `/ai-dashboard/` and handles Home Assistant authentication server-side so the dashboard can call HA APIs without exposing a long-lived token in the browser.
+- **Version**: `1.0.0`.
 - **Key Modules**:
   - `__init__.py` — integration setup.
-  - `http.py` — HTTP view that proxies dashboard assets and exposes a forecast helper endpoint.
+  - `http.py` — HTTP/WebSocket views: serves dashboard assets with registry-derived area names injected, proxies HA state events and service calls over `/ai-dashboard/ws`, and exposes helper endpoints `POST /ai-dashboard/api/forecast` (weather forecast) and `POST /ai-dashboard/api/history` (recorder state history for sparklines, via `homeassistant.components.recorder.history.get_significant_states` run in the recorder executor).
+- **Restart Required**: Any change to this component's Python requires a Home Assistant restart to take effect.
 
 ### `bambu_lab`
 
@@ -209,6 +217,13 @@ Each integration is a Home Assistant standard package with a `manifest.json`, `_
     - `tests/` — unit tests with JSON mock payloads.
 - **Services**: Defined in `services.yaml`. Includes `send_command`, `print_project_file`, `skip_objects`, `move_axis`, `extrude_retract`, `load_filament`, `set_filament`, `get_filament_data`, `start_filament_drying`, etc.
 
+### `extended_openai_conversation`
+
+- **Purpose**: Extended OpenAI Conversation integration (HACS) for chat/voice-based control of the HA instance.
+- **Version**: `2.0.2`.
+- **Integration Type**: `service`.
+- **External Requirement**: `openai~=2.21.0`.
+
 ### `hacs`
 
 - **Purpose**: Home Assistant Community Store (HACS).
@@ -223,11 +238,18 @@ Each integration is a Home Assistant standard package with a `manifest.json`, `_
   - `websocket/` — WebSocket API endpoints.
   - `hacs_frontend/` — bundled frontend assets.
 
+### `openhasp`
+
+- **Purpose**: openHASP integration (HACS) for the physical wall plate; plate layout is defined in `openhasp/wall_panel.yaml` and pushed over MQTT.
+- **Version**: `0.7.2`.
+- **Dependencies**: `mqtt`, `http`. Subscribes to `hasp/discovery/#`.
+- **External Requirement**: `jsonschema>=3.2.0`.
+
 ### `pagerduty`
 
 - **Purpose**: PagerDuty integration for incidents and on-call data.
-- **Version**: `v1.5.0`.
-- **External Requirement**: `pagerduty==6.3.0`.
+- **Version**: `v1.21.0`.
+- **External Requirement**: `pagerduty==7.0.0`.
 - **Platforms**: sensor, calendar, notify.
 - **Key Modules**:
   - `__init__.py` — setup and config entry handling.
@@ -246,13 +268,14 @@ Each integration is a Home Assistant standard package with a `manifest.json`, `_
 ### `uix`
 
 - **Purpose**: UI eXtension for Home Assistant (custom Lovelace/frontend extension).
-- **Version**: `7.7.1`.
+- **Version**: `8.0.1`.
 - **Integration Type**: `service`.
 - **Key Modules**:
   - `__init__.py` — frontend script registration and cleanup.
   - `frontend.py` — serves `uix.js` and registers extra module URLs.
   - `connection.py` — WebSocket command handlers.
   - `config_flow.py` — configuration flow.
+  - `checks.py`, `diagnostics.py`, `helpers.py`, `const.py` — supporting modules.
   - `uix.js` / `uix.js.gz` — bundled frontend code.
 
 ---

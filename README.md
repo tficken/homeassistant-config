@@ -8,7 +8,7 @@ Personal Home Assistant configuration running on Home Assistant OS `2026.8.1`. T
 
 ### Custom Integrations (`custom_components/`)
 
-**`ai_dashboard_proxy`** — A custom Home Assistant integration I wrote in Python that serves a retro-terminal wall dashboard at `/ai-dashboard/`. It exposes a WebSocket proxy that forwards HA state events and service calls server-side, so no long-lived access token is ever exposed to the browser. The dashboard (`www/ai-dashboard/`) is vanilla HTML/CSS/JS: clock, weather, room monitors, presence, radar, and door status on a single landscape home screen.
+**`ai_dashboard_proxy`** — A custom Home Assistant integration I wrote in Python that serves a retro-terminal wall dashboard at `/ai-dashboard/`. It exposes a WebSocket proxy that forwards HA state events and service calls server-side, plus REST helper endpoints for weather forecasts and recorder history, so no long-lived access token is ever exposed to the browser. The dashboard (`www/ai-dashboard/`) is vanilla HTML/CSS/JS with four dock-navigated screens: a home screen (clock, weather, room monitors, presence, radar, door status), a control hub (scenes, scripts, lights, cameras), a security view, and a status monitor with 24-hour SVG sparklines drawn from recorder history.
 
 **`bambu_lab`** — Full Bambu Lab 3D printer integration. Handles MQTT-based communication with two P1S printers, exposes sensor/binary_sensor/camera/light/fan entities, and includes a full coordinator pattern, config flow, device triggers, and diagnostics. I run two P1S units for my 3D printing business (TLF Productions); this integration keeps them monitored from the same platform as the rest of my home systems.
 
@@ -17,6 +17,8 @@ Personal Home Assistant configuration running on Home Assistant OS `2026.8.1`. T
 **`pagerduty`** — Custom PagerDuty integration. Bridges home automation alerting with the same incident management platform I use professionally at NRC Health.
 
 **`alexa_media`** — Alexa Media Player integration (via HACS). Enables announcements and TTS on Amazon Echo devices through `notify.alexa_media_*` services.
+
+**`openhasp`** — openHASP integration (via HACS) driving a physical wall plate over MQTT; plate layout defined in `openhasp/wall_panel.yaml`.
 
 **`hacs`** — Home Assistant Community Store for managing community components.
 
@@ -56,7 +58,7 @@ A Node.js script that programmatically builds Lovelace dashboards by reading the
 
 ### AI-Assisted Development
 
-This repo includes `AGENTS.md` — a structured guide I maintain so that AI coding agents (Cursor, Claude, etc.) have full context about the project architecture, file layout, and workflow conventions before making changes. The project uses a Superpowers skill system with design specs and implementation plans tracked in `docs/superpowers/`.
+This repo includes `AGENTS.md` — a structured guide I maintain so that AI coding agents (Kimi Code, Claude Code, Cursor, etc.) have full context about the project architecture, file layout, and workflow conventions before making changes. The project uses a Superpowers skill system with design specs and implementation plans tracked in `docs/superpowers/`.
 
 ---
 
@@ -72,4 +74,4 @@ This repo includes `AGENTS.md` — a structured guide I maintain so that AI codi
 | Hardware | Bambu Lab P1S × 2, OpenHASP wall panel, Zigbee sensors, Z-Wave devices |
 | Monitoring | PagerDuty integration, mobile push, persistent notifications |
 | Voice assistants | Alexa via Home Assistant Cloud + Alexa Media Player |
-| AI tooling | Extended OpenAI Conversation, Claude Code, agent-guided development |
+| AI tooling | Extended OpenAI Conversation, Kimi Code, Claude Code, agent-guided development |
