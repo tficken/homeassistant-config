@@ -984,17 +984,35 @@ function renderHomeScreen() {
     const home = state ? isActive(state.state) : false;
     const label = presenceLabel(id);
     const initial = label.charAt(0).toUpperCase();
+    const zone = state && state.state && state.state !== "home" && state.state !== "not_home"
+      ? state.state.replace(/_/g, " ") : "";
+    let battery = "";
+    const trackers = (state && state.attributes && Array.isArray(state.attributes.device_trackers))
+      ? state.attributes.device_trackers : [];
+    for (const t of trackers) {
+      const baseId = String(t).split(".").pop();
+      const lvl = states[`sensor.${baseId}_battery_level`];
+      const battState = states[`sensor.${baseId}_battery_state`];
+      if (lvl && !isUnavailable(lvl)) {
+        const charging = battState && /charging/i.test(battState.state) && !/not/i.test(battState.state);
+        battery = `${lvl.state}%${charging ? " ⚡" : ""}`;
+        break;
+      }
+    }
+    const lastSeen = state ? relativeTime(state.last_changed) : "";
     return `
-      <div style="flex:1;min-width:0;" data-entity-id="${id}">
-        <div class="terminal-panel" style="display:flex;align-items:center;gap:12px;padding:14px;height:100%;">
-          <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:1.6rem;color:var(--green);box-shadow:0 0 12px rgba(20,254,23,0.15);flex-shrink:0;">${initial}</div>
-          <div style="flex:1;min-width:0;">
-            <div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(label)}</div>
-            <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
-              ${renderStatusLed(home ? "home" : "off")}
-              <span style="font-family:var(--font-mono);font-size:0.85rem;color:${home ? 'var(--green)' : 'var(--text-muted)'};">${home ? "HOME" : "AWAY"}</span>
-            </div>
+      <div class="terminal-panel" data-entity-id="${id}" style="display:flex;align-items:center;gap:12px;padding:14px;">
+        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:1.6rem;color:var(--green);box-shadow:0 0 12px rgba(20,254,23,0.15);flex-shrink:0;">${initial}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(label)}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+            ${renderStatusLed(home ? "home" : "off")}
+            <span style="font-family:var(--font-mono);font-size:0.85rem;color:${home ? 'var(--green)' : 'var(--text-muted)'};">${home ? "HOME" : (zone ? escapeHtml(zone.toUpperCase()) : "AWAY")}</span>
           </div>
+        </div>
+        <div style="text-align:right;font-family:var(--font-mono);flex-shrink:0;">
+          ${battery ? `<div style="color:var(--green);font-size:1rem;">${escapeHtml(battery)}</div>` : ""}
+          ${lastSeen ? `<div style="color:var(--text-muted);font-size:0.75rem;margin-top:4px;">${escapeHtml(lastSeen)}</div>` : ""}
         </div>
       </div>`;
   }).join("");
@@ -1004,8 +1022,24 @@ function renderHomeScreen() {
   const timeStrMarked = escapeHtml(timeStr).replace(/:/g, '<span class="colon">:</span>');
   const dateStr = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
 
-  const presencePanel = renderTerminalPanel(sectionTitle("presence"), `<div style="display:flex;gap:10px;height:100%;align-items:center;">${presence}</div>`, "fill");
+  const presencePanel = renderTerminalPanel(sectionTitle("presence"), `<div style="display:flex;flex-direction:column;gap:10px;height:100%;justify-content:space-evenly;">${presence}</div>`, "fill");
   const doorsPanel = renderTerminalPanel(sectionTitle("doors"), renderDoors());
+
+  const calStates = Object.keys(states).filter(id => id.startsWith("calendar.")).map(id => states[id]).filter(Boolean);
+  const cal = calStates.find(s => s.state === "on") || calStates.find(s => s.attributes && s.attributes.message);
+  let oncallPanel = "";
+  if (cal) {
+    const isOn = cal.state === "on";
+    const msg = cal.attributes && cal.attributes.message ? cal.attributes.message : "";
+    const end = cal.attributes && cal.attributes.end_time ? new Date(cal.attributes.end_time) : null;
+    const until = isOn && end && !isNaN(end.getTime())
+      ? end.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" }) : "";
+    oncallPanel = renderTerminalPanel("ON CALL", `
+      <div style="display:flex;align-items:center;justify-content:space-between;font-family:var(--font-mono);gap:10px;">
+        <span style="color:${isOn ? 'var(--green)' : 'var(--text-muted)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${isOn ? escapeHtml(msg) : "NO ACTIVE SHIFT"}</span>
+        ${until ? `<span style="color:var(--text-muted);font-size:0.8rem;flex-shrink:0;">until ${escapeHtml(until)}</span>` : ""}
+      </div>`);
+  }
 
   const main = `
     ${renderAlertBanner(getAlerts())}
@@ -1016,6 +1050,7 @@ function renderHomeScreen() {
           <div id="date" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
         </div>
         <div style="flex:1;min-height:0;">${presencePanel}</div>
+        ${oncallPanel ? `<div style="flex-shrink:0;">${oncallPanel}</div>` : ""}
       </div>
       <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
         ${weatherPanel}
