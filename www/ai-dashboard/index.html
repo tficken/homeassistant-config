@@ -447,6 +447,7 @@ function applyTheme() {
 }
 
 function friendlyName(entityId) {
+  if (config.labels && config.labels[entityId]) return config.labels[entityId];
   const s = states[entityId];
   if (s && s.attributes && s.attributes.friendly_name) return s.attributes.friendly_name;
   const e = entityById[entityId];

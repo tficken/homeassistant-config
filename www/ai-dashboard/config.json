@@ -3,6 +3,10 @@
     "person.woteg": "Travis",
     "person.bobbie": "Bobbie"
   },
+  "labels": {
+    "binary_sensor.living_room_front_door": "Front Door",
+    "binary_sensor.backdoor": "Back Door"
+  },
   "theme": {
     "backgroundImage": "",
     "accentColor": "#2dd4bf"
