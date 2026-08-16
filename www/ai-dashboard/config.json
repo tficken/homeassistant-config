@@ -86,8 +86,7 @@
           "preferEntity": "camera.front_door_last_recording",
           "activityEntities": [
             "event.front_door_motion",
-            "event.front_door_ding",
-            "sensor.front_door_last_activity"
+            "event.front_door_ding"
           ]
         }
       }
@@ -112,11 +111,7 @@
       "entities": [
         "binary_sensor.living_room_front_door",
         "binary_sensor.backdoor"
-      ],
-      "lastActivity": {
-        "binary_sensor.living_room_front_door": "sensor.front_door_last_activity",
-        "binary_sensor.backdoor": "sensor.downstairs_last_activity"
-      }
+      ]
     },
     "environment": {
       "title": "Environment",

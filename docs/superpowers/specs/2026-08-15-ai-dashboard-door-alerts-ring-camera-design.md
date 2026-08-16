@@ -104,3 +104,24 @@ No Python changes; no HA restart required.
   - Open/close a door → its Doors card shows the RECENT highlight; after 10 min it clears.
   - SECURITY screen: front door shows a still image with LAST EVENT label; backyard
     still streams live; triggering front door motion refreshes the snapshot.
+
+## Amendment (2026-08-15): Doors use contact sensors, not Ring last_activity
+
+**Root cause found during verification:** both doors showed the same "activity ago"
+time. The doors section was wired to Ring's `sensor.*_last_activity`, which (per HA
+core `components/ring/sensor.py`) is the device's latest history entry **of any
+kind — including `on_demand`** events that Ring records when live view/snapshot is
+pulled. The dashboard's own camera feeds therefore kept both sensors perpetually
+fresh, making them meaningless as door open/close indicators.
+
+**Changes:**
+- `renderDoors()` and `recentDoorIds()` now derive the last-activity line and the
+  RECENT highlight from each door binary sensor's own `last_changed` (ZHA contact
+  sensors: `binary_sensor.living_room_front_door`, `binary_sensor.backdoor`).
+- The `sections.doors.lastActivity` config map was removed (config.json,
+  DEFAULT_CONFIG, and the settings editor's referenced-entity/cleanup logic).
+- `sections.cameras.snapshot.*.activityEntities` no longer includes
+  `sensor.front_door_last_activity` — only `event.front_door_motion` and
+  `event.front_door_ding`. This avoids a potential feedback loop (snapshot pull →
+  on_demand event → last_activity change → snapshot refresh) and makes the camera
+  panel's LAST EVENT label reflect real motion/ring events.
