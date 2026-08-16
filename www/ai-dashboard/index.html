@@ -1149,8 +1149,8 @@ function renderHomeScreen() {
     ${renderAlertBanner(getAlerts())}
     <div style="display:grid;grid-template-columns:0.9fr 1.2fr 1fr;gap:14px;flex:1;min-height:0;">
       <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
-        <div style="flex-shrink:0;padding:8px 0 0 8px;">
-          <div id="clock" style="font-family:var(--font-mono);font-size:clamp(4rem,9vw,6.5rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);">${timeStrMarked}</div>
+        <div style="flex-shrink:0;padding:8px 0 0 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
+          <div id="clock" style="font-family:var(--font-mono);font-size:clamp(4rem,9vw,6.5rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);white-space:nowrap;">${timeStrMarked}</div>
           <div id="date" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
         </div>
         <div style="flex:1;min-height:0;">${presencePanel}</div>
@@ -1361,6 +1361,15 @@ function updateClock() {
   if (el) {
     const timeStr = now.toLocaleTimeString([], opts);
     el.innerHTML = escapeHtml(timeStr).replace(/:/g, '<span class="colon">:</span>');
+    // Fit the time on one line: start from the clamp(4rem, 9vw, 6.5rem) size,
+    // then shrink proportionally until it fits the column width.
+    const preferred = Math.min(Math.max(64, window.innerWidth * 0.09), 104);
+    el.style.fontSize = preferred + "px";
+    const avail = el.parentElement.clientWidth - 16;
+    const need = el.scrollWidth;
+    if (need > avail && need > 0) {
+      el.style.fontSize = Math.max(28, Math.floor(preferred * avail / need)) + "px";
+    }
   }
   const d = document.getElementById("date");
   if (d) d.textContent = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
