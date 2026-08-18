@@ -171,6 +171,7 @@ Stored under `blueprints/`. These are Home Assistant-provided reusable templates
 Common device families in this instance (entity IDs follow these prefixes):
 
 - **Lights / Ceiling fans**: `light.ceiling_fan`, `light.living_room_ceiling_fan`, `light.third_reality_inc_3rcb01057z*`, `light.*_chamber_light`
+- **Bedroom bulbs**: Sylvania Smart+ WiFi A19 — Alexa-only, not integrable with HA (Tuya white-label lock). Slated for replacement; see `docs/sylvania-smartplus-wifi-notes.md`.
 - **Bambu Lab 3D printers**: `sensor.p1s_*`, `binary_sensor.p1s_*`, `fan.p1s_*`, `light.p1s_*_chamber_light`, `camera.p1s_*_camera`, etc.
 - **Cameras**: `camera.front_door_live_view`, `camera.downstairs_live_view`, `camera.p1s_*_camera`
 - **Environmental sensors**: `sensor.hobeian_zg_204zx_*`, `binary_sensor.hobeian_zg_204zx*`
