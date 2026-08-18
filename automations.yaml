@@ -295,6 +295,38 @@
       entity_id: scene.pagerduty_flash_restore
   mode: single
 
+- id: '1786780000002'
+  alias: PD New Incident announcement
+  description: Announce new PagerDuty incidents over the master bedroom Echo Dot
+  triggers:
+  - trigger: state
+    entity_id:
+    - sensor.pagerduty_p2wm8b3_pagerduty_assigned_incidents
+  conditions:
+  - condition: template
+    value_template: "{{ trigger.from_state is not none and trigger.to_state.state | int(0) > trigger.from_state.state | int(0) }}"
+  actions:
+  - variables:
+      incidents: "{{ state_attr('sensor.pagerduty_p2wm8b3_pagerduty_assigned_incidents', 'assigned_incidents') or [] }}"
+      message: >-
+        {% if incidents %}
+        {% set inc = incidents[0] %}
+        New PagerDuty incident: {{ inc.title }} on {{ inc.impacted_service }}. Urgency: {{ inc.urgency }}.
+        {% else %}
+        New PagerDuty incident assigned to you.
+        {% endif %}
+  - action: media_player.volume_set
+    target:
+      entity_id: media_player.master_bedroom_echo_dot
+    data:
+      volume_level: 0.8
+  - action: notify.alexa_media_master_bedroom_echo_dot
+    data:
+      message: "{{ message }}"
+      data:
+        type: announce
+  mode: single
+
 - id: '1786780000001'
   alias: Door/window open announcement
   description: Announce door/window openings over Alexa and notify phone when no one is home or night mode is on
