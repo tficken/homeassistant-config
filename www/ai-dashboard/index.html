@@ -253,6 +253,7 @@ input[type="range"] { accent-color: var(--green); }
 <div class="vignette"></div>
 <div id="status-led" class="status-led" style="position:fixed;top:14px;left:14px;z-index:50;"></div>
 <div id="status-text" style="position:fixed;top:12px;left:32px;z-index:50;font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);">CONNECTING</div>
+<div id="conn-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:60;background:rgba(255,174,0,0.12);border:1px solid var(--amber);color:var(--amber);font-family:var(--font-mono);padding:10px 14px;letter-spacing:0.05em;text-align:center;">! CONNECTION LOST — RETRYING</div>
 <button id="settings-btn" style="position:fixed;top:10px;right:14px;z-index:50;background:transparent;border:none;color:var(--text-muted);font-family:var(--font-mono);cursor:pointer;" onclick="openSettings()">[ SETTINGS ]</button>
 
 <div id="app">
@@ -323,6 +324,7 @@ let haConfig = null;
 let forecastCache = { daily: [], fetchedAt: null };
 let historyCache = {};
 let currentScreen = "home";
+let clockFontSize = null;
 
 async function apiFetch(path) {
   const headers = token ? { "Authorization": `Bearer ${token}` } : {};
@@ -373,15 +375,18 @@ async function refreshForecast() {
 }
 
 async function fetchHistory(entityIds, hours = 24) {
-  const missing = entityIds.filter(id => !historyCache[id]);
-  if (!missing.length) return;
+  const now = Date.now();
+  const stale = entityIds.filter(id =>
+    !historyCache[id] || (now - historyCache[id].fetchedAt) > 30 * 60 * 1000
+  );
+  if (!stale.length) return;
   const res = await apiCall("POST", "/ai-dashboard/api/history", {
-    entity_ids: missing,
+    entity_ids: stale,
     hours: hours
   });
   if (!res) return;
-  for (const id of missing) {
-    if (Array.isArray(res[id])) historyCache[id] = res[id];
+  for (const id of stale) {
+    if (Array.isArray(res[id])) historyCache[id] = { fetchedAt: now, data: res[id] };
   }
 }
 
@@ -645,6 +650,8 @@ function setStatus(cls) {
     else if (cls === "disconnected") led.classList.add("danger");
     else led.classList.add("warn");
   }
+  const banner = document.getElementById("conn-banner");
+  if (banner) banner.style.display = cls === "connected" ? "none" : "block";
   if (cls === "connected") reconnectDelay = 1000;
 }
 
@@ -747,6 +754,18 @@ function renderLightCard(entityId) {
   </div>`;
 }
 
+function renderSwitchCard(entityId) {
+  const state = states[entityId];
+  const offline = isUnavailable(state);
+  const active = state ? isActive(state.state) : false;
+  return `<div class="terminal-panel" data-entity-id="${entityId}">
+    <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;" onclick="toggleEntity('${entityId}')">
+      <div>${renderStatusLed(offline ? "unavailable" : (active ? "on" : "off"))} <span style="font-family:var(--font-mono);">${escapeHtml(friendlyName(entityId))}</span></div>
+      <div style="color:var(--text-muted);font-family:var(--font-mono);">${offline ? "OFFLINE" : (active ? "ON" : "OFF")}</div>
+    </div>
+  </div>`;
+}
+
 function renderMetricCard(entityId) {
   const state = states[entityId];
   if (!state) return "";
@@ -762,7 +781,7 @@ function renderMetricCard(entityId) {
 }
 
 function renderSparkline(entityId, width = 100, height = 20) {
-  const data = historyCache[entityId];
+  const data = historyCache[entityId] && historyCache[entityId].data;
   if (!data || data.length < 2) return "";
   const values = data.map(d => parseFloat(d.state)).filter(v => !isNaN(v));
   if (values.length < 2) return "";
@@ -882,13 +901,13 @@ async function initRadarMap() {
 
     let idx = layers.length - 1;
     layers[idx].setOpacity(0.65);
-    timestamp.textContent = "RADAR UPDATED " + new Date(useFrames[useFrames.length - 1].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    timestamp.textContent = "RADAR UPDATED " + new Date(useFrames[idx].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
     radarAnimInterval = setInterval(() => {
       layers[idx].setOpacity(0);
       idx = (idx + 1) % layers.length;
       layers[idx].setOpacity(0.65);
-      timestamp.textContent = "RADAR UPDATED " + new Date(useFrames[useFrames.length - 1].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      timestamp.textContent = "RADAR UPDATED " + new Date(useFrames[idx].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
     }, 700);
 
     setTimeout(() => map.invalidateSize(), 150);
@@ -1197,6 +1216,7 @@ function renderHomeScreen() {
 
   document.getElementById("home-screen").innerHTML = main;
   initRadarMap();
+  measureClock();
   lastRecentDoorKey = recentDoorIds().join(",");
 }
 
@@ -1209,7 +1229,10 @@ function renderControlScreen() {
   const sceneButtons = scenes.map(id => renderSceneButton(id)).join("");
   const scriptButtons = scripts.map(id => renderSceneButton(id)).join("");
   const lightIds = quick.filter(id => id.startsWith("light."));
+  const switchIds = quick.filter(id => id.startsWith("switch."));
   const lightCards = lightIds.map(id => renderLightCard(id)).join("");
+  const switchCards = switchIds.map(id => renderSwitchCard(id)).join("");
+  const controlCards = lightCards + switchCards;
 
   const main = `
     <div style="display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:14px;flex:1;min-height:0;">
@@ -1218,7 +1241,7 @@ function renderControlScreen() {
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;min-height:0;">
         <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;">
-          ${renderTerminalPanel(sectionTitle("quickControls"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${lightCards || "<div style='color:var(--text-muted)'>NO LIGHTS</div>"}</div>`, "fill")}
+          ${renderTerminalPanel(sectionTitle("quickControls"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${controlCards || "<div style='color:var(--text-muted)'>NO CONTROLS</div>"}</div>`, "fill")}
         </div>
         <div style="flex-shrink:0;">
           ${renderMediaCard(mediaId)}
@@ -1392,6 +1415,19 @@ async function renderAll() {
   updateClock();
 }
 
+function measureClock() {
+  const el = document.getElementById("clock");
+  if (!el) { clockFontSize = null; return; }
+  // Fit the time on one line: start from the clamp(4rem, 9vw, 6.5rem) size,
+  // then shrink proportionally until it fits the column width.
+  const preferred = Math.min(Math.max(64, window.innerWidth * 0.09), 104);
+  el.style.fontSize = preferred + "px";
+  const avail = el.parentElement.clientWidth - 16;
+  const need = el.scrollWidth;
+  clockFontSize = need > avail && need > 0 ? Math.max(28, Math.floor(preferred * avail / need)) : preferred;
+  el.style.fontSize = clockFontSize + "px";
+}
+
 function updateClock() {
   const now = new Date();
   const opts = config.layout.clock24h ? { hour: "2-digit", minute: "2-digit", hour12: false } : { hour: "numeric", minute: "2-digit" };
@@ -1399,15 +1435,7 @@ function updateClock() {
   if (el) {
     const timeStr = now.toLocaleTimeString([], opts);
     el.innerHTML = escapeHtml(timeStr).replace(/:/g, '<span class="colon">:</span>');
-    // Fit the time on one line: start from the clamp(4rem, 9vw, 6.5rem) size,
-    // then shrink proportionally until it fits the column width.
-    const preferred = Math.min(Math.max(64, window.innerWidth * 0.09), 104);
-    el.style.fontSize = preferred + "px";
-    const avail = el.parentElement.clientWidth - 16;
-    const need = el.scrollWidth;
-    if (need > avail && need > 0) {
-      el.style.fontSize = Math.max(28, Math.floor(preferred * avail / need)) + "px";
-    }
+    if (clockFontSize != null) el.style.fontSize = clockFontSize + "px";
   }
   const d = document.getElementById("date");
   if (d) d.textContent = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
@@ -1979,6 +2007,7 @@ async function init() {
     if (token) connect();
   }
   setInterval(updateClock, 1000);
+  window.addEventListener("resize", measureClock);
   setInterval(refreshDoorRecency, 30000);
   setInterval(() => {
     const cams = (config.sections && config.sections.cameras) || {};
