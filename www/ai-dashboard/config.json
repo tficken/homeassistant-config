@@ -149,16 +149,6 @@
   "dock": {
     "items": [
       {
-        "icon": "💡",
-        "entityId": "scene.all_lights_off",
-        "label": "All off"
-      },
-      {
-        "icon": "🌙",
-        "entityId": "script.goodnight",
-        "label": "Goodnight"
-      },
-      {
         "icon": "⚙️",
         "action": "settings",
         "label": "Settings"
