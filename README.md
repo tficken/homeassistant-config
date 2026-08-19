@@ -8,7 +8,7 @@ Personal Home Assistant configuration running on Home Assistant OS `2026.8.1`. T
 
 ### Custom Integrations (`custom_components/`)
 
-**`ai_dashboard_proxy`** — A custom Home Assistant integration I wrote in Python that serves a retro-terminal wall dashboard at `/ai-dashboard/`. It exposes a WebSocket proxy that forwards HA state events and service calls server-side, plus REST helper endpoints for weather forecasts and recorder history, so no long-lived access token is ever exposed to the browser. The dashboard (`www/ai-dashboard/`) is vanilla HTML/CSS/JS with four dock-navigated screens: a home screen (clock, weather, room monitors, presence, radar, door status), a control hub (scenes, scripts, lights, cameras), a security view, and a status monitor with 24-hour SVG sparklines drawn from recorder history.
+**`ai_dashboard_proxy`** — A custom Home Assistant integration I wrote in Python that serves a retro-terminal wall dashboard at `/ai-dashboard/`. It exposes a WebSocket proxy (with heartbeat and a domain allowlist for service calls) that forwards HA state events and service calls server-side, plus REST helper endpoints for weather forecasts, recorder history, and config persistence with automatic backup pruning — so no long-lived access token is ever exposed to the browser. The dashboard (`www/ai-dashboard/`) is vanilla HTML/CSS/JS with four dock-navigated screens plus configurable quick-action buttons: a home screen (clock, weather, room monitors, presence, radar, door status), a control hub (scenes, scripts, lights, cameras), a security view, and a status monitor with 24-hour SVG sparklines drawn from recorder history. It has a built-in settings editor (layout drag-board, appearance, per-entity label overrides), updates cards in place instead of re-rendering on every state event, and vendors Leaflet locally so the radar works even when the internet is down.
 
 **`bambu_lab`** — Full Bambu Lab 3D printer integration. Handles MQTT-based communication with two P1S printers, exposes sensor/binary_sensor/camera/light/fan entities, and includes a full coordinator pattern, config flow, device triggers, and diagnostics. I run two P1S units for my 3D printing business (TLF Productions); this integration keeps them monitored from the same platform as the rest of my home systems.
 
@@ -28,13 +28,12 @@ Personal Home Assistant configuration running on Home Assistant OS `2026.8.1`. T
 
 Event-driven automations written in YAML with Jinja2 templating:
 
-- **Security**: Motion-triggered siren after sunset using sun-position conditions
-- **Printer monitoring**: State-transition detection on two Bambu P1S units — alerts on print completion and hardware/HMS errors
+- **Printer monitoring**: State-transition detection on two Bambu P1S units — mobile push + persistent alerts on print completion and hardware/HMS errors
 - **Battery monitoring**: Multi-device battery check across 5 sensors using Jinja2 list comprehension and conditional messaging
 - **Disk health**: Threshold-based alerting when HA disk usage exceeds 85%, with mobile push notification
-- **Automated backups**: Weekly full backup via shell command + Python script; nightly cleanup of backups older than 14 days
+- **Automated backups**: Weekly full backup via shell command + Python script; nightly cleanup of backups older than 14 days; both phone me if they fail
 - **Wall panel**: MQTT-based backlight control with day/night brightness scheduling and startup page-push on HA boot
-- **PagerDuty alerting**: New incident flashes the office ceiling fan red 3 times and restores its prior state
+- **PagerDuty alerting**: New incident flashes the office ceiling fan red 3 times and restores its prior state; high-urgency incidents also trigger a short Echo announcement that restores the speaker's prior volume afterwards
 - **Door/window announcements**: Door or window opening is announced over Alexa devices; phone notification is sent only when no one is home
 
 ---
