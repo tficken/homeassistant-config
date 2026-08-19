@@ -188,6 +188,7 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
   display: inline-flex; align-items: center; gap: 6px;
   background: rgba(255,255,255,0.07); border: 1px solid var(--border);
   border-radius: 999px; padding: 5px 10px; font-size: 0.8rem; margin: 4px 4px 0 0;
+  cursor: grab; user-select: none; touch-action: none;
 }
 .entity-chip button { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; }
 .drag-handle { cursor: grab; color: var(--text-muted); padding: 0 6px; user-select: none; touch-action: none; font-family: var(--font-mono); }
@@ -199,10 +200,14 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
   background: rgba(255,255,255,0.07); border: 1px solid var(--border);
   border-radius: 4px; padding: 4px 6px; font-size: 0.8rem; margin-top: 4px;
   color: var(--text);
+  cursor: grab; user-select: none; touch-action: none;
 }
 .palette-chip.on-board { opacity: 0.55; }
 .palette-chip.dragging { opacity: 0.4; }
 #palette.drop-before { outline: 1px dashed var(--danger); outline-offset: 2px; }
+#drag-ghost { position: fixed; z-index: 9999; pointer-events: none; opacity: 0.85; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
+.editor-dragging [data-chip-list] { outline: 1px dotted var(--border); outline-offset: 2px; }
+.editor-dragging #palette { outline: 1px dotted var(--danger); outline-offset: 2px; }
 input, select {
   background: rgba(255,255,255,0.07); border: 1px solid var(--border); border-radius: 4px;
   padding: 8px 10px; color: var(--text); font-size: 0.9rem;
@@ -1763,11 +1768,17 @@ function initEditorDrag() {
   if (!body) return;
   let drag = null;
 
-  body.querySelectorAll("[data-drag-chip]").forEach(h => {
-    h.addEventListener("pointerdown", ev => startDrag(ev, "chip", h.closest(".entity-chip")));
+  body.querySelectorAll(".entity-chip").forEach(chip => {
+    chip.addEventListener("pointerdown", ev => {
+      if (ev.target.closest("button")) return;
+      startDrag(ev, "chip", chip);
+    });
   });
-  body.querySelectorAll("[data-drag-palette]").forEach(h => {
-    h.addEventListener("pointerdown", ev => startDrag(ev, "palette", h.closest(".palette-chip")));
+  body.querySelectorAll(".palette-chip").forEach(chip => {
+    chip.addEventListener("pointerdown", ev => {
+      if (ev.target.closest("button")) return;
+      startDrag(ev, "palette", chip);
+    });
   });
   body.querySelectorAll("[data-drag-section]").forEach(h => {
     h.addEventListener("pointerdown", ev => startDrag(ev, "section", h.closest(".editor-section")));
@@ -1785,33 +1796,70 @@ function initEditorDrag() {
         : el.getAttribute("data-section-key"),
       id,
       pointerId: ev.pointerId,
+      startX: ev.clientX,
       startY: ev.clientY,
-      moved: false
+      moved: false,
+      ghost: null
     };
     document.addEventListener("pointermove", onMove);
     document.addEventListener("pointerup", onUp, { once: true });
+    document.addEventListener("pointercancel", onCancel, { once: true });
   }
 
   function onMove(ev) {
     if (!drag || ev.pointerId !== drag.pointerId) return;
-    if (!drag.moved && Math.abs(ev.clientY - drag.startY) < 6) return;
+    if (!drag.moved && Math.hypot(ev.clientX - drag.startX, ev.clientY - drag.startY) < 6) return;
     if (!drag.moved) {
       drag.moved = true;
       drag.el.classList.add("dragging");
+      body.classList.add("editor-dragging");
+      const ghost = drag.el.cloneNode(true);
+      ghost.id = "drag-ghost";
+      ghost.style.width = drag.el.offsetWidth + "px";
+      document.body.appendChild(ghost);
+      drag.ghost = ghost;
     }
+    if (drag.ghost) {
+      drag.ghost.style.left = (ev.clientX + 12) + "px";
+      drag.ghost.style.top = (ev.clientY + 12) + "px";
+    }
+    // Auto-scroll the palette or board when dragging near their edges.
+    [document.getElementById("palette-list"), document.getElementById("board")].forEach(sc => {
+      if (!sc) return;
+      const r = sc.getBoundingClientRect();
+      if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) return;
+      if (ev.clientY < r.top + 40) sc.scrollTop -= 12;
+      else if (ev.clientY > r.bottom - 40) sc.scrollTop += 12;
+    });
     clearIndicators();
     const target = findDropTarget(ev);
     if (target) target.classList.add("drop-before");
   }
 
-  function onUp(ev) {
-    document.removeEventListener("pointermove", onMove);
-    if (!drag) return;
-    const target = drag.moved ? findDropTarget(ev) : null;
-    drag.el.classList.remove("dragging");
+  function cleanupDrag(d) {
+    d.el.classList.remove("dragging");
+    if (d.ghost) d.ghost.remove();
+    body.classList.remove("editor-dragging");
     clearIndicators();
+  }
+
+  function onCancel() {
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    if (!drag) return;
     const d = drag;
     drag = null;
+    cleanupDrag(d);
+  }
+
+  function onUp(ev) {
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointercancel", onCancel);
+    if (!drag) return;
+    const target = drag.moved ? findDropTarget(ev) : null;
+    const d = drag;
+    drag = null;
+    cleanupDrag(d);
     if (d.moved && target) {
       applyDrop(d, target);
       renderAll();
