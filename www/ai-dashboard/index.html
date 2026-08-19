@@ -1607,10 +1607,13 @@ function renderDataTab() {
 }
 
 const SCREEN_SECTION_GROUPS = [
-  { screen: "HOME", sections: ["home", "doors", "environment"] },
+  { screen: "HOME", sections: ["home", "doors"] },
   { screen: "CONTROL HUB", sections: ["scenes", "scripts", "quickControls"] },
   { screen: "SECURITY", sections: ["cameras", "security"] },
-  { screen: "STATUS MONITOR", sections: ["system"] }
+  {
+    screen: "STATUS MONITOR", sections: ["environment", "system"],
+    notes: { environment: "temp/humidity also appear in HOME room monitors" }
+  }
 ];
 
 let paletteFilter = "";
@@ -1663,10 +1666,17 @@ function renderLayoutTab() {
         <button class="btn" style="padding:1px 8px;" onclick="removeMissingEntity('${escapeHtml(id)}')" title="Remove from config">×</button>
       </div>`).join("")}
     </div>` : "";
-  const board = SCREEN_SECTION_GROUPS.map(g => {
+  const groupedKeys = new Set(SCREEN_SECTION_GROUPS.flatMap(g => g.sections));
+  const ungrouped = Object.keys(config.sections || {}).filter(k => !groupedKeys.has(k));
+  const groups = ungrouped.length
+    ? SCREEN_SECTION_GROUPS.concat([{ screen: "NOT RENDERED BY ANY SCREEN", sections: ungrouped, unused: true }])
+    : SCREEN_SECTION_GROUPS;
+  const board = groups.map(g => {
     const keys = orderedSectionKeys(g.sections.filter(k => config.sections && config.sections[k]));
     const cards = keys.map(key => {
       const sec = config.sections[key];
+      const note = g.notes && g.notes[key]
+        ? `<div style="color:var(--text-muted);font-size:0.68rem;margin-top:4px;">${escapeHtml(g.notes[key])}</div>` : "";
       const chips = (sec.entities || []).map(id =>
         `<span class="entity-chip" data-section="${key}" data-entity="${escapeHtml(id)}" title="${escapeHtml(id)}"><span class="drag-handle" data-drag-chip title="Drag to reorder, move, or drag back to the palette to remove">⠿</span>${escapeHtml(friendlyName(id))} <button onclick="removeSectionEntity('${key}','${escapeHtml(id)}')">×</button></span>`
       ).join("");
@@ -1678,10 +1688,11 @@ function renderLayoutTab() {
             <input value="${escapeHtml(sec.title || key)}" onchange="setSectionProp('${key}','title',this.value)" style="flex:1;min-width:80px;padding:4px 8px;" title="Section title">
           </div>
           <div class="chip-list" data-chip-list="${key}" style="display:flex;flex-wrap:wrap;gap:2px;min-height:34px;border-radius:4px;">${chips || "<span style='color:var(--text-muted);font-size:0.75rem;padding:6px;'>Drop entities here</span>"}</div>
+          ${note}
         </div>`;
     }).join("");
     return `<div style="min-width:0;">
-      <h3 style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 8px;">${g.screen}</h3>
+      <h3 style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.1em;color:${g.unused ? "var(--text-muted)" : "var(--green)"};margin:0 0 8px;">${g.screen}</h3>
       ${cards || "<p style='color:var(--text-muted);font-size:0.8rem;'>No sections on this screen.</p>"}
     </div>`;
   }).join("");
@@ -1696,7 +1707,7 @@ function renderLayoutTab() {
         <div id="palette-list" style="overflow-y:auto;flex:1;min-height:0;">${renderPaletteList()}</div>
         <p style="color:var(--text-muted);font-size:0.72rem;margin:8px 0 0;flex-shrink:0;">Drag an entity onto a section to add it. Drag a chip back here to remove it.</p>
       </div>
-      <div id="board" style="flex:1;min-width:0;overflow-y:auto;display:grid;grid-template-columns:repeat(4,minmax(210px,1fr));gap:12px;align-content:start;">${board}</div>
+      <div id="board" style="flex:1;min-width:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;align-content:start;">${board}</div>
     </div>`;
 }
 
