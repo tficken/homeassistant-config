@@ -71,7 +71,7 @@ views:
               columns: 4
               rows: auto
           - type: tile
-            entity: scene.living_room_lights_on
+            entity: script.living_room_lights_on
             name: Living Room On
             icon: mdi:sofa
             grid_options:
