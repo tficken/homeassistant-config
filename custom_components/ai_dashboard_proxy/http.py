@@ -344,7 +344,7 @@ async def history_handler(request: web.Request) -> web.StreamResponse:
         )
 
 
-CONFIG_KEYS = {"theme", "layout", "entities", "sections", "sectionOrder", "dock", "presenceLabels"}
+CONFIG_KEYS = {"theme", "layout", "entities", "sections", "sectionOrder", "dock", "presenceLabels", "labels"}
 
 
 async def config_save_handler(request: web.Request) -> web.StreamResponse:
