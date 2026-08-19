@@ -17,6 +17,8 @@ from homeassistant.components.recorder import get_instance
 from homeassistant.components.recorder import history as recorder_history
 from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.area_registry import EVENT_AREA_REGISTRY_UPDATED
+from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
 from homeassistant.helpers.json import json_dumps
 from homeassistant.util import dt as dt_util
 
@@ -173,15 +175,15 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         return web.Response(status=500, text=f"Auth check failed: {e}\n{traceback.format_exc()}")
 
     hass: HomeAssistant = request.app["hass"]
-    ws = web.WebSocketResponse()
+    ws = web.WebSocketResponse(heartbeat=30)
     await ws.prepare(request)
 
     @callback
     def forward_event(event: Any) -> None:
         new_state = event.data.get("new_state")
-        if new_state is None:
+        if new_state is None or ws.closed:
             return
-        asyncio.run_coroutine_threadsafe(
+        future = asyncio.run_coroutine_threadsafe(
             ws.send_json(
                 {
                     "type": "event",
@@ -194,6 +196,17 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
             ),
             hass.loop,
         )
+
+        def _silence_future(fut: Any) -> None:
+            # Retrieve the result so send failures on closing sockets do not
+            # surface as "Future exception was never retrieved" log noise.
+            # concurrent.futures.CancelledError is a subclass of Exception.
+            try:
+                fut.result()
+            except Exception:
+                pass
+
+        future.add_done_callback(_silence_future)
 
     unsub = hass.bus.async_listen(EVENT_STATE_CHANGED, forward_event)
 
@@ -226,6 +239,23 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
                 domain = data.get("domain")
                 service = data.get("service")
                 service_data = data.get("service_data", {})
+                if domain not in ALLOWED_SERVICE_DOMAINS:
+                    await ws.send_json(
+                        {
+                            "id": data.get("id", 0),
+                            "type": "result",
+                            "success": False,
+                            "error": {
+                                "code": "domain_not_allowed",
+                                "message": (
+                                    f"Service domain '{domain}' is not allowed "
+                                    "through the dashboard proxy"
+                                ),
+                            },
+                        },
+                        dumps=json_dumps,
+                    )
+                    continue
                 hass.async_create_task(
                     hass.services.async_call(domain, service, service_data)
                 )
@@ -346,6 +376,21 @@ async def history_handler(request: web.Request) -> web.StreamResponse:
 
 CONFIG_KEYS = {"theme", "layout", "entities", "sections", "sectionOrder", "dock", "presenceLabels", "labels"}
 
+ALLOWED_SERVICE_DOMAINS = {
+    "light",
+    "switch",
+    "scene",
+    "script",
+    "media_player",
+    "vacuum",
+    "siren",
+    "lock",
+    "cover",
+    "fan",
+    "climate",
+    "input_boolean",
+}
+
 
 async def config_save_handler(request: web.Request) -> web.StreamResponse:
     """Save the dashboard config to www/ai-dashboard/config.json."""
@@ -382,6 +427,23 @@ async def config_save_handler(request: web.Request) -> web.StreamResponse:
                 json.dump(body, f, indent=2, ensure_ascii=False)
                 f.write("\n")
             os.replace(tmp_path, config_path)
+            # Keep only the newest 10 backups.
+            directory = os.path.dirname(config_path)
+            prefix = os.path.basename(config_path) + ".bak."
+            backups = sorted(
+                (
+                    os.path.join(directory, f)
+                    for f in os.listdir(directory)
+                    if f.startswith(prefix)
+                ),
+                key=os.path.getmtime,
+                reverse=True,
+            )
+            for old in backups[10:]:
+                try:
+                    os.remove(old)
+                except OSError:
+                    pass
 
         await hass.async_add_executor_job(write_file)
         return web.json_response({"success": True})
@@ -397,6 +459,13 @@ async def async_setup_http(hass: HomeAssistant, secret: str | None) -> None:
     app = hass.http.app
     app["ai_dashboard_secret"] = secret
     app["ai_dashboard_areas"] = await async_load_entity_areas(hass)
+
+    async def _refresh_areas(event: Any) -> None:
+        """Rebuild the entity->area map when the area/entity registry changes."""
+        app["ai_dashboard_areas"] = await async_load_entity_areas(hass)
+
+    hass.bus.async_listen(EVENT_AREA_REGISTRY_UPDATED, _refresh_areas)
+    hass.bus.async_listen(EVENT_ENTITY_REGISTRY_UPDATED, _refresh_areas)
     # Register specific routes before the catch-all static route.
     app.router.add_get("/ai-dashboard/ws", websocket_handler)
     app.router.add_post("/ai-dashboard/api/forecast", forecast_handler)
