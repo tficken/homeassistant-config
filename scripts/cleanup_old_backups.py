@@ -49,6 +49,24 @@ def api_request(path: str, method: str = "GET", data: bytes | None = None) -> di
         return json.loads(resp.read().decode("utf-8"))
 
 
+def notify_failure(message: str) -> None:
+    """Send a phone notification via the HA Core API through the Supervisor proxy.
+
+    Failures here must never mask the original error, so all exceptions are
+    caught and only logged.
+    """
+    if not TOKEN:
+        return
+    try:
+        payload = json.dumps({
+            "title": "Backup cleanup failed",
+            "message": message,
+        }).encode("utf-8")
+        api_request("/core/api/services/notify/mobile_app_traviss_iphone", method="POST", data=payload)
+    except Exception as exc:
+        log(f"Failed to send failure notification: {exc}")
+
+
 def main() -> int:
     try:
         cutoff = datetime.now(tz=timezone.utc) - timedelta(days=DAYS_TO_KEEP)
@@ -88,6 +106,7 @@ def main() -> int:
         return 0
     except Exception as exc:
         log(f"ERROR: {exc}")
+        notify_failure(str(exc))
         return 1
 
 
