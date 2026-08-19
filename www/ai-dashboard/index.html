@@ -918,11 +918,25 @@ function renderBottomButton(label, target, active = false) {
   return `<button class="${cls}" onclick="showScreen('${target}')">${escapeHtml(label)}</button>`;
 }
 
+function renderDockItem(item) {
+  const icon = item.icon ? escapeHtml(item.icon) + " " : "";
+  const label = escapeHtml(item.label || item.entityId || "");
+  if (item.action === "settings") {
+    return `<button class="bottom-btn" onclick="openSettings()">${icon}${label}</button>`;
+  }
+  if (item.entityId) {
+    return `<button class="bottom-btn" onclick="toggleEntity('${item.entityId}')">${icon}${label}</button>`;
+  }
+  return "";
+}
+
 function renderDock() {
-  return renderBottomButton("HOME", "home", currentScreen === "home") +
+  const screens = renderBottomButton("HOME", "home", currentScreen === "home") +
     renderBottomButton("CONTROL HUB", "control", currentScreen === "control") +
     renderBottomButton("SECURITY", "security", currentScreen === "security") +
     renderBottomButton("STATUS MONITOR", "status", currentScreen === "status");
+  const items = ((config.dock && config.dock.items) || []).map(renderDockItem).join("");
+  return screens + items;
 }
 
 // ---- Screens ----
