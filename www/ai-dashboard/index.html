@@ -673,6 +673,15 @@ function setBrightness(entityId, pct) {
 }
 
 async function fetchRegistry() {
+  if (window.HA_INTEGRATION_PROXY) {
+    // Proxied dashboard has no HA token; the registry endpoints would 401.
+    // window.HA_AREAS (injected by the proxy) already covers area lookups.
+    areas = [];
+    entities = [];
+    areaMap = {};
+    entityById = {};
+    return;
+  }
   const [aRes, eRes] = await Promise.all([
     apiFetch("/api/config/area_registry/list"),
     apiFetch("/api/config/entity_registry/list")
@@ -1877,11 +1886,18 @@ function connectProxy() {
   ws = new WebSocket(url);
   ws.onopen = () => {
     setStatus("connected");
-    ws.send(JSON.stringify({ id: 1, type: "get_states" }));
-    ws.send(JSON.stringify({ id: 2, type: "subscribe_events", event_type: "state_changed" }));
+    // The proxy pushes the full state list ({id: 1, type: "result"}) on connect
+    // and forwards every state_changed event unprompted, so the client sends
+    // neither get_states nor subscribe_events here.
   };
   ws.onmessage = async (ev) => {
-    const msg = JSON.parse(ev.data);
+    let msg;
+    try {
+      msg = JSON.parse(ev.data);
+    } catch (e) {
+      console.warn("dropping malformed WS frame", e);
+      return;
+    }
     if (msg.type === "result" && msg.id === 1 && msg.success) {
       states = {};
       for (const s of msg.result) states[s.entity_id] = s;
@@ -1909,7 +1925,13 @@ function connect() {
   ws = new WebSocket(url);
   ws.onopen = () => ws.send(JSON.stringify({ type: "auth", access_token: token }));
   ws.onmessage = async (ev) => {
-    const msg = JSON.parse(ev.data);
+    let msg;
+    try {
+      msg = JSON.parse(ev.data);
+    } catch (e) {
+      console.warn("dropping malformed WS frame", e);
+      return;
+    }
     if (msg.type === "auth_ok") {
       setStatus("connected");
       ws.send(JSON.stringify({ id: 1, type: "get_states" }));
