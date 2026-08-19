@@ -294,12 +294,13 @@ const DEFAULT_CONFIG = {
     cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.downstairs_live_view"], snapshot: { "camera.front_door_live_view": { preferEntity: "camera.front_door_last_recording", activityEntities: ["event.front_door_motion", "event.front_door_ding"] } } },
     security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2", "sensor.front_door_last_activity", "sensor.downstairs_last_activity"] },
     doors: { title: "Doors", icon: "🚪", entities: ["binary_sensor.living_room_front_door", "binary_sensor.backdoor"] },
+    roomMonitors: { title: "Room Monitors", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2"] },
     environment: { title: "Environment", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_illuminance", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2", "sensor.hobeian_zg_204zx_illuminance_2"] },
     presence: { title: "Presence", icon: "👤", entities: ["binary_sensor.hobeian_zg_204zx", "binary_sensor.hobeian_zg_204zx_2"] },
     system: { title: "System", icon: "⚙️", entities: ["sensor.home_assistant_core_cpu_percent", "sensor.home_assistant_core_memory_percent", "sensor.ha_disk_usage", "vacuum.geordi_la_forge", "vacuum.pooper_litter_box", "update.home_assistant_core_update", "update.home_assistant_operating_system_update", "update.home_assistant_supervisor_update"] }
   },
-  sectionOrder: ["home", "scenes", "scripts", "quickControls", "cameras", "security", "doors", "environment", "presence", "system"],
-  dock: { items: [{ icon: "💡", entityId: "scene.all_lights_off", label: "All off" }, { icon: "🌙", entityId: "script.goodnight", label: "Goodnight" }, { icon: "⚙️", action: "settings", label: "Settings" }] }
+  sectionOrder: ["home", "scenes", "scripts", "quickControls", "cameras", "security", "doors", "roomMonitors", "environment", "presence", "system"],
+  dock: { items: [{ icon: "⚙️", action: "settings", label: "Settings" }] }
 };
 
 const DOMAIN_ICONS = {
@@ -1003,12 +1004,12 @@ function getAlerts() {
 }
 
 function renderRoomMonitors() {
-  const environment = (config.sections && config.sections.environment && config.sections.environment.entities) || [];
-  if (!environment.length) return "<div style='color:var(--text-muted);font-family:var(--font-mono);'>NO ROOM DATA</div>";
+  const roomMonitors = (config.sections && config.sections.roomMonitors && config.sections.roomMonitors.entities) || [];
+  if (!roomMonitors.length) return "<div style='color:var(--text-muted);font-family:var(--font-mono);'>NO ROOM DATA</div>";
 
   const rooms = {};
   const order = [];
-  for (const id of environment) {
+  for (const id of roomMonitors) {
     const area = entityArea(id) || friendlyName(id);
     if (!rooms[area]) {
       rooms[area] = {};
@@ -1204,7 +1205,7 @@ function renderHomeScreen() {
       </div>
       <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
         ${weatherPanel}
-        <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;">${renderTerminalPanel("ROOM MONITORS", renderRoomMonitors(), "fill")}</div>
+        <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;">${renderTerminalPanel(sectionTitle("roomMonitors"), renderRoomMonitors(), "fill")}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
         <div style="flex:1;min-height:0;">${renderRadarFrame()}</div>
@@ -1366,7 +1367,7 @@ function entityBelongsToScreen(entityId, screen) {
       config.entities.weather,
       ...getPresenceEntities(),
       ...((config.sections.doors && config.sections.doors.entities) || []),
-      ...((config.sections.environment && config.sections.environment.entities) || [])
+      ...((config.sections.roomMonitors && config.sections.roomMonitors.entities) || [])
     ],
     control: [
       ...((config.sections.scenes && config.sections.scenes.entities) || []),
@@ -1607,13 +1608,18 @@ function renderDataTab() {
 }
 
 const SCREEN_SECTION_GROUPS = [
-  { screen: "HOME", sections: ["home", "doors"] },
+  {
+    screen: "HOME", sections: ["home", "doors", "roomMonitors"],
+    fixed: [
+      { name: "🕐 Clock", note: "built in" },
+      { name: "🌦️ Weather", note: "entity set in Appearance tab" },
+      { name: "📡 Radar", note: "built in" },
+      { name: "📅 On Call", note: "auto-detects calendar.* entities" }
+    ]
+  },
   { screen: "CONTROL HUB", sections: ["scenes", "scripts", "quickControls"] },
   { screen: "SECURITY", sections: ["cameras", "security"] },
-  {
-    screen: "STATUS MONITOR", sections: ["environment", "system"],
-    notes: { environment: "temp/humidity also appear in HOME room monitors" }
-  }
+  { screen: "STATUS MONITOR", sections: ["environment", "system"] }
 ];
 
 let paletteFilter = "";
@@ -1675,8 +1681,6 @@ function renderLayoutTab() {
     const keys = orderedSectionKeys(g.sections.filter(k => config.sections && config.sections[k]));
     const cards = keys.map(key => {
       const sec = config.sections[key];
-      const note = g.notes && g.notes[key]
-        ? `<div style="color:var(--text-muted);font-size:0.68rem;margin-top:4px;">${escapeHtml(g.notes[key])}</div>` : "";
       const chips = (sec.entities || []).map(id =>
         `<span class="entity-chip" data-section="${key}" data-entity="${escapeHtml(id)}" title="${escapeHtml(id)}"><span class="drag-handle" data-drag-chip title="Drag to reorder, move, or drag back to the palette to remove">⠿</span>${escapeHtml(friendlyName(id))} <button onclick="removeSectionEntity('${key}','${escapeHtml(id)}')">×</button></span>`
       ).join("");
@@ -1688,12 +1692,17 @@ function renderLayoutTab() {
             <input value="${escapeHtml(sec.title || key)}" onchange="setSectionProp('${key}','title',this.value)" style="flex:1;min-width:80px;padding:4px 8px;" title="Section title">
           </div>
           <div class="chip-list" data-chip-list="${key}" style="display:flex;flex-wrap:wrap;gap:2px;min-height:34px;border-radius:4px;">${chips || "<span style='color:var(--text-muted);font-size:0.75rem;padding:6px;'>Drop entities here</span>"}</div>
-          ${note}
         </div>`;
     }).join("");
+    const fixedCards = (g.fixed || []).map(f => `
+      <div style="border:1px dashed var(--border);border-radius:6px;padding:8px;margin-bottom:10px;opacity:0.65;">
+        <div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-muted);">${escapeHtml(f.name)}</div>
+        <div style="color:var(--text-muted);font-size:0.68rem;margin-top:2px;">${escapeHtml(f.note)}</div>
+      </div>`).join("");
+    const empty = !cards && !fixedCards ? "<p style='color:var(--text-muted);font-size:0.8rem;'>No sections on this screen.</p>" : "";
     return `<div style="min-width:0;">
       <h3 style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.1em;color:${g.unused ? "var(--text-muted)" : "var(--green)"};margin:0 0 8px;">${g.screen}</h3>
-      ${cards || "<p style='color:var(--text-muted);font-size:0.8rem;'>No sections on this screen.</p>"}
+      ${cards}${fixedCards}${empty}
     </div>`;
   }).join("");
   return `

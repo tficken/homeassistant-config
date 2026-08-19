@@ -100,6 +100,16 @@
         "binary_sensor.backdoor"
       ]
     },
+    "roomMonitors": {
+      "title": "Room Monitors",
+      "icon": "🌡️",
+      "entities": [
+        "sensor.hobeian_zg_204zx_temperature",
+        "sensor.hobeian_zg_204zx_humidity",
+        "sensor.hobeian_zg_204zx_temperature_2",
+        "sensor.hobeian_zg_204zx_humidity_2"
+      ]
+    },
     "environment": {
       "title": "Environment",
       "icon": "🌡️",
@@ -142,6 +152,7 @@
     "cameras",
     "security",
     "doors",
+    "roomMonitors",
     "environment",
     "presence",
     "system"
