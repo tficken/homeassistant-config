@@ -291,7 +291,7 @@
 
 - id: '1786780000002'
   alias: PD New Incident announcement
-  description: Announce new PagerDuty incidents over the master bedroom Echo Dot
+  description: Announce new high-urgency PagerDuty incidents over the master bedroom Echo Dot, restoring its prior volume afterwards
   triggers:
   - trigger: state
     entity_id:
@@ -299,16 +299,13 @@
   conditions:
   - condition: template
     value_template: "{{ trigger.from_state is not none and trigger.to_state.state | int(0) > trigger.from_state.state | int(0) }}"
+  - condition: template
+    value_template: >-
+      {% set incs = state_attr('sensor.pagerduty_p2wm8b3_pagerduty_assigned_incidents', 'assigned_incidents') or [] %}
+      {{ incs | length > 0 and incs[0].urgency == 'high' }}
   actions:
   - variables:
-      incidents: "{{ state_attr('sensor.pagerduty_p2wm8b3_pagerduty_assigned_incidents', 'assigned_incidents') or [] }}"
-      message: >-
-        {% if incidents %}
-        {% set inc = incidents[0] %}
-        New PagerDuty incident: {{ inc.title }} on {{ inc.impacted_service }}. Urgency: {{ inc.urgency }}.
-        {% else %}
-        New PagerDuty incident assigned to you.
-        {% endif %}
+      prev_volume: "{{ state_attr('media_player.master_bedroom_echo_dot', 'volume_level') }}"
   - action: media_player.volume_set
     target:
       entity_id: media_player.master_bedroom_echo_dot
@@ -316,9 +313,17 @@
       volume_level: 0.8
   - action: notify.alexa_media_master_bedroom_echo_dot
     data:
-      message: "{{ message }}"
+      message: New PagerDuty Alert
       data:
         type: announce
+  - delay: "00:00:08"
+  - condition: template
+    value_template: "{{ prev_volume is not none }}"
+  - action: media_player.volume_set
+    target:
+      entity_id: media_player.master_bedroom_echo_dot
+    data:
+      volume_level: "{{ prev_volume }}"
   mode: single
 
 - id: '1786780000001'
