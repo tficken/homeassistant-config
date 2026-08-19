@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import ipaddress
 import json
+import logging
 import mimetypes
 import os
 import traceback
@@ -21,6 +22,8 @@ from homeassistant.helpers.area_registry import EVENT_AREA_REGISTRY_UPDATED
 from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
 from homeassistant.helpers.json import json_dumps
 from homeassistant.util import dt as dt_util
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _is_local_ip(ip: str | None) -> bool:
@@ -427,23 +430,27 @@ async def config_save_handler(request: web.Request) -> web.StreamResponse:
                 json.dump(body, f, indent=2, ensure_ascii=False)
                 f.write("\n")
             os.replace(tmp_path, config_path)
-            # Keep only the newest 10 backups.
-            directory = os.path.dirname(config_path)
-            prefix = os.path.basename(config_path) + ".bak."
-            backups = sorted(
-                (
-                    os.path.join(directory, f)
-                    for f in os.listdir(directory)
-                    if f.startswith(prefix)
-                ),
-                key=os.path.getmtime,
-                reverse=True,
-            )
-            for old in backups[10:]:
-                try:
-                    os.remove(old)
-                except OSError:
-                    pass
+            # Keep only the newest 10 backups. Pruning failures must not
+            # break the save: the config is already persisted at this point.
+            try:
+                directory = os.path.dirname(config_path)
+                prefix = os.path.basename(config_path) + ".bak."
+                backups = sorted(
+                    (
+                        os.path.join(directory, f)
+                        for f in os.listdir(directory)
+                        if f.startswith(prefix)
+                    ),
+                    key=os.path.getmtime,
+                    reverse=True,
+                )
+                for old in backups[10:]:
+                    try:
+                        os.remove(old)
+                    except OSError:
+                        pass
+            except OSError as err:
+                _LOGGER.warning("Failed to prune config backups: %s", err)
 
         await hass.async_add_executor_job(write_file)
         return web.json_response({"success": True})
