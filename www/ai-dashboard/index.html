@@ -1399,8 +1399,49 @@ function entityBelongsToScreen(entityId, screen) {
   return false;
 }
 
+function updateEntityCardInPlace(entityId) {
+  const el = document.querySelector(`[data-entity-id="${CSS.escape(entityId)}"]`);
+  const domain = entityId.split(".")[0];
+  if (currentScreen === "home") {
+    if (domain === "calendar") return false; // on-call panel appears/disappears: structural
+    const doors = (config.sections.doors && config.sections.doors.entities) || [];
+    if (doors.includes(entityId)) {
+      const panel = document.getElementById("doors-panel");
+      if (!panel) return false;
+      panel.innerHTML = renderTerminalPanel(sectionTitle("doors"), renderDoors());
+      lastRecentDoorKey = recentDoorIds().join(",");
+      return true;
+    }
+    // Weather panel, presence cards (battery reads sibling sensors), and room
+    // monitors (per-area cells, not per-entity) are not addressable per entity.
+    return false;
+  }
+  if (!el) return false;
+  // Never yank the DOM out from under an active slider drag.
+  if (document.activeElement && el.contains(document.activeElement)) return true;
+  let html = null;
+  if (currentScreen === "control") {
+    if (domain === "light") html = renderLightCard(entityId);
+    else if (domain === "switch") html = renderSwitchCard(entityId);
+    else if (entityId === (config.entities.mediaPlayer || "")) html = renderMediaCard(entityId);
+  } else if (currentScreen === "security") {
+    if (["sensor", "binary_sensor"].includes(domain)) html = renderMetricCard(entityId);
+    // switch/siren/button/script render as scene-btns without data-entity-id: structural fallback
+  } else if (currentScreen === "status") {
+    // Env metrics embed sparklines; printer cards read sibling sensors;
+    // vacuum cards exist but printer progress must not be missed: keep fallback.
+    return false;
+  }
+  if (html) {
+    el.outerHTML = html;
+    return true;
+  }
+  return false;
+}
+
 async function updateCard(state) {
   if (!entityBelongsToScreen(state.entity_id, currentScreen)) return;
+  if (updateEntityCardInPlace(state.entity_id)) return;
   if (currentScreen === "home") renderHomeScreen();
   else if (currentScreen === "control") renderControlScreen();
   else if (currentScreen === "security") renderSecurityScreen();
