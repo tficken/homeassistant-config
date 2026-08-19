@@ -26,14 +26,25 @@ from homeassistant.util import dt as dt_util
 _LOGGER = logging.getLogger(__name__)
 
 
+# Home LAN subnets that get frictionless access. Deliberately excludes
+# loopback (127.0.0.0/8) and the HassOS/docker ranges (172.16.0.0/12):
+# Nabu Casa Remote UI (snitun) forwards external traffic from those ranges,
+# so treating them as "local" would expose the dashboard to the internet.
+_LAN_NETWORKS = (
+    ipaddress.ip_network("192.168.0.0/16"),
+    ipaddress.ip_network("10.0.0.0/8"),
+)
+
+
 def _is_local_ip(ip: str | None) -> bool:
-    """Return True if the client IP is on a private/local network."""
+    """Return True if the client IP is on the home LAN."""
     if not ip:
         return False
     try:
-        return ipaddress.ip_address(ip).is_private
+        addr = ipaddress.ip_address(ip)
     except ValueError:
         return False
+    return any(addr in net for net in _LAN_NETWORKS)
 
 
 def _is_authorized(request: web.Request, secret: str | None) -> bool:
