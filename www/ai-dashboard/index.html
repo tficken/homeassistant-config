@@ -1400,7 +1400,11 @@ function entityBelongsToScreen(entityId, screen) {
 }
 
 function updateEntityCardInPlace(entityId) {
-  const el = document.querySelector(`[data-entity-id="${CSS.escape(entityId)}"]`);
+  // Scope the lookup to the active screen: inactive screens keep their last-rendered
+  // HTML in the DOM, so a document-wide query could match a hidden screen's card.
+  const screenEl = document.getElementById(currentScreen + "-screen");
+  if (!screenEl) return false;
+  const el = screenEl.querySelector(`[data-entity-id="${CSS.escape(entityId)}"]`);
   const domain = entityId.split(".")[0];
   if (currentScreen === "home") {
     if (domain === "calendar") return false; // on-call panel appears/disappears: structural
