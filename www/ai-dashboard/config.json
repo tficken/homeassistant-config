@@ -1,12 +1,4 @@
 {
-  "presenceLabels": {
-    "person.woteg": "Travis",
-    "person.bobbie": "Bobbie"
-  },
-  "labels": {
-    "binary_sensor.living_room_front_door": "Front Door",
-    "binary_sensor.backdoor": "Back Door"
-  },
   "theme": {
     "backgroundImage": "",
     "accentColor": "#2dd4bf"
@@ -14,7 +6,6 @@
   "layout": {
     "clock24h": false
   },
-  "sectionOrder": ["home", "scenes", "scripts", "quickControls", "cameras", "security", "doors", "environment", "presence", "system"],
   "entities": {
     "weather": "weather.forecast_home",
     "mediaPlayer": "media_player.living_room_fire_tv_living_room"
@@ -136,7 +127,6 @@
         "sensor.home_assistant_core_cpu_percent",
         "sensor.home_assistant_core_memory_percent",
         "sensor.ha_disk_usage",
-        "vacuum.geordi_la_forge",
         "vacuum.pooper_litter_box",
         "update.home_assistant_core_update",
         "update.home_assistant_operating_system_update",
@@ -144,6 +134,18 @@
       ]
     }
   },
+  "sectionOrder": [
+    "home",
+    "scenes",
+    "scripts",
+    "quickControls",
+    "cameras",
+    "security",
+    "doors",
+    "environment",
+    "presence",
+    "system"
+  ],
   "dock": {
     "items": [
       {
@@ -162,5 +164,13 @@
         "label": "Settings"
       }
     ]
+  },
+  "presenceLabels": {
+    "person.woteg": "Travis",
+    "person.bobbie": "Bobbie"
+  },
+  "labels": {
+    "binary_sensor.living_room_front_door": "Front Door",
+    "binary_sensor.backdoor": "Back Door"
   }
 }
