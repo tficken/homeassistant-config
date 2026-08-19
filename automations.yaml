@@ -1,25 +1,3 @@
-- id: '1784005048682'
-  alias: backyard night motion
-  description: ''
-  triggers:
-  - trigger: event.received
-    target:
-      entity_id: event.downstairs_motion
-    options:
-      event_type:
-      - motion
-  conditions:
-  - condition: sun
-    after: sunset
-    before: sunrise
-  actions:
-  - action: siren.turn_on
-    metadata: {}
-    target:
-      entity_id: siren.downstairs_siren_2
-    data: {}
-  mode: single
-
 - id: cleanup_old_backups
   alias: Cleanup old backups
   description: Delete backups older than 14 days via Supervisor API
@@ -140,6 +118,10 @@
         title: "P1S print finished"
         message: "P1S print status changed to {{ trigger.to_state.state }}."
         notification_id: bambu_p1s_print_finished
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: "P1S print finished"
+        message: "P1S print status changed to {{ trigger.to_state.state }}."
   mode: single
 
 - id: bambu_p1s_print_error
@@ -164,6 +146,10 @@
         title: "P1S print error"
         message: "P1S reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
         notification_id: bambu_p1s_print_error
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: "P1S print error"
+        message: "P1S reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
   mode: single
 
 - id: bambu_p1s_uno_print_finished
@@ -185,6 +171,10 @@
         title: "P1S UNO print finished"
         message: "P1S UNO print status changed to {{ trigger.to_state.state }}."
         notification_id: bambu_p1s_uno_print_finished
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: "P1S UNO print finished"
+        message: "P1S UNO print status changed to {{ trigger.to_state.state }}."
   mode: single
 
 - id: bambu_p1s_uno_print_error
@@ -209,6 +199,10 @@
         title: "P1S UNO print error"
         message: "P1S UNO reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
         notification_id: bambu_p1s_uno_print_error
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: "P1S UNO print error"
+        message: "P1S UNO reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
   mode: single
 
 - id: wall_panel_push_pages_on_startup
