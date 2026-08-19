@@ -281,11 +281,9 @@ input[type="range"] { accent-color: var(--green); }
 <script>
 const DEFAULT_CONFIG = {
   theme: { backgroundImage: "", accentColor: "#2dd4bf" },
-  layout: { left: ["home", "environment", "presence"], center: ["clock", "radar", "forecast"], right: ["scenes", "quickControls", "security", "system", "cameras"], clock24h: false },
+  layout: { clock24h: false },
   entities: {
     weather: "weather.forecast_home",
-    temperatures: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_temperature_2"],
-    summaryChips: [],
     mediaPlayer: "media_player.living_room_fire_tv_living_room"
   },
   sections: {
@@ -1737,8 +1735,6 @@ function collectReferencedIds() {
   if (config.entities) {
     if (config.entities.weather) ids.add(config.entities.weather);
     if (config.entities.mediaPlayer) ids.add(config.entities.mediaPlayer);
-    for (const t of (config.entities.temperatures || [])) ids.add(t);
-    for (const t of (config.entities.summaryChips || [])) ids.add(t);
   }
   for (const key of Object.keys(config.sections || {})) {
     const sec = config.sections[key];
@@ -1767,8 +1763,6 @@ function removeMissingEntity(id) {
   if (config.entities) {
     if (config.entities.weather === id) config.entities.weather = "";
     if (config.entities.mediaPlayer === id) config.entities.mediaPlayer = "";
-    config.entities.temperatures = (config.entities.temperatures || []).filter(x => x !== id);
-    config.entities.summaryChips = (config.entities.summaryChips || []).filter(x => x !== id);
   }
   if (config.dock && Array.isArray(config.dock.items)) {
     config.dock.items = config.dock.items.filter(i => i.entityId !== id);

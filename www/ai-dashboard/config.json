@@ -12,19 +12,11 @@
     "accentColor": "#2dd4bf"
   },
   "layout": {
-    "left": ["home", "environment", "presence"],
-    "center": ["clock", "radar", "forecast"],
-    "right": ["scenes", "quickControls", "security", "system", "cameras"],
     "clock24h": false
   },
   "sectionOrder": ["home", "scenes", "scripts", "quickControls", "cameras", "security", "doors", "environment", "presence", "system"],
   "entities": {
     "weather": "weather.forecast_home",
-    "temperatures": [
-      "sensor.hobeian_zg_204zx_temperature",
-      "sensor.hobeian_zg_204zx_temperature_2"
-    ],
-    "summaryChips": [],
     "mediaPlayer": "media_player.living_room_fire_tv_living_room"
   },
   "sections": {
