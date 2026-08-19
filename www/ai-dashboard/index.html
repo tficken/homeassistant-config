@@ -837,11 +837,16 @@ function renderRadarFrame() {
 }
 
 let radarMap = null;
+let radarMapEl = null;
 let radarAnimInterval = null;
 async function initRadarMap() {
   const el = document.getElementById("radar-map");
   if (!el || !window.L || !haConfig) return;
-  if (radarMap) { radarMap.remove(); radarMap = null; }
+  // Init once per #radar-map element: renderHomeScreen() replaces the element
+  // on a full home re-render, in which case we rebuild; plain state updates
+  // leave the element (and the map) untouched.
+  if (radarMap && radarMapEl === el) return;
+  if (radarMap) { radarMap.remove(); radarMap = null; radarMapEl = null; }
   if (radarAnimInterval) { clearInterval(radarAnimInterval); radarAnimInterval = null; }
   try {
     const res = await fetch("https://api.rainviewer.com/public/weather-maps.json", { cache: "no-store" });
@@ -881,6 +886,7 @@ async function initRadarMap() {
 
     setTimeout(() => map.invalidateSize(), 150);
     radarMap = map;
+    radarMapEl = el;
   } catch (e) {
     console.error("radar init failed", e);
     el.innerHTML = '<div style="color:var(--text-muted);padding:14px;">RADAR OFFLINE</div>';
@@ -1313,7 +1319,12 @@ async function showScreen(name) {
 
 function entityBelongsToScreen(entityId, screen) {
   const sectionMap = {
-    home: [config.entities.weather, ...getPresenceEntities()],
+    home: [
+      config.entities.weather,
+      ...getPresenceEntities(),
+      ...((config.sections.doors && config.sections.doors.entities) || []),
+      ...((config.sections.environment && config.sections.environment.entities) || [])
+    ],
     control: [
       ...((config.sections.scenes && config.sections.scenes.entities) || []),
       ...((config.sections.scripts && config.sections.scripts.entities) || []),
@@ -1332,9 +1343,14 @@ function entityBelongsToScreen(entityId, screen) {
   const ids = sectionMap[screen] || [];
   if (ids.includes(entityId)) return true;
   if (screen === "home") {
+    if (entityId.startsWith("calendar.")) return true;
     const sec = (config.sections.security && config.sections.security.entities) || [];
     const sys = (config.sections.system && config.sections.system.entities) || [];
     if (sec.includes(entityId) || sys.includes(entityId)) return true;
+  }
+  if (screen === "status" && entityId.startsWith("sensor.") &&
+      (entityId.endsWith("_print_status") || entityId.includes("print_progress") || entityId.includes("remaining_time"))) {
+    return true;
   }
   return false;
 }
