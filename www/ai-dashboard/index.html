@@ -208,6 +208,11 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
 #drag-ghost { position: fixed; z-index: 9999; pointer-events: none; opacity: 0.85; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
 .editor-dragging [data-chip-list] { outline: 1px dotted var(--border); outline-offset: 2px; }
 .editor-dragging #palette { outline: 1px dotted var(--danger); outline-offset: 2px; }
+.editor-dragging [data-preview-col] { outline: 1px dotted var(--border); outline-offset: 2px; }
+[data-preview-col].drop-before { outline: 1px dashed var(--accent); outline-offset: 2px; }
+#preview-stage [data-panel-id].drop-before { box-shadow: 0 -2px 0 var(--accent); }
+#preview-stage [data-panel-id].dragging { opacity: 0.4; }
+#preview-stage .panel-title { cursor: grab; user-select: none; touch-action: none; }
 input, select {
   background: rgba(255,255,255,0.07); border: 1px solid var(--border); border-radius: 4px;
   padding: 8px 10px; color: var(--text); font-size: 0.9rem;
@@ -1606,6 +1611,14 @@ function closeSettings() {
 const SETTINGS_TABS = ["Layout", "Appearance", "Labels", "Data"];
 let settingsTab = "Layout";
 
+const EDITOR_SCREENS = [["home", "HOME"], ["control", "CONTROL HUB"], ["security", "SECURITY"], ["status", "STATUS MONITOR"]];
+let editorScreen = "home";
+
+function setEditorScreen(name) {
+  editorScreen = name;
+  buildSettings();
+}
+
 function switchSettingsTab(name) {
   settingsTab = name;
   buildSettings();
@@ -1779,39 +1792,9 @@ function renderLayoutTab() {
         <button class="btn" style="padding:1px 8px;" onclick="removeMissingEntity('${escapeHtml(id)}')" title="Remove from config">×</button>
       </div>`).join("")}
     </div>` : "";
-  const groupedKeys = new Set(SCREEN_SECTION_GROUPS.flatMap(g => g.sections));
-  const ungrouped = Object.keys(config.sections || {}).filter(k => !groupedKeys.has(k));
-  const groups = ungrouped.length
-    ? SCREEN_SECTION_GROUPS.concat([{ screen: "NOT RENDERED BY ANY SCREEN", sections: ungrouped, unused: true }])
-    : SCREEN_SECTION_GROUPS;
-  const board = groups.map(g => {
-    const keys = orderedSectionKeys(g.sections.filter(k => config.sections && config.sections[k]));
-    const cards = keys.map(key => {
-      const sec = config.sections[key];
-      const chips = (sec.entities || []).map(id =>
-        `<span class="entity-chip" data-section="${key}" data-entity="${escapeHtml(id)}" title="${escapeHtml(id)}"><span class="drag-handle" data-drag-chip title="Drag to reorder, move, or drag back to the palette to remove">⠿</span>${escapeHtml(friendlyName(id))} <button onclick="removeSectionEntity('${key}','${escapeHtml(id)}')">×</button></span>`
-      ).join("");
-      return `
-        <div class="editor-section" data-section-key="${key}" style="border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:10px;">
-          <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-            <span class="drag-handle" data-drag-section="${key}" title="Drag to reorder section">⠿</span>
-            <input value="${escapeHtml(sec.icon || "")}" onchange="setSectionProp('${key}','icon',this.value)" style="width:42px;text-align:center;padding:4px;" title="Section icon">
-            <input value="${escapeHtml(sec.title || key)}" onchange="setSectionProp('${key}','title',this.value)" style="flex:1;min-width:80px;padding:4px 8px;" title="Section title">
-          </div>
-          <div class="chip-list" data-chip-list="${key}" style="display:flex;flex-wrap:wrap;gap:2px;min-height:34px;border-radius:4px;">${chips || "<span style='color:var(--text-muted);font-size:0.75rem;padding:6px;'>Drop entities here</span>"}</div>
-        </div>`;
-    }).join("");
-    const fixedCards = (g.fixed || []).map(f => `
-      <div style="border:1px dashed var(--border);border-radius:6px;padding:8px;margin-bottom:10px;opacity:0.65;">
-        <div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--text-muted);">${escapeHtml(f.name)}</div>
-        <div style="color:var(--text-muted);font-size:0.68rem;margin-top:2px;">${escapeHtml(f.note)}</div>
-      </div>`).join("");
-    const empty = !cards && !fixedCards ? "<p style='color:var(--text-muted);font-size:0.8rem;'>No sections on this screen.</p>" : "";
-    return `<div style="min-width:0;">
-      <h3 style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.1em;color:${g.unused ? "var(--text-muted)" : "var(--green)"};margin:0 0 8px;">${g.screen}</h3>
-      ${cards}${fixedCards}${empty}
-    </div>`;
-  }).join("");
+  const previewTabs = EDITOR_SCREENS.map(([id, label]) =>
+    `<button class="btn" style="${id === editorScreen ? "border-color:var(--accent);color:var(--accent);" : ""}" onclick="setEditorScreen('${id}')">${label}</button>`
+  ).join("");
   return `
     <div style="display:flex;gap:14px;height:100%;min-height:0;">
       <div id="palette" style="width:290px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;border:1px solid var(--border);border-radius:6px;padding:10px;">
@@ -1821,9 +1804,14 @@ function renderLayoutTab() {
         </label>
         ${missingBlock}
         <div id="palette-list" style="overflow-y:auto;flex:1;min-height:0;">${renderPaletteList()}</div>
-        <p style="color:var(--text-muted);font-size:0.72rem;margin:8px 0 0;flex-shrink:0;">Drag an entity onto a section to add it. Drag a chip back here to remove it.</p>
+        <p style="color:var(--text-muted);font-size:0.72rem;margin:8px 0 0;flex-shrink:0;">Drag an entity onto a panel to add it. Drag a card back here to remove it.</p>
       </div>
-      <div id="board" style="flex:1;min-width:0;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;align-content:start;">${board}</div>
+      <div id="preview" style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;">
+        <div id="preview-tabs" style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0;">${previewTabs}</div>
+        <div id="preview-stage" style="flex:1;min-height:0;overflow:auto;border:1px solid var(--border);border-radius:6px;padding:10px;">
+          <div id="preview-stage-inner"></div>
+        </div>
+      </div>
     </div>`;
 }
 
@@ -1835,11 +1823,207 @@ function initLayoutEditor() {
     paletteNewOnly = newOnlyEl ? newOnlyEl.checked : false;
     const list = document.getElementById("palette-list");
     if (list) list.innerHTML = renderPaletteList();
-    initEditorDrag();
+    initPreviewDrag();
   };
   if (filterEl) filterEl.addEventListener("input", refresh);
   if (newOnlyEl) newOnlyEl.addEventListener("change", refresh);
-  initEditorDrag();
+  initPreviewDrag();
+  renderEditorPreview();
+}
+
+// Kill duplicate-id interference with the live #clock/#radar-map/#doors-panel
+// and neutralize inline onclick/onchange handlers inside the preview.
+function sanitizePreviewHtml(html) {
+  return html.replace(/ id="/g, ' data-pid="').replace(/ on\w+="[^"]*"/g, "");
+}
+
+const PREVIEW_BUILDERS = {
+  home: buildHomePanels,
+  control: buildControlPanels,
+  security: buildSecurityPanels,
+  status: buildStatusPanels
+};
+
+// Build the editorScreen's HTML at real pixel size and display it scaled to
+// fit the stage. Fire-and-forget from initLayoutEditor; re-wires drag handlers
+// once the preview DOM exists.
+async function renderEditorPreview() {
+  const screen = editorScreen;
+  const stage = document.getElementById("preview-stage");
+  const inner = document.getElementById("preview-stage-inner");
+  if (!stage || !inner) return;
+  const build = PREVIEW_BUILDERS[screen] || buildHomePanels;
+  const b = await build();
+  // Bail if a tab switch re-rendered the settings body while we awaited.
+  if (editorScreen !== screen || !inner.isConnected) return;
+  // Hidden screens report clientWidth 0 (display:none); fall back to the
+  // active screen, which shares the same container and therefore width.
+  const live = document.getElementById(screen + "-screen");
+  let w = live ? live.clientWidth : 0;
+  if (!w) {
+    const active = document.querySelector(".screen.active");
+    w = active && active.clientWidth ? active.clientWidth : stage.clientWidth;
+  }
+  // Assemble inline (assembleColumns' signature stays untouched) so each
+  // column div carries data-preview-col for panel drop targeting.
+  const colsHtml = effectivePanels(screen).map((col, i) =>
+    `<div data-preview-col="${i}" style="${b.colStyles[i]}">${col.map(id => b.panels[id] || "").join("")}</div>`
+  ).join("");
+  inner.style.width = w + "px";
+  inner.innerHTML = sanitizePreviewHtml(`<div style="${b.gridStyle}">${colsHtml}</div>`);
+  const k = Math.min(1, stage.clientWidth / w);
+  inner.style.transform = `scale(${k})`;
+  inner.style.transformOrigin = "top left";
+  if (window.updateOverflowBadges) window.updateOverflowBadges();
+  initPreviewDrag();
+}
+
+function applyPanelDrop(panelId, target) {
+  ensureConfigPanels();
+  const cols = config.panels[editorScreen];
+  if (!cols) return;
+  const targetPanelId = target.getAttribute("data-panel-id");
+  const colEl = target.closest("[data-preview-col]");
+  if (!colEl) return;
+  const dest = cols[parseInt(colEl.getAttribute("data-preview-col"), 10)];
+  if (!dest) return;
+  for (const col of cols) {
+    const i = col.indexOf(panelId);
+    if (i !== -1) col.splice(i, 1);
+  }
+  let index = targetPanelId ? dest.indexOf(targetPanelId) : -1;
+  if (index === -1) index = dest.length;
+  dest.splice(index, 0, panelId);
+  renderAll();
+  buildSettings();
+}
+
+function initPreviewDrag() {
+  const body = document.getElementById("settings-body");
+  if (!body) return;
+  const stage = document.getElementById("preview-stage");
+  // Belt-and-braces against any missed inline handlers (sanitization already
+  // strips them; .panel-title clicks are wired in Task 4).
+  if (stage && !stage.dataset.clickGuard) {
+    stage.dataset.clickGuard = "1";
+    stage.addEventListener("click", e => {
+      if (!e.target.closest(".panel-title")) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+  }
+  body.querySelectorAll(".palette-chip").forEach(chip => {
+    if (chip.dataset.dragWired) return;
+    chip.dataset.dragWired = "1";
+    chip.addEventListener("pointerdown", ev => {
+      if (ev.target.closest("button")) return;
+      startDrag(ev, "palette", chip);
+    });
+  });
+  if (stage) stage.querySelectorAll("[data-panel-id] .panel-title").forEach(title => {
+    if (title.dataset.dragWired) return;
+    title.dataset.dragWired = "1";
+    title.addEventListener("pointerdown", ev => {
+      const panel = ev.target.closest("[data-panel-id]");
+      if (panel) startDrag(ev, "panel", panel);
+    });
+  });
+  let drag = null;
+
+  function startDrag(ev, kind, el) {
+    if (!el) return;
+    ev.preventDefault();
+    const id = el.getAttribute(kind === "panel" ? "data-panel-id" : "data-entity");
+    drag = {
+      kind,
+      el,
+      key: kind === "palette" ? sectionOfEntity(id) : null,
+      id,
+      pointerId: ev.pointerId,
+      startX: ev.clientX,
+      startY: ev.clientY,
+      moved: false,
+      ghost: null
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp, { once: true });
+    document.addEventListener("pointercancel", onCancel, { once: true });
+  }
+
+  function onMove(ev) {
+    if (!drag || ev.pointerId !== drag.pointerId) return;
+    if (!drag.moved && Math.hypot(ev.clientX - drag.startX, ev.clientY - drag.startY) < 6) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      drag.el.classList.add("dragging");
+      body.classList.add("editor-dragging");
+      const ghost = drag.el.cloneNode(true);
+      ghost.id = "drag-ghost";
+      ghost.style.width = drag.el.offsetWidth + "px";
+      document.body.appendChild(ghost);
+      drag.ghost = ghost;
+    }
+    if (drag.ghost) {
+      drag.ghost.style.left = (ev.clientX + 12) + "px";
+      drag.ghost.style.top = (ev.clientY + 12) + "px";
+    }
+    // Auto-scroll the palette or preview stage when dragging near their edges.
+    [document.getElementById("palette-list"), document.getElementById("preview-stage")].forEach(sc => {
+      if (!sc) return;
+      const r = sc.getBoundingClientRect();
+      if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) return;
+      if (ev.clientY < r.top + 40) sc.scrollTop -= 12;
+      else if (ev.clientY > r.bottom - 40) sc.scrollTop += 12;
+    });
+    clearIndicators();
+    const target = findDropTarget(ev);
+    if (target) target.classList.add("drop-before");
+  }
+
+  function cleanupDrag(d) {
+    d.el.classList.remove("dragging");
+    if (d.ghost) d.ghost.remove();
+    body.classList.remove("editor-dragging");
+    clearIndicators();
+  }
+
+  function onCancel() {
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    cleanupDrag(d);
+  }
+
+  function onUp(ev) {
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointercancel", onCancel);
+    if (!drag) return;
+    const target = drag.moved ? findDropTarget(ev) : null;
+    const d = drag;
+    drag = null;
+    cleanupDrag(d);
+    if (d.moved && target && d.kind === "panel") {
+      applyPanelDrop(d.id, target);
+    }
+  }
+
+  function findDropTarget(ev) {
+    if (drag.kind !== "panel") return null; // palette drags no-op until Task 4
+    const el = document.elementFromPoint(ev.clientX, ev.clientY);
+    if (!el || !stage) return null;
+    const panel = el.closest("[data-panel-id]");
+    if (panel && stage.contains(panel) && panel !== drag.el) return panel;
+    const colEl = el.closest("[data-preview-col]");
+    if (colEl && stage.contains(colEl)) return colEl;
+    return null;
+  }
+
+  function clearIndicators() {
+    document.querySelectorAll(".drop-before").forEach(x => x.classList.remove("drop-before"));
+  }
 }
 
 function setSectionProp(key, prop, value) {

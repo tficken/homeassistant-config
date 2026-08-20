@@ -175,7 +175,7 @@ function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
   5. Re-run overflow measurement hook (stub `updateOverflowBadges()` added in Task 5; call site guarded `if (window.updateOverflowBadges)`) — or add the call in Task 5; do not leave a dangling reference.
 - `initPreviewDrag()` — replaces `initEditorDrag` for the new tab. Task 3 scope: drag kinds `"panel"` (handle: `.panel-title` inside `#preview-stage [data-panel-id]`) and `"palette"` (existing `.palette-chip` — retargeted in Task 4; for now palette drags may no-op). Carry over from `initEditorDrag` verbatim: 6px `Math.hypot` threshold, `.dragging` class, `#drag-ghost` clone, `body.classList.add("editor-dragging")`, auto-scroll of `#palette-list` and `#preview-stage` (12px within 40px of edges), `pointercancel`/`onCancel` cleanup, `clearIndicators()`, drop via `document.elementFromPoint`. Panel drop targets: another `[data-panel-id]` (insert before it in that column) or a `[data-preview-col]` column (append at end). `applyPanelDrop(panelId, target)`: `ensureConfigPanels()`, remove id from its current column in `config.panels[editorScreen]`, insert at target position, then `renderAll(); buildSettings();`.
 
-- [ ] **Step 1: Rewrite `renderLayoutTab` (~L1670–1726).** Keep the palette column markup byte-for-byte (`#palette`, `#palette-filter`, `#palette-newonly`, `missingBlock`, `#palette-list`, hint `<p>` — update the hint text to "Drag an entity onto a panel to add it. Drag a card back here to remove it."). Replace `#board` with:
+- [x] **Step 1: Rewrite `renderLayoutTab` (~L1670–1726).** Keep the palette column markup byte-for-byte (`#palette`, `#palette-filter`, `#palette-newonly`, `missingBlock`, `#palette-list`, hint `<p>` — update the hint text to "Drag an entity onto a panel to add it. Drag a card back here to remove it."). Replace `#board` with:
   ```html
   <div id="preview" style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;">
     <div id="preview-tabs" style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0;">
@@ -187,10 +187,10 @@ function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
   </div>
   ```
   Delete the entire board-building path (`groupedKeys`/`ungrouped`/`groups`/`board` ~L1680–1712). `SCREEN_SECTION_GROUPS` itself stays until Task 6 (it becomes unreferenced here).
-- [ ] **Step 2: Update `initLayoutEditor` (~L1728)** to call `renderEditorPreview()` (async fire-and-forget) after wiring the palette filter/newonly listeners, and call `initPreviewDrag()` instead of `initEditorDrag`. The palette `refresh` closure must also re-run `initPreviewDrag()` after replacing `#palette-list` innerHTML.
-- [ ] **Step 3: Add `editorScreen`/`setEditorScreen`/`sanitizePreviewHtml`/`renderEditorPreview`** in the Settings section near `renderLayoutTab`. `buildSettings` (~L1518) needs no signature change; Layout branch already calls `renderLayoutTab()` + `initLayoutEditor()`.
-- [ ] **Step 4: Implement `initPreviewDrag` + `applyPanelDrop`** (panel dragging only this task). Add a click-capture guard on `#preview-stage`: `stage.addEventListener("click", e => { if (!e.target.closest(".panel-title")) { e.preventDefault(); e.stopPropagation(); } }, true)` as belt-and-braces against any missed inline handlers (sanitization already strips them; title clicks are wired in Task 4).
-- [ ] **Step 5: CSS additions** in the `<style>` block (near `.editor-dragging` ~L209):
+- [x] **Step 2: Update `initLayoutEditor` (~L1728)** to call `renderEditorPreview()` (async fire-and-forget) after wiring the palette filter/newonly listeners, and call `initPreviewDrag()` instead of `initEditorDrag`. The palette `refresh` closure must also re-run `initPreviewDrag()` after replacing `#palette-list` innerHTML.
+- [x] **Step 3: Add `editorScreen`/`setEditorScreen`/`sanitizePreviewHtml`/`renderEditorPreview`** in the Settings section near `renderLayoutTab`. `buildSettings` (~L1518) needs no signature change; Layout branch already calls `renderLayoutTab()` + `initLayoutEditor()`.
+- [x] **Step 4: Implement `initPreviewDrag` + `applyPanelDrop`** (panel dragging only this task). Add a click-capture guard on `#preview-stage`: `stage.addEventListener("click", e => { if (!e.target.closest(".panel-title")) { e.preventDefault(); e.stopPropagation(); } }, true)` as belt-and-braces against any missed inline handlers (sanitization already strips them; title clicks are wired in Task 4).
+- [x] **Step 5: CSS additions** in the `<style>` block (near `.editor-dragging` ~L209):
   ```css
   .editor-dragging [data-preview-col] { outline: 1px dotted var(--border); outline-offset: 2px; }
   [data-preview-col].drop-before { outline: 1px dashed var(--accent); outline-offset: 2px; }
@@ -198,8 +198,8 @@ function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
   #preview-stage [data-panel-id].dragging { opacity: 0.4; }
   #preview-stage .panel-title { cursor: grab; user-select: none; touch-action: none; }
   ```
-- [ ] **Step 6: Validate** (JS check + HTML parse as in Task 1 Step 7). Manual: Settings → Layout shows the live HOME screen rendered small in the pane; tab bar switches screens; dragging a panel by its header reorders it (dashboard behind modal updates after drop). Do not save yet (proxy needs restart) — or verify Save & Apply still succeeds because other known keys intersect `CONFIG_KEYS`.
-- [ ] **Step 7: Commit.**
+- [x] **Step 6: Validate** (JS check + HTML parse as in Task 1 Step 7). Manual: Settings → Layout shows the live HOME screen rendered small in the pane; tab bar switches screens; dragging a panel by its header reorders it (dashboard behind modal updates after drop). Do not save yet (proxy needs restart) — or verify Save & Apply still succeeds because other known keys intersect `CONFIG_KEYS`.
+- [x] **Step 7: Commit.**
   ```bash
   git add www/ai-dashboard/index.html
   git commit -m "feat(ai-dashboard): visual preview layout editor with panel dragging"
