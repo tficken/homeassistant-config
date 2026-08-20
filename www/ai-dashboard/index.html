@@ -718,8 +718,8 @@ async function fetchHAConfig() {
 
 // ---- Component renderers ----
 
-function renderTerminalPanel(title, bodyHtml, cls) {
-  return `<div class="terminal-panel${cls ? " " + cls : ""}">
+function renderTerminalPanel(title, bodyHtml, cls, attrs) {
+  return `<div class="terminal-panel${cls ? " " + cls : ""}"${attrs ? " " + attrs : ""}>
     <div class="panel-title">${escapeHtml(title)}</div>
     <div class="panel-body">${bodyHtml}</div>
   </div>`;
@@ -741,7 +741,7 @@ function renderAlertBanner(alerts) {
 
 function renderSceneButton(entityId) {
   const name = friendlyName(entityId);
-  return `<button class="scene-btn" onclick="toggleEntity('${entityId}')">${escapeHtml(name)}</button>`;
+  return `<button class="scene-btn" data-entity-id="${entityId}" onclick="toggleEntity('${entityId}')">${escapeHtml(name)}</button>`;
 }
 
 function renderLightCard(entityId) {
@@ -970,6 +970,16 @@ function renderDock() {
   return screens + items;
 }
 
+// Assemble a screen grid from prebuilt panel HTML. `columns` is an array of
+// columns, each an ordered array of panel ids; every panel string's outermost
+// element carries data-panel-id (inert live, used by the layout editor).
+function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
+  const cols = columns.map((col, i) =>
+    `<div style="${colStyles[i]}">${col.map(id => panelHtml[id] || "").join("")}</div>`
+  ).join("");
+  return `<div style="${gridStyle}">${cols}</div>`;
+}
+
 // ---- Screens ----
 
 function getPresenceEntities() {
@@ -1087,7 +1097,7 @@ function renderDoors() {
   return `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${cards}</div>`;
 }
 
-function renderHomeScreen() {
+function buildHomePanels() {
   const weatherId = config.entities.weather || "weather.forecast_home";
   const weather = states[weatherId];
   const temp = weather && weather.attributes && weather.attributes.temperature != null ? `${weather.attributes.temperature}°` : "--";
@@ -1129,7 +1139,7 @@ function renderHomeScreen() {
       </div>
     </div>
     ${forecastHtml}
-  `);
+  `, "", 'data-panel-id="weather"');
 
   const presence = getPresenceEntities().map(id => {
     const state = states[id];
@@ -1197,35 +1207,41 @@ function renderHomeScreen() {
       </div>`);
   }
 
-  const main = `
-    ${renderAlertBanner(getAlerts())}
-    <div style="display:grid;grid-template-columns:0.9fr 1.2fr 1fr;gap:14px;flex:1;min-height:0;">
-      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
-        <div style="flex-shrink:0;padding:8px 0 0 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;">
-          <div id="clock" style="font-family:var(--font-mono);font-size:clamp(4rem,9vw,6.5rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);white-space:nowrap;">${timeStrMarked}</div>
-          <div id="date" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
-        </div>
-        <div style="flex:1;min-height:0;">${presencePanel}</div>
-        ${oncallPanel ? `<div style="flex-shrink:0;">${oncallPanel}</div>` : ""}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
-        ${weatherPanel}
-        <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;">${renderTerminalPanel(sectionTitle("roomMonitors"), renderRoomMonitors(), "fill")}</div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;">
-        <div style="flex:1;min-height:0;">${renderRadarFrame()}</div>
-        <div style="flex-shrink:0;">${doorsPanel}</div>
-      </div>
-    </div>
-  `;
+  const panels = {
+    clock: `<div style="flex-shrink:0;padding:8px 0 0 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;" data-panel-id="clock">
+      <div id="clock" style="font-family:var(--font-mono);font-size:clamp(4rem,9vw,6.5rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);white-space:nowrap;">${timeStrMarked}</div>
+      <div id="date" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
+    </div>`,
+    presence: `<div style="flex:1;min-height:0;" data-panel-id="presence">${presencePanel}</div>`,
+    oncall: oncallPanel ? `<div style="flex-shrink:0;" data-panel-id="oncall">${oncallPanel}</div>` : "",
+    weather: weatherPanel,
+    roomMonitors: `<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="roomMonitors">${renderTerminalPanel(sectionTitle("roomMonitors"), renderRoomMonitors(), "fill")}</div>`,
+    radar: `<div style="flex:1;min-height:0;" data-panel-id="radar">${renderRadarFrame()}</div>`,
+    doors: `<div style="flex-shrink:0;" data-panel-id="doors"><div id="doors-panel">${renderTerminalPanel(sectionTitle("doors"), renderDoors())}</div></div>`,
+  };
+  return {
+    panels,
+    gridStyle: "display:grid;grid-template-columns:0.9fr 1.2fr 1fr;gap:14px;flex:1;min-height:0;",
+    colStyles: [
+      "display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;",
+      "display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;",
+      "display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;",
+    ],
+  };
+}
 
+function renderHomeScreen() {
+  const b = buildHomePanels();
+  const main = `${renderAlertBanner(getAlerts())}${assembleColumns(b.panels,
+    [["clock", "presence", "oncall"], ["weather", "roomMonitors"], ["radar", "doors"]],
+    b.gridStyle, b.colStyles)}`;
   document.getElementById("home-screen").innerHTML = main;
   initRadarMap();
   measureClock();
   lastRecentDoorKey = recentDoorIds().join(",");
 }
 
-function renderControlScreen() {
+function buildControlPanels() {
   const scenes = (config.sections && config.sections.scenes && config.sections.scenes.entities) || [];
   const scripts = (config.sections && config.sections.scripts && config.sections.scripts.entities) || [];
   const quick = (config.sections && config.sections.quickControls && config.sections.quickControls.entities) || [];
@@ -1239,37 +1255,32 @@ function renderControlScreen() {
   const switchCards = switchIds.map(id => renderSwitchCard(id)).join("");
   const controlCards = lightCards + switchCards;
 
-  const main = `
-    <div style="display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:14px;flex:1;min-height:0;">
-      <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
-        ${renderTerminalPanel(sectionTitle("scenes"), `<div class="stretch-btns" style="display:flex;flex-direction:column;gap:10px;height:100%;">${sceneButtons || "<div style='color:var(--text-muted)'>NO SCENES</div>"}</div>`, "fill")}
-      </div>
-      <div style="display:flex;flex-direction:column;gap:10px;min-height:0;">
-        <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;">
-          ${renderTerminalPanel(sectionTitle("quickControls"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${controlCards || "<div style='color:var(--text-muted)'>NO CONTROLS</div>"}</div>`, "fill")}
-        </div>
-        <div style="flex-shrink:0;">
-          ${renderMediaCard(mediaId)}
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;">
-        ${renderTerminalPanel(sectionTitle("scripts"), `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${scriptButtons || "<div style='color:var(--text-muted)'>NO SCRIPTS</div>"}</div>`)}
-      </div>
-    </div>
-  `;
-  document.getElementById("control-screen").innerHTML = main;
+  const panels = {
+    scenes: renderTerminalPanel(sectionTitle("scenes"), `<div class="stretch-btns" style="display:flex;flex-direction:column;gap:10px;height:100%;">${sceneButtons || "<div style='color:var(--text-muted)'>NO SCENES</div>"}</div>`, "fill", 'data-panel-id="scenes"'),
+    quickControls: `<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="quickControls">${renderTerminalPanel(sectionTitle("quickControls"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${controlCards || "<div style='color:var(--text-muted)'>NO CONTROLS</div>"}</div>`, "fill")}</div>`,
+    media: `<div style="flex-shrink:0;" data-panel-id="media">${renderMediaCard(mediaId)}</div>`,
+    scripts: renderTerminalPanel(sectionTitle("scripts"), `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${scriptButtons || "<div style='color:var(--text-muted)'>NO SCRIPTS</div>"}</div>`, "", 'data-panel-id="scripts"'),
+  };
+  return {
+    panels,
+    gridStyle: "display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:14px;flex:1;min-height:0;",
+    colStyles: [
+      "display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;",
+      "display:flex;flex-direction:column;gap:10px;min-height:0;",
+      "display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;",
+    ],
+  };
 }
 
-async function renderStatusScreen() {
+function renderControlScreen() {
+  const b = buildControlPanels();
+  document.getElementById("control-screen").innerHTML = assembleColumns(b.panels,
+    [["scenes"], ["quickControls", "media"], ["scripts"]], b.gridStyle, b.colStyles);
+}
+
+async function buildStatusPanels() {
   const environment = (config.sections && config.sections.environment && config.sections.environment.entities) || [];
   const system = (config.sections && config.sections.system && config.sections.system.entities) || [];
-
-  const historyIds = environment.filter(id => {
-    const s = states[id];
-    const dc = s && s.attributes && s.attributes.device_class;
-    return dc === "temperature" || dc === "humidity";
-  });
-  await fetchHistory(historyIds, 24);
 
   const envGroups = {};
   const envOrder = [];
@@ -1322,16 +1333,38 @@ async function renderStatusScreen() {
     </div>`;
   }).join("");
 
-  const main = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0;overflow:hidden;">
-      <div style="min-height:0;overflow-y:auto;display:flex;flex-direction:column;">${renderTerminalPanel(sectionTitle("environment"), envMetrics, "fill")}</div>
-      <div style="min-height:0;overflow-y:auto;display:flex;flex-direction:column;">${renderTerminalPanel(sectionTitle("system"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${sysMetrics + vacuumCards + printerCards}</div>`, "fill")}</div>
-    </div>
-  `;
-  document.getElementById("status-screen").innerHTML = main;
+  const panels = {
+    environment: `<div style="min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="environment">${renderTerminalPanel(sectionTitle("environment"), envMetrics, "fill")}</div>`,
+    system: `<div style="min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="system">${renderTerminalPanel(sectionTitle("system"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${sysMetrics + vacuumCards + printerCards}</div>`, "fill")}</div>`,
+  };
+  return {
+    panels,
+    gridStyle: "display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0;overflow:hidden;",
+    // Single-panel columns use display:grid so each panel wrapper (a grid item)
+    // stretches to full column height exactly as it did as a direct grid item;
+    // a flex column would collapse it to content height and break the
+    // .terminal-panel.fill height:100% chain.
+    colStyles: [
+      "min-height:0;display:grid;",
+      "min-height:0;display:grid;",
+    ],
+  };
 }
 
-function renderSecurityScreen() {
+async function renderStatusScreen() {
+  const environment = (config.sections && config.sections.environment && config.sections.environment.entities) || [];
+  const historyIds = environment.filter(id => {
+    const s = states[id];
+    const dc = s && s.attributes && s.attributes.device_class;
+    return dc === "temperature" || dc === "humidity";
+  });
+  await fetchHistory(historyIds, 24);
+  const b = await buildStatusPanels();
+  document.getElementById("status-screen").innerHTML = assembleColumns(b.panels,
+    [["environment"], ["system"]], b.gridStyle, b.colStyles);
+}
+
+function buildSecurityPanels() {
   const cameras = (config.sections && config.sections.cameras && config.sections.cameras.entities) || [];
   const security = (config.sections && config.sections.security && config.sections.security.entities) || [];
 
@@ -1344,13 +1377,24 @@ function renderSecurityScreen() {
     return renderMetricCard(id);
   }).join("");
 
-  const main = `
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;min-height:0;overflow:hidden;">
-      ${cameraFeeds}
-    </div>
-    <div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;">${renderTerminalPanel(sectionTitle("security"), `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;grid-auto-rows:1fr;height:100%;">${securityCards}</div>`, "fill")}</div>
-  `;
-  document.getElementById("security-screen").innerHTML = main;
+  const panels = {
+    cameras: `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;min-height:0;overflow:hidden;" data-panel-id="cameras">${cameraFeeds}</div>`,
+    security: `<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="security">${renderTerminalPanel(sectionTitle("security"), `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;grid-auto-rows:1fr;height:100%;">${securityCards}</div>`, "fill")}</div>`,
+  };
+  return {
+    panels,
+    gridStyle: "display:grid;grid-template-columns:1fr;gap:14px;flex:1;min-height:0;",
+    // Single column: the grid contributes no gap (one track), so the column's
+    // 14px flex gap is the only gap between the camera grid and the security
+    // panel — same as the .screen gap that separated them before.
+    colStyles: ["display:flex;flex-direction:column;gap:14px;min-height:0;"],
+  };
+}
+
+function renderSecurityScreen() {
+  const b = buildSecurityPanels();
+  document.getElementById("security-screen").innerHTML = assembleColumns(b.panels,
+    [["cameras", "security"]], b.gridStyle, b.colStyles);
 }
 
 async function showScreen(name) {

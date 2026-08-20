@@ -59,7 +59,7 @@
 - Every panel HTML string's **outermost element** carries `data-panel-id="<id>"` (inert on live screens, used by the editor later).
 - Panel ids: `clock`, `presence`, `oncall`, `weather`, `roomMonitors`, `radar`, `doors`, `scenes`, `quickControls`, `media`, `scripts`, `cameras`, `security`, `environment`, `system`.
 
-- [ ] **Step 1: Add `assembleColumns` helper.** Place it just above `// ---- Screens ----` (~L973):
+- [x] **Step 1: Add `assembleColumns` helper.** Place it just above `// ---- Screens ----` (~L973):
 
 ```js
 function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
@@ -70,7 +70,7 @@ function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
 }
 ```
 
-- [ ] **Step 2: Refactor `renderHomeScreen` (~L1090–1226).** Move all panel HTML construction into `buildHomePanels()` returning:
+- [x] **Step 2: Refactor `renderHomeScreen` (~L1090–1226).** Move all panel HTML construction into `buildHomePanels()` returning:
   - `panels.clock`: the existing clock/date container div (~L1204–1207), with `data-panel-id="clock"` added; keep `id="clock"`/`id="date"` inside.
   - `panels.presence`: `<div style="flex:1;min-height:0;" data-panel-id="presence">${presencePanel}</div>` (presencePanel markup unchanged, ~L1177).
   - `panels.oncall`: `<div style="flex-shrink:0;" data-panel-id="oncall">${oncallPanel}</div>`, or `""` when no calendar state matches (~L1180–1198 logic unchanged).
@@ -92,17 +92,17 @@ function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
       lastRecentDoorKey = recentDoorIds().join(",");
     }
     ```
-- [ ] **Step 3: Refactor `renderControlScreen` (~L1228–1261).** `buildControlPanels()` returns panels `scenes` (fill panel + stretch-btns, ~L1245), `quickControls` (existing flex:1 wrapper + fill panel, ~L1248–1250), `media` (`<div style="flex-shrink:0;" data-panel-id="media">${renderMediaCard(mediaId)}</div>`, ~L1251–1253), `scripts` (~L1256); `gridStyle: "display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:14px;flex:1;min-height:0;"`; colStyles exactly today's per-column styles (~L1244/1247/1255 — note columns 1 and 3 have `overflow-y:auto`, column 2 does not). Writer: `document.getElementById("control-screen").innerHTML = assembleColumns(b.panels, [["scenes"], ["quickControls", "media"], ["scripts"]], b.gridStyle, b.colStyles);`
-- [ ] **Step 4: Refactor `renderStatusScreen` (~L1263–1332).** Keep the `fetchHistory(historyIds, 24)` prefetch in the async writer. `async buildStatusPanels()` contains the env-grouping, sysMetrics/vacuumCards/printerCards logic unchanged, returning panels `environment` and `system` (both keep their `min-height:0;overflow-y:auto;...` wrapper + `fill` panel, ~L1327–1328); `gridStyle: "display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0;overflow:hidden;"`; colStyles `["min-height:0;display:flex;flex-direction:column;", "min-height:0;display:flex;flex-direction:column;"]` — move the per-column `overflow-y:auto` into the panel wrappers (it is already on the panel wrapper divs today, so colStyles drop it; verify computed layout is unchanged). Writer awaits builder, assembles `[["environment"], ["system"]]`, writes innerHTML.
-- [ ] **Step 5: Refactor `renderSecurityScreen` (~L1334–1354).** `buildSecurityPanels()` returns `panels.cameras` = `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;min-height:0;" data-panel-id="cameras">${cameraFeeds}</div>` (feeds keep no panel wrapper, as today) and `panels.security` = the existing fill-panel wrapper (~L1351) with `data-panel-id="security"`; `gridStyle: "display:grid;grid-template-columns:1fr;gap:14px;flex:1;min-height:0;"`, colStyles `["display:flex;flex-direction:column;gap:14px;min-height:0;"]`. Writer assembles `[["cameras", "security"]]`. (Security becomes a one-column screen; with a single column this reproduces today's vertical stack — `.screen` already has `gap:14px`, so verify the gap between the camera grid and the security panel does not double; drop `gap` from the colStyle if it does.)
-- [ ] **Step 6: Add `data-entity-id` to `renderSceneButton` (~L742):** `<button class="scene-btn" data-entity-id="${entityId}" onclick="toggleEntity('${entityId}')">`. This is inert live and lets the editor drag scene/script/security-button cards later.
-- [ ] **Step 7: Validate.**
+- [x] **Step 3: Refactor `renderControlScreen` (~L1228–1261).** `buildControlPanels()` returns panels `scenes` (fill panel + stretch-btns, ~L1245), `quickControls` (existing flex:1 wrapper + fill panel, ~L1248–1250), `media` (`<div style="flex-shrink:0;" data-panel-id="media">${renderMediaCard(mediaId)}</div>`, ~L1251–1253), `scripts` (~L1256); `gridStyle: "display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:14px;flex:1;min-height:0;"`; colStyles exactly today's per-column styles (~L1244/1247/1255 — note columns 1 and 3 have `overflow-y:auto`, column 2 does not). Writer: `document.getElementById("control-screen").innerHTML = assembleColumns(b.panels, [["scenes"], ["quickControls", "media"], ["scripts"]], b.gridStyle, b.colStyles);`
+- [x] **Step 4: Refactor `renderStatusScreen` (~L1263–1332).** Keep the `fetchHistory(historyIds, 24)` prefetch in the async writer. `async buildStatusPanels()` contains the env-grouping, sysMetrics/vacuumCards/printerCards logic unchanged, returning panels `environment` and `system` (both keep their `min-height:0;overflow-y:auto;...` wrapper + `fill` panel, ~L1327–1328); `gridStyle: "display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0;overflow:hidden;"`; colStyles `["min-height:0;display:flex;flex-direction:column;", "min-height:0;display:flex;flex-direction:column;"]` — move the per-column `overflow-y:auto` into the panel wrappers (it is already on the panel wrapper divs today, so colStyles drop it; verify computed layout is unchanged). Writer awaits builder, assembles `[["environment"], ["system"]]`, writes innerHTML.
+- [x] **Step 5: Refactor `renderSecurityScreen` (~L1334–1354).** `buildSecurityPanels()` returns `panels.cameras` = `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;min-height:0;" data-panel-id="cameras">${cameraFeeds}</div>` (feeds keep no panel wrapper, as today) and `panels.security` = the existing fill-panel wrapper (~L1351) with `data-panel-id="security"`; `gridStyle: "display:grid;grid-template-columns:1fr;gap:14px;flex:1;min-height:0;"`, colStyles `["display:flex;flex-direction:column;gap:14px;min-height:0;"]`. Writer assembles `[["cameras", "security"]]`. (Security becomes a one-column screen; with a single column this reproduces today's vertical stack — `.screen` already has `gap:14px`, so verify the gap between the camera grid and the security panel does not double; drop `gap` from the colStyle if it does.)
+- [x] **Step 6: Add `data-entity-id` to `renderSceneButton` (~L742):** `<button class="scene-btn" data-entity-id="${entityId}" onclick="toggleEntity('${entityId}')">`. This is inert live and lets the editor drag scene/script/security-button cards later.
+- [x] **Step 7: Validate.**
   ```bash
   sed -n '/^<script>$/,/^<\/script>$/p' www/ai-dashboard/index.html | sed '1d;$d' > /tmp/dash-inline.js && .tools/node/node.exe --check /tmp/dash-inline.js && echo "JS syntax OK"
   py -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
   ```
   Manual spot-check (browser hard refresh `Ctrl+Shift+R`): all four screens look identical to before; clock ticks; radar animates; doors recency border still works.
-- [ ] **Step 8: Commit.**
+- [x] **Step 8: Commit.**
   ```bash
   git add www/ai-dashboard/index.html
   git commit -m "refactor(ai-dashboard): split screen renderers into pure builders and thin writers"
