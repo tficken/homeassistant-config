@@ -1871,9 +1871,16 @@ async function renderEditorPreview() {
   ).join("");
   inner.style.width = w + "px";
   inner.innerHTML = sanitizePreviewHtml(`<div style="${b.gridStyle}">${colsHtml}</div>`);
-  const k = Math.min(1, stage.clientWidth / w);
+  // Scale against the stage's content-box width so the stage padding doesn't
+  // bake in horizontal overflow.
+  const stageStyle = getComputedStyle(stage);
+  const stageContentW = stage.clientWidth - parseFloat(stageStyle.paddingLeft) - parseFloat(stageStyle.paddingRight);
+  const k = Math.min(1, stageContentW / w);
   inner.style.transform = `scale(${k})`;
   inner.style.transformOrigin = "top left";
+  // transform doesn't affect layout: shrink the layout box to the scaled
+  // footprint or the stage shows scrollbars/dead space around the preview.
+  inner.style.height = (inner.scrollHeight * k) + "px";
   if (window.updateOverflowBadges) window.updateOverflowBadges();
   initPreviewDrag();
 }
