@@ -144,6 +144,12 @@
       ]
     }
   },
+  "panels": {
+    "home": [["clock", "presence", "oncall"], ["weather", "roomMonitors"], ["radar", "doors"]],
+    "control": [["scenes"], ["quickControls", "media"], ["scripts"]],
+    "security": [["cameras", "security"]],
+    "status": [["environment"], ["system"]]
+  },
   "sectionOrder": [
     "home",
     "scenes",

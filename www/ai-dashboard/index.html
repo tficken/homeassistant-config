@@ -284,8 +284,73 @@ input[type="range"] { accent-color: var(--green); }
 </div>
 
 <script>
+// Layout model: screen -> array of columns -> ordered panel ids.
+const DEFAULT_PANELS = {
+  home:    [["clock", "presence", "oncall"], ["weather", "roomMonitors"], ["radar", "doors"]],
+  control: [["scenes"], ["quickControls", "media"], ["scripts"]],
+  security: [["cameras", "security"]],
+  status:  [["environment"], ["system"]]
+};
+
+// Panel id -> how the panel is backed. kinds:
+//   section — entities live in config.sections[section] (presence: title/icon from
+//             sections.presence but entities from sections.home filtered to
+//             person.*/device_tracker.* — see getPresenceEntities())
+//   fixed   — built-in panel, not entity-editable (clock, radar)
+//   entity  — single entity from config.entities[entityKey] (set in Appearance tab)
+//   auto    — self-populating (oncall detects calendar.* entities)
+const PANEL_REGISTRY = {
+  clock:        { kind: "fixed", note: "built in" },
+  radar:        { kind: "fixed", note: "built in" },
+  oncall:       { kind: "auto", note: "auto-detects calendar.* entities" },
+  weather:      { kind: "entity", entityKey: "weather", note: "entity set in Appearance tab" },
+  media:        { kind: "entity", entityKey: "mediaPlayer", note: "entity set in Appearance tab" },
+  presence:     { kind: "section", section: "home", filter: "person" },
+  roomMonitors: { kind: "section", section: "roomMonitors" },
+  doors:        { kind: "section", section: "doors" },
+  scenes:       { kind: "section", section: "scenes" },
+  quickControls:{ kind: "section", section: "quickControls" },
+  scripts:      { kind: "section", section: "scripts" },
+  cameras:      { kind: "section", section: "cameras" },
+  security:     { kind: "section", section: "security" },
+  environment:  { kind: "section", section: "environment" },
+  system:       { kind: "section", section: "system" }
+};
+
+// Resolve the effective layout for a screen: config.panels if valid, else the
+// defaults; unknown panel ids dropped, missing default panels re-appended at
+// their default column/index. Pure — never mutates config.
+function effectivePanels(screen) {
+  const defaults = DEFAULT_PANELS[screen] || [];
+  const raw = config.panels && config.panels[screen];
+  const cols = (Array.isArray(raw) && raw.length && raw.every(Array.isArray))
+    ? raw.map(col => col.filter(id => PANEL_REGISTRY[id]))
+    : defaults.map(col => col.slice());
+  const present = new Set(cols.flat());
+  defaults.forEach((col, ci) => {
+    col.forEach((id, pi) => {
+      if (!present.has(id)) {
+        const target = cols[ci] || (cols[ci] = []);
+        target.splice(Math.min(pi, target.length), 0, id);
+        present.add(id);
+      }
+    });
+  });
+  return cols;
+}
+
+// Copy the resolved layout into config.panels so a later save persists the full
+// model (the editor calls this before its first mutation).
+function ensureConfigPanels() {
+  config.panels = config.panels || {};
+  for (const screen of Object.keys(DEFAULT_PANELS)) {
+    config.panels[screen] = effectivePanels(screen).map(col => col.slice());
+  }
+}
+
 const DEFAULT_CONFIG = {
   theme: { backgroundImage: "", accentColor: "#2dd4bf" },
+  panels: DEFAULT_PANELS,
   layout: { clock24h: false },
   entities: {
     weather: "weather.forecast_home",
@@ -1233,7 +1298,7 @@ function buildHomePanels() {
 function renderHomeScreen() {
   const b = buildHomePanels();
   const main = `${renderAlertBanner(getAlerts())}${assembleColumns(b.panels,
-    [["clock", "presence", "oncall"], ["weather", "roomMonitors"], ["radar", "doors"]],
+    effectivePanels("home"),
     b.gridStyle, b.colStyles)}`;
   document.getElementById("home-screen").innerHTML = main;
   initRadarMap();
@@ -1275,7 +1340,7 @@ function buildControlPanels() {
 function renderControlScreen() {
   const b = buildControlPanels();
   document.getElementById("control-screen").innerHTML = assembleColumns(b.panels,
-    [["scenes"], ["quickControls", "media"], ["scripts"]], b.gridStyle, b.colStyles);
+    effectivePanels("control"), b.gridStyle, b.colStyles);
 }
 
 async function buildStatusPanels() {
@@ -1361,7 +1426,7 @@ async function renderStatusScreen() {
   await fetchHistory(historyIds, 24);
   const b = await buildStatusPanels();
   document.getElementById("status-screen").innerHTML = assembleColumns(b.panels,
-    [["environment"], ["system"]], b.gridStyle, b.colStyles);
+    effectivePanels("status"), b.gridStyle, b.colStyles);
 }
 
 function buildSecurityPanels() {
@@ -1394,7 +1459,7 @@ function buildSecurityPanels() {
 function renderSecurityScreen() {
   const b = buildSecurityPanels();
   document.getElementById("security-screen").innerHTML = assembleColumns(b.panels,
-    [["cameras", "security"]], b.gridStyle, b.colStyles);
+    effectivePanels("security"), b.gridStyle, b.colStyles);
 }
 
 async function showScreen(name) {
@@ -1411,29 +1476,22 @@ async function showScreen(name) {
 }
 
 function entityBelongsToScreen(entityId, screen) {
-  const sectionMap = {
-    home: [
-      config.entities.weather,
-      ...getPresenceEntities(),
-      ...((config.sections.doors && config.sections.doors.entities) || []),
-      ...((config.sections.roomMonitors && config.sections.roomMonitors.entities) || [])
-    ],
-    control: [
-      ...((config.sections.scenes && config.sections.scenes.entities) || []),
-      ...((config.sections.scripts && config.sections.scripts.entities) || []),
-      ...((config.sections.quickControls && config.sections.quickControls.entities) || []),
-      config.entities.mediaPlayer
-    ],
-    security: [
-      ...((config.sections.cameras && config.sections.cameras.entities) || []),
-      ...((config.sections.security && config.sections.security.entities) || [])
-    ],
-    status: [
-      ...((config.sections.environment && config.sections.environment.entities) || []),
-      ...((config.sections.system && config.sections.system.entities) || [])
-    ]
-  };
-  const ids = sectionMap[screen] || [];
+  // Base membership derives from the effective panel layout, so moved panels
+  // keep receiving in-place card updates on their new screen.
+  const ids = [];
+  for (const col of effectivePanels(screen)) {
+    for (const pid of col) {
+      const p = PANEL_REGISTRY[pid];
+      if (!p) continue;
+      if (p.kind === "section") {
+        ids.push(...(pid === "presence"
+          ? getPresenceEntities()
+          : ((config.sections[p.section] && config.sections[p.section].entities) || [])));
+      } else if (p.kind === "entity" && config.entities[p.entityKey]) {
+        ids.push(config.entities[p.entityKey]);
+      }
+    }
+  }
   if (ids.includes(entityId)) return true;
   if (screen === "home") {
     if (entityId.startsWith("calendar.")) return true;

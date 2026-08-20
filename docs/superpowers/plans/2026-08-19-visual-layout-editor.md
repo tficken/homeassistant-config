@@ -131,16 +131,16 @@ function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
 - `effectivePanels(screen)` → defensive-merge resolver: start from `config.panels[screen]` if it is a non-empty array of arrays, else deep-copy `DEFAULT_PANELS[screen]`; drop ids not in `PANEL_REGISTRY`; append registry panels present in `DEFAULT_PANELS[screen]` but missing from the result at their default column/index. Pure — does not mutate config.
 - `ensureConfigPanels()` → copies `effectivePanels(s)` for all four screens into `config.panels` (used by the editor before its first mutation so the full model is written on save).
 
-- [ ] **Step 1: Add `PANEL_REGISTRY`, `DEFAULT_PANELS`, `effectivePanels`, `ensureConfigPanels`** just below `DEFAULT_CONFIG` (~L309). Add `panels: DEFAULT_PANELS` to `DEFAULT_CONFIG` (assign via `JSON.parse(JSON.stringify(...))` semantics — i.e. in `DEFAULT_CONFIG` write `panels: DEFAULT_PANELS` and rely on `loadConfig`'s deep copy; do NOT remove `sectionOrder` yet — that is Task 6).
-- [ ] **Step 2: Writers consume the model.** In each of the four writers (Task 1), replace the hardcoded column literal with `effectivePanels("<screen>")`, e.g. `assembleColumns(b.panels, effectivePanels("home"), b.gridStyle, b.colStyles)`.
-- [ ] **Step 3: Rewrite `entityBelongsToScreen` (~L1369)** to derive base membership from the effective layout instead of the hardcoded `sectionMap`: for the given screen, collect entity ids from each panel in `effectivePanels(screen)` — `section` panels → `config.sections[section].entities` (presence → `getPresenceEntities()`), `entity` panels → the configured entity id, `auto`/`fixed` → none. Keep the existing special cases unchanged: home also matches `calendar.*` plus security/system section ids (alert banner reads those sections regardless of panel placement), status also matches `sensor.*_print_status`/`print_progress`/`remaining_time`.
-- [ ] **Step 4: Proxy one-liner.** In `custom_components/ai_dashboard_proxy/http.py` ~L380, change:
+- [x] **Step 1: Add `PANEL_REGISTRY`, `DEFAULT_PANELS`, `effectivePanels`, `ensureConfigPanels`** just below `DEFAULT_CONFIG` (~L309). Add `panels: DEFAULT_PANELS` to `DEFAULT_CONFIG` (assign via `JSON.parse(JSON.stringify(...))` semantics — i.e. in `DEFAULT_CONFIG` write `panels: DEFAULT_PANELS` and rely on `loadConfig`'s deep copy; do NOT remove `sectionOrder` yet — that is Task 6).
+- [x] **Step 2: Writers consume the model.** In each of the four writers (Task 1), replace the hardcoded column literal with `effectivePanels("<screen>")`, e.g. `assembleColumns(b.panels, effectivePanels("home"), b.gridStyle, b.colStyles)`.
+- [x] **Step 3: Rewrite `entityBelongsToScreen` (~L1369)** to derive base membership from the effective layout instead of the hardcoded `sectionMap`: for the given screen, collect entity ids from each panel in `effectivePanels(screen)` — `section` panels → `config.sections[section].entities` (presence → `getPresenceEntities()`), `entity` panels → the configured entity id, `auto`/`fixed` → none. Keep the existing special cases unchanged: home also matches `calendar.*` plus security/system section ids (alert banner reads those sections regardless of panel placement), status also matches `sensor.*_print_status`/`print_progress`/`remaining_time`.
+- [x] **Step 4: Proxy one-liner.** In `custom_components/ai_dashboard_proxy/http.py` ~L380, change:
   ```python
   CONFIG_KEYS = {"theme", "layout", "entities", "sections", "sectionOrder", "dock", "presenceLabels", "labels", "panels"}
   ```
   (Leave `"sectionOrder"` in place for backward compatibility; it becomes unused in Task 6.)
-- [ ] **Step 5: `config.json` defaults.** Add the default `panels` object (same shape as `DEFAULT_PANELS`) after the `"sections"` block in `www/ai-dashboard/config.json`. Do not remove `"sectionOrder"` yet (Task 6).
-- [ ] **Step 6: Validate.**
+- [x] **Step 5: `config.json` defaults.** Add the default `panels` object (same shape as `DEFAULT_PANELS`) after the `"sections"` block in `www/ai-dashboard/config.json`. Do not remove `"sectionOrder"` yet (Task 6).
+- [x] **Step 6: Validate.**
   ```bash
   sed -n '/^<script>$/,/^<\/script>$/p' www/ai-dashboard/index.html | sed '1d;$d' > /tmp/dash-inline.js && .tools/node/node.exe --check /tmp/dash-inline.js && echo "JS syntax OK"
   py -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
@@ -149,7 +149,7 @@ function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
   py -m compileall custom_components/ai_dashboard_proxy -q
   ```
   Manual spot-check: hard refresh; all four screens unchanged (defaults == old hardcoded layout).
-- [ ] **Step 7: Commit.**
+- [x] **Step 7: Commit.**
   ```bash
   git add www/ai-dashboard/index.html www/ai-dashboard/config.json custom_components/ai_dashboard_proxy/http.py
   git commit -m "feat(ai-dashboard): add config.panels layout model with defensive defaults

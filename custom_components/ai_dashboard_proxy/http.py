@@ -377,7 +377,7 @@ async def history_handler(request: web.Request) -> web.StreamResponse:
         )
 
 
-CONFIG_KEYS = {"theme", "layout", "entities", "sections", "sectionOrder", "dock", "presenceLabels", "labels"}
+CONFIG_KEYS = {"theme", "layout", "entities", "sections", "sectionOrder", "dock", "presenceLabels", "labels", "panels"}
 
 ALLOWED_SERVICE_DOMAINS = {
     "light",
