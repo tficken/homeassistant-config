@@ -1976,14 +1976,16 @@ function wireTitleEdit(title, key) {
     let changed = false;
     iconInput.addEventListener("change", () => { changed = true; setSectionProp(key, "icon", iconInput.value); });
     titleInput.addEventListener("change", () => { changed = true; setSectionProp(key, "title", titleInput.value); });
-    title.addEventListener("focusout", () => {
+    const onFocusOut = () => {
       // Defer so focus moving between the two inputs doesn't restore early.
       setTimeout(() => {
         if (title.contains(document.activeElement)) return;
+        title.removeEventListener("focusout", onFocusOut);
         if (changed) buildSettings();
         else title.innerHTML = original;
       }, 0);
-    });
+    };
+    title.addEventListener("focusout", onFocusOut);
   });
 }
 
@@ -2002,7 +2004,11 @@ function decoratePreviewPanels(inner) {
     const panelId = panel.getAttribute("data-panel-id");
     const entry = PANEL_REGISTRY[panelId];
     if (!entry) return;
-    const title = panel.querySelector(".panel-title");
+    // The panel's own title chrome only — skip .panel-title elements hosted by
+    // entity cards inside the panel (camera feed cards render their own name
+    // titles; the cameras panel itself has no title, so it gets no note chip
+    // or title editing — panel dragging still works via the cards' titles).
+    const title = [...panel.querySelectorAll(".panel-title")].find(t => !t.closest("[data-entity-id]"));
     if (entry.note && title && !title.querySelector(".preview-note")) {
       const note = document.createElement("span");
       note.className = "preview-note";
@@ -2042,7 +2048,9 @@ function decoratePreviewPanels(inner) {
       btn.title = "Remove from section";
       btn.addEventListener("click", ev => {
         ev.stopPropagation();
-        const key = sectionOfEntity(id);
+        // Remove from this card's own panel section (exact), falling back to
+        // the first section containing the id.
+        const key = section || sectionOfEntity(id);
         if (key) removeSectionEntity(key, id); // re-renders dashboard + settings
       });
       card.appendChild(btn);
