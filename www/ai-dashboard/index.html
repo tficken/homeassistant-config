@@ -291,6 +291,10 @@ input[type="range"] { accent-color: var(--green); }
 
 <script>
 // Layout model: screen -> array of columns -> ordered panel ids.
+// Known limitation: panels can move within/between columns of their own screen
+// only — each screen's builder builds only its own panels, so moving a panel
+// to a different screen (hand-edited config.panels) renders an empty slot there
+// while effectivePanels re-appends it on its default screen.
 const DEFAULT_PANELS = {
   home:    [["clock", "presence", "oncall"], ["weather", "roomMonitors"], ["radar", "doors"]],
   control: [["scenes"], ["quickControls", "media"], ["scripts"]],
@@ -2072,7 +2076,21 @@ function decoratePreviewPanels(inner) {
     // entity cards inside the panel (camera feed cards render their own name
     // titles; the cameras panel itself has no title, so it gets no note chip
     // or title editing — panel dragging still works via the cards' titles).
-    const title = [...panel.querySelectorAll(".panel-title")].find(t => !t.closest("[data-entity-id]"));
+    let title = [...panel.querySelectorAll(".panel-title")].find(t => !t.closest("[data-entity-id]"));
+    if (!title && !panel.querySelector(".panel-title")) {
+      // Headerless panel (no .panel-title anywhere — the clock today; cameras
+      // is deliberately excluded: its card-hosted titles are the drag handles
+      // by design). Inject an editor-only handle bar with the panel name so
+      // the existing [data-panel-id] .panel-title drag wiring and note-chip
+      // logic below pick it up. Preview-only chrome — live builder markup is
+      // untouched, so the live screens stay pixel-identical.
+      const handle = document.createElement("div");
+      handle.className = "panel-title preview-injected-handle";
+      handle.style.cssText = "color:var(--text-muted);font-size:0.7rem;font-family:var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;";
+      handle.textContent = panelId;
+      panel.prepend(handle);
+      title = handle;
+    }
     if (entry.note && title && !title.querySelector(".preview-note")) {
       const note = document.createElement("span");
       note.className = "preview-note";
