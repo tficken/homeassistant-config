@@ -213,6 +213,7 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
 #preview-stage [data-panel-id].drop-before { box-shadow: 0 -2px 0 var(--accent); }
 #preview-stage [data-panel-id].dragging { opacity: 0.4; }
 #preview-stage .panel-title { cursor: grab; user-select: none; touch-action: none; }
+[data-preview-col].preview-overflow [data-panel-id] { outline: 1px solid var(--amber); }
 #preview-stage [data-entity-id].drop-before { box-shadow: 0 -2px 0 var(--accent); }
 #preview-stage [data-entity-id].dragging { opacity: 0.4; }
 input, select {
@@ -1052,12 +1053,14 @@ function renderDock() {
 
 // Assemble a screen grid from prebuilt panel HTML. `columns` is an array of
 // columns, each an ordered array of panel ids; every panel string's outermost
-// element carries data-panel-id (inert live, used by the layout editor).
+// element carries data-panel-id (inert live, used by the layout editor). The
+// outer grid div carries data-screen-grid so the editor's overflow check can
+// measure the live grid's available height.
 function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
   const cols = columns.map((col, i) =>
     `<div style="${colStyles[i]}">${col.map(id => panelHtml[id] || "").join("")}</div>`
   ).join("");
-  return `<div style="${gridStyle}">${cols}</div>`;
+  return `<div data-screen-grid style="${gridStyle}">${cols}</div>`;
 }
 
 // ---- Screens ----
@@ -1879,8 +1882,12 @@ async function renderEditorPreview() {
   const colsHtml = effectivePanels(screen).map((col, i) =>
     `<div data-preview-col="${i}" style="${b.colStyles[i]}">${col.map(id => b.panels[id] || "").join("")}</div>`
   ).join("");
+  // Sanitize once and share the exact same HTML with the hidden measure
+  // container so overflow math reflects the current (post-edit) effective
+  // layout, never a stale cache.
+  const sanitized = sanitizePreviewHtml(`<div style="${b.gridStyle}">${colsHtml}</div>`);
   inner.style.width = w + "px";
-  inner.innerHTML = sanitizePreviewHtml(`<div style="${b.gridStyle}">${colsHtml}</div>`);
+  inner.innerHTML = sanitized;
   // Scale against the stage's content-box width so the stage padding doesn't
   // bake in horizontal overflow.
   const stageStyle = getComputedStyle(stage);
@@ -1892,8 +1899,94 @@ async function renderEditorPreview() {
   // footprint or the stage shows scrollbars/dead space around the preview.
   inner.style.height = (inner.scrollHeight * k) + "px";
   decoratePreviewPanels(inner);
-  if (window.updateOverflowBadges) window.updateOverflowBadges();
+  if (window.updateOverflowBadges) window.updateOverflowBadges(sanitized, w);
   initPreviewDrag();
+}
+
+// Measured overflow warning for the layout preview. Recomputes on every
+// renderEditorPreview (editor open, tab switch, every edit).
+//
+// IMPORTANT: all offsetHeight reads happen on the persistent hidden
+// #preview-measure container — a 1.0-scale offscreen clone of the preview HTML
+// — never on the scaled preview DOM. transform: scale() does not affect layout,
+// so measuring the scaled DOM would technically give the same numbers, but
+// injecting/clearing badges in the visible preview while reading heights from
+// it would invite layout thrash and feedback loops; the offscreen clone keeps
+// measurement and badge mutation fully separate.
+//
+// Caveat: the measurement reflects CURRENT content only. It cannot predict
+// future states — e.g. printer cards that appear mid-print or the on-call panel
+// that appears when a shift starts — so a layout that fits now may overflow
+// later, and one that overflows now may be fine in practice.
+function updateOverflowBadges(html, width) {
+  const inner = document.getElementById("preview-stage-inner");
+  if (!inner) return;
+  // Clear previous badges/classes at the start of each recompute.
+  inner.querySelectorAll(".overflow-badge").forEach(el => el.remove());
+  inner.querySelectorAll("[data-preview-col].preview-overflow")
+    .forEach(col => col.classList.remove("preview-overflow"));
+
+  // Persistent hidden measure container, created once. visibility:hidden keeps
+  // it laid out (measurable) but invisible; left:-10000px keeps it offscreen.
+  let measure = document.getElementById("preview-measure");
+  if (!measure) {
+    measure = document.createElement("div");
+    measure.id = "preview-measure";
+    measure.setAttribute("aria-hidden", "true");
+    measure.style.cssText = "position:absolute;left:-10000px;top:0;visibility:hidden;";
+    document.body.appendChild(measure);
+  }
+
+  // Width fallback mirrors renderEditorPreview: a hidden screen (display:none)
+  // reports clientWidth 0, so fall back to the active screen, which shares the
+  // same container and therefore width.
+  const live = document.getElementById(editorScreen + "-screen");
+  let w = width || (live ? live.clientWidth : 0);
+  if (!w) {
+    const active = document.querySelector(".screen.active");
+    w = active && active.clientWidth ? active.clientWidth : 0;
+  }
+  // Available height = the live grid's clientHeight (the grid is the flex:1
+  // child of the screen, so this already excludes dock/banner/alert chrome).
+  // Same hidden-screen caveat as width: fall back to the active screen's grid —
+  // same flex container, so same height (unless home's alert banner is showing,
+  // in which case the fallback is only approximate).
+  let grid = live ? live.querySelector("[data-screen-grid]") : null;
+  let avail = grid ? grid.clientHeight : 0;
+  if (!avail) {
+    const activeGrid = document.querySelector(".screen.active [data-screen-grid]");
+    avail = activeGrid ? activeGrid.clientHeight : 0;
+  }
+  if (!w || !avail) return; // nothing reliable to measure against; skip badging
+
+  measure.style.width = w + "px";
+  // `html` is the pristine sanitized render passed by renderEditorPreview.
+  // inner.innerHTML is only a defensive fallback (it includes editor
+  // affordances like × buttons/entity strips, which would skew heights).
+  measure.innerHTML = html || inner.innerHTML;
+
+  const previewCols = inner.querySelectorAll("[data-preview-col]");
+  measure.querySelectorAll("[data-preview-col]").forEach((mcol, i) => {
+    const panels = mcol.querySelectorAll(":scope > [data-panel-id]");
+    if (!panels.length) return;
+    // Sum panel heights + inter-panel gaps. Parse the computed row-gap so the
+    // math stays honest if the column CSS changes (NaN for "normal" -> 14px,
+    // the dashboard's standard gap).
+    let gap = parseFloat(getComputedStyle(mcol).rowGap);
+    if (Number.isNaN(gap)) gap = 14;
+    let sum = gap * (panels.length - 1);
+    panels.forEach(p => { sum += p.offsetHeight; });
+    const over = sum - avail;
+    if (over > 0 && previewCols[i]) {
+      const n = Math.ceil(over / 10) * 10;
+      previewCols[i].classList.add("preview-overflow");
+      const badge = document.createElement("div");
+      badge.className = "overflow-badge";
+      badge.style.cssText = "background:rgba(255,174,0,0.15);border:1px solid var(--amber);color:var(--amber);font-family:var(--font-mono);font-size:0.7rem;padding:3px 8px;margin-bottom:6px;";
+      badge.textContent = `⚠ overflows by ~${n}px`;
+      previewCols[i].insertBefore(badge, previewCols[i].firstChild);
+    }
+  });
 }
 
 function applyPanelDrop(panelId, target) {
@@ -2025,7 +2118,19 @@ function decoratePreviewPanels(inner) {
       // section's entities as a footer chip strip instead.
       const ents = (config.sections[section] && config.sections[section].entities) || [];
       const panelBody = panel.querySelector(".panel-body") || panel;
-      if (ents.length && !panelBody.querySelector("[data-entity-strip]")) {
+      if (!ents.length) {
+        // Zero-entity section: muted hint so the empty panel reads as
+        // intentional rather than broken (not an error style).
+        if (!panelBody.querySelector("[data-empty-hint]")) {
+          const hint = document.createElement("div");
+          hint.setAttribute("data-empty-hint", section);
+          hint.style.cssText = "color:var(--text-muted);font-size:0.75rem;font-family:var(--font-mono);";
+          hint.textContent = "no entities — drag from palette";
+          panelBody.appendChild(hint);
+        }
+        return;
+      }
+      if (!panelBody.querySelector("[data-entity-strip]")) {
         const strip = document.createElement("div");
         strip.setAttribute("data-entity-strip", section);
         strip.style.marginTop = "8px";
