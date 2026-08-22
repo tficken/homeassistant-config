@@ -264,21 +264,21 @@ function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
 - Modify: `www/ai-dashboard/config.json`
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1: Delete dead code in `index.html`:**
+- [x] **Step 1: Delete dead code in `index.html`:**
   - `SCREEN_SECTION_GROUPS` const (~L1615–1628) — unreferenced since Task 3.
   - `orderedSectionKeys` (~L477–483) — unreferenced.
   - `sectionOrder` key in `DEFAULT_CONFIG` (~L307).
   - The `sectionOrder` maintenance block in `migrateConfig` (~L434–437).
   - Old `initEditorDrag` remnants now fully superseded: the `"section"` drag kind, `data-drag-section`/`data-section-key`/`data-chip-list` handling, and the section-order branch of `applyDrop` (the old `applyDrop` section-mutation logic was already reused/rewritten in Task 4 — delete whatever is unreachable).
   - CSS for `.editor-section` (~L195–196) and `[data-chip-list].drop-before` (~L197) if no longer referenced (the Task 4 entity strip uses `.entity-chip`, not `data-chip-list`).
-- [ ] **Step 2: Grep to confirm zero stale references** (expected: no hits):
+- [x] **Step 2: Grep to confirm zero stale references** (expected: no hits):
   ```bash
   grep -n "SCREEN_SECTION_GROUPS\|orderedSectionKeys\|sectionOrder\|editor-section\|data-drag-section\|data-drag-chip\|data-chip-list" www/ai-dashboard/index.html
   ```
   (`sectionOrder` may legitimately remain only in `http.py` `CONFIG_KEYS`.)
-- [ ] **Step 3: Remove `"sectionOrder"` from `www/ai-dashboard/config.json`** (the array after `"sections"`). Validate: `py -m json.tool www/ai-dashboard/config.json > /dev/null && echo OK`.
-- [ ] **Step 4: Update `AGENTS.md`** — in the "AI Dashboard Development Workflow" step 0, replace the description of the Layout tab drag board with: the Layout tab is a visual preview editor (screen tabs, drag panels by header between columns/screens, drag entities from palette onto panels, × removes, measured overflow badge). Mention `config.panels` as the layout model and that panel order replaced `sectionOrder`.
-- [ ] **Step 5: Full validation suite:**
+- [x] **Step 3: Remove `"sectionOrder"` from `www/ai-dashboard/config.json`** (the array after `"sections"`). Validate: `py -m json.tool www/ai-dashboard/config.json > /dev/null && echo OK`.
+- [x] **Step 4: Update `AGENTS.md`** — in the "AI Dashboard Development Workflow" step 0, replace the description of the Layout tab drag board with: the Layout tab is a visual preview editor (screen tabs, drag panels by header between columns/screens, drag entities from palette onto panels, × removes, measured overflow badge). Mention `config.panels` as the layout model and that panel order replaced `sectionOrder`.
+- [x] **Step 5: Full validation suite:**
   ```bash
   sed -n '/^<script>$/,/^<\/script>$/p' www/ai-dashboard/index.html | sed '1d;$d' > /tmp/dash-inline.js && .tools/node/node.exe --check /tmp/dash-inline.js && echo "JS syntax OK"
   py -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
@@ -286,7 +286,7 @@ function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
   flake8 custom_components/ai_dashboard_proxy --max-line-length=120 --extend-ignore=E501,W503
   py -m compileall custom_components/ai_dashboard_proxy -q
   ```
-- [ ] **Step 6: Manual browser checklist** (hard refresh `Ctrl+Shift+R` first; do the HA restart before item 6):
+- [x] **Step 6: Manual browser checklist** (hard refresh `Ctrl+Shift+R` first; do the HA restart before item 6):
   1. Settings → Layout: preview matches the live screens 1:1 with default layout.
   2. Drag `doors` panel to column 1 on HOME → dashboard behind modal updates → Save & Apply → hard refresh → persists.
   3. Drag an entity from palette onto a panel; drag a card between panels; × removes; drag to palette removes.
@@ -294,7 +294,7 @@ function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
   5. Preview ID sanitization: live clock keeps ticking and live radar keeps animating while the preview is open.
   6. **Restart Home Assistant** (required for the `CONFIG_KEYS` change in `http.py`), then Save & Apply with a panel change → 200 and `panels` key present in `config.json`.
   7. Regression: temporarily test with a `config.json` lacking `panels` (restore from a `config.json.bak.*`) → all four screens render identically via `DEFAULT_PANELS`.
-- [ ] **Step 7: Commit.**
+- [x] **Step 7: Commit.**
   ```bash
   git add www/ai-dashboard/index.html www/ai-dashboard/config.json AGENTS.md
   git commit -m "refactor(ai-dashboard): remove section-box board and sectionOrder, superseded by panels model"

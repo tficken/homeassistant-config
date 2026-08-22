@@ -150,19 +150,6 @@
     "security": [["cameras", "security"]],
     "status": [["environment"], ["system"]]
   },
-  "sectionOrder": [
-    "home",
-    "scenes",
-    "scripts",
-    "quickControls",
-    "cameras",
-    "security",
-    "doors",
-    "roomMonitors",
-    "environment",
-    "presence",
-    "system"
-  ],
   "dock": {
     "items": [
       {

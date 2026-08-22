@@ -192,9 +192,8 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
 }
 .entity-chip button { background: transparent; border: none; color: var(--text-muted); cursor: pointer; font-size: 0.8rem; }
 .drag-handle { cursor: grab; color: var(--text-muted); padding: 0 6px; user-select: none; touch-action: none; font-family: var(--font-mono); }
-.entity-chip.dragging, .editor-section.dragging { opacity: 0.4; }
-.entity-chip.drop-before, .editor-section.drop-before { box-shadow: 0 -2px 0 var(--accent); }
-[data-chip-list].drop-before { outline: 1px dashed var(--accent); outline-offset: 2px; }
+.entity-chip.dragging { opacity: 0.4; }
+.entity-chip.drop-before { box-shadow: 0 -2px 0 var(--accent); }
 .palette-chip {
   display: flex; align-items: center; gap: 4px;
   background: rgba(255,255,255,0.07); border: 1px solid var(--border);
@@ -206,7 +205,6 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
 .palette-chip.dragging { opacity: 0.4; }
 #palette.drop-before { outline: 1px dashed var(--danger); outline-offset: 2px; }
 #drag-ghost { position: fixed; z-index: 9999; pointer-events: none; opacity: 0.85; box-shadow: 0 4px 16px rgba(0,0,0,0.5); }
-.editor-dragging [data-chip-list] { outline: 1px dotted var(--border); outline-offset: 2px; }
 .editor-dragging #palette { outline: 1px dotted var(--danger); outline-offset: 2px; }
 .editor-dragging [data-preview-col] { outline: 1px dotted var(--border); outline-offset: 2px; }
 [data-preview-col].drop-before { outline: 1px dashed var(--accent); outline-offset: 2px; }
@@ -385,7 +383,6 @@ const DEFAULT_CONFIG = {
     presence: { title: "Presence", icon: "👤", entities: ["binary_sensor.hobeian_zg_204zx", "binary_sensor.hobeian_zg_204zx_2"] },
     system: { title: "System", icon: "⚙️", entities: ["sensor.home_assistant_core_cpu_percent", "sensor.home_assistant_core_memory_percent", "sensor.ha_disk_usage", "vacuum.geordi_la_forge", "vacuum.pooper_litter_box", "update.home_assistant_core_update", "update.home_assistant_operating_system_update", "update.home_assistant_supervisor_update"] }
   },
-  sectionOrder: ["home", "scenes", "scripts", "quickControls", "cameras", "security", "doors", "roomMonitors", "environment", "presence", "system"],
   dock: { items: [{ icon: "⚙️", action: "settings", label: "Settings" }] }
 };
 
@@ -512,10 +509,7 @@ function migrateConfig(cfg) {
     }
     delete cfg.entities.quickControls;
   }
-  const keys = Object.keys(cfg.sections || {});
-  if (!Array.isArray(cfg.sectionOrder)) cfg.sectionOrder = [];
-  cfg.sectionOrder = cfg.sectionOrder.filter(k => keys.includes(k));
-  for (const k of keys) if (!cfg.sectionOrder.includes(k)) cfg.sectionOrder.push(k);
+  delete cfg.sectionOrder; // superseded by config.panels
 }
 
 async function saveConfig() {
@@ -553,14 +547,6 @@ function sectionTitle(key, fallback) {
   const s = config.sections && config.sections[key];
   const t = s && s.title ? String(s.title) : (fallback || key);
   return t.toUpperCase();
-}
-
-function orderedSectionKeys(keys) {
-  const order = Array.isArray(config.sectionOrder) ? config.sectionOrder : [];
-  return keys.slice().sort((a, b) => {
-    const ia = order.indexOf(a), ib = order.indexOf(b);
-    return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
-  });
 }
 
 function entityArea(entityId) {
@@ -1740,21 +1726,6 @@ function renderDataTab() {
   `;
 }
 
-const SCREEN_SECTION_GROUPS = [
-  {
-    screen: "HOME", sections: ["home", "doors", "roomMonitors"],
-    fixed: [
-      { name: "🕐 Clock", note: "built in" },
-      { name: "🌦️ Weather", note: "entity set in Appearance tab" },
-      { name: "📡 Radar", note: "built in" },
-      { name: "📅 On Call", note: "auto-detects calendar.* entities" }
-    ]
-  },
-  { screen: "CONTROL HUB", sections: ["scenes", "scripts", "quickControls"] },
-  { screen: "SECURITY", sections: ["cameras", "security"] },
-  { screen: "STATUS MONITOR", sections: ["environment", "system"] }
-];
-
 let paletteFilter = "";
 let paletteNewOnly = false;
 
@@ -2166,8 +2137,7 @@ function decoratePreviewPanels(inner) {
 // Entity/palette drop: drag to the palette removes from the source section, a
 // card/chip target inserts before it in that card's section, a panel target
 // appends to the panel's section. Fixed/auto/entity panels reject the drop and
-// surface their registry note as a transient hint. Section mutation reuses the
-// old board's applyDrop splice logic.
+// surface their registry note as a transient hint.
 function applyEntityDrop(d, target) {
   const id = d.id;
   const fromKey = d.key;
@@ -2400,178 +2370,6 @@ function removeSectionEntity(key, id) {
   sec.entities = (sec.entities || []).filter(x => x !== id);
   renderAll();
   buildSettings();
-}
-
-function addSectionEntity(key, id) {
-  const sec = config.sections[key];
-  if (!sec) return;
-  sec.entities = sec.entities || [];
-  if (!sec.entities.includes(id)) sec.entities.push(id);
-  renderAll();
-  buildSettings();
-}
-
-function initEditorDrag() {
-  const body = document.getElementById("settings-body");
-  if (!body) return;
-  let drag = null;
-
-  body.querySelectorAll(".entity-chip").forEach(chip => {
-    chip.addEventListener("pointerdown", ev => {
-      if (ev.target.closest("button")) return;
-      startDrag(ev, "chip", chip);
-    });
-  });
-  body.querySelectorAll(".palette-chip").forEach(chip => {
-    chip.addEventListener("pointerdown", ev => {
-      if (ev.target.closest("button")) return;
-      startDrag(ev, "palette", chip);
-    });
-  });
-  body.querySelectorAll("[data-drag-section]").forEach(h => {
-    h.addEventListener("pointerdown", ev => startDrag(ev, "section", h.closest(".editor-section")));
-  });
-
-  function startDrag(ev, kind, el) {
-    if (!el) return;
-    ev.preventDefault();
-    const id = kind === "section" ? null : el.getAttribute("data-entity");
-    drag = {
-      kind,
-      el,
-      key: kind === "chip" ? el.getAttribute("data-section")
-        : kind === "palette" ? sectionOfEntity(id)
-        : el.getAttribute("data-section-key"),
-      id,
-      pointerId: ev.pointerId,
-      startX: ev.clientX,
-      startY: ev.clientY,
-      moved: false,
-      ghost: null
-    };
-    document.addEventListener("pointermove", onMove);
-    document.addEventListener("pointerup", onUp, { once: true });
-    document.addEventListener("pointercancel", onCancel, { once: true });
-  }
-
-  function onMove(ev) {
-    if (!drag || ev.pointerId !== drag.pointerId) return;
-    if (!drag.moved && Math.hypot(ev.clientX - drag.startX, ev.clientY - drag.startY) < 6) return;
-    if (!drag.moved) {
-      drag.moved = true;
-      drag.el.classList.add("dragging");
-      body.classList.add("editor-dragging");
-      const ghost = drag.el.cloneNode(true);
-      ghost.id = "drag-ghost";
-      ghost.style.width = drag.el.offsetWidth + "px";
-      document.body.appendChild(ghost);
-      drag.ghost = ghost;
-    }
-    if (drag.ghost) {
-      drag.ghost.style.left = (ev.clientX + 12) + "px";
-      drag.ghost.style.top = (ev.clientY + 12) + "px";
-    }
-    // Auto-scroll the palette or board when dragging near their edges.
-    [document.getElementById("palette-list"), document.getElementById("board")].forEach(sc => {
-      if (!sc) return;
-      const r = sc.getBoundingClientRect();
-      if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) return;
-      if (ev.clientY < r.top + 40) sc.scrollTop -= 12;
-      else if (ev.clientY > r.bottom - 40) sc.scrollTop += 12;
-    });
-    clearIndicators();
-    const target = findDropTarget(ev);
-    if (target) target.classList.add("drop-before");
-  }
-
-  function cleanupDrag(d) {
-    d.el.classList.remove("dragging");
-    if (d.ghost) d.ghost.remove();
-    body.classList.remove("editor-dragging");
-    clearIndicators();
-  }
-
-  function onCancel() {
-    document.removeEventListener("pointermove", onMove);
-    document.removeEventListener("pointerup", onUp);
-    if (!drag) return;
-    const d = drag;
-    drag = null;
-    cleanupDrag(d);
-  }
-
-  function onUp(ev) {
-    document.removeEventListener("pointermove", onMove);
-    document.removeEventListener("pointercancel", onCancel);
-    if (!drag) return;
-    const target = drag.moved ? findDropTarget(ev) : null;
-    const d = drag;
-    drag = null;
-    cleanupDrag(d);
-    if (d.moved && target) {
-      applyDrop(d, target);
-      renderAll();
-      buildSettings();
-    }
-  }
-
-  function findDropTarget(ev) {
-    const el = document.elementFromPoint(ev.clientX, ev.clientY);
-    if (!el) return null;
-    if (drag.kind === "chip" || drag.kind === "palette") {
-      const chip = el.closest(".entity-chip");
-      if (chip && chip !== drag.el) return chip;
-      const list = el.closest("[data-chip-list]");
-      if (list) return list;
-      const palette = el.closest("#palette");
-      if (palette) return palette;
-      return null;
-    }
-    const sec = el.closest(".editor-section");
-    if (sec && sec !== drag.el) return sec;
-    return null;
-  }
-
-  function clearIndicators() {
-    document.querySelectorAll(".drop-before").forEach(x => x.classList.remove("drop-before"));
-  }
-
-  function applyDrop(d, target) {
-    if (d.kind === "chip" || d.kind === "palette") {
-      const id = d.id;
-      const fromKey = d.key;
-      if (target.id === "palette") {
-        if (fromKey && config.sections[fromKey]) {
-          config.sections[fromKey].entities = (config.sections[fromKey].entities || []).filter(x => x !== id);
-        }
-        return;
-      }
-      let toKey, beforeId = null;
-      if (target.classList.contains("entity-chip")) {
-        toKey = target.getAttribute("data-section");
-        beforeId = target.getAttribute("data-entity");
-      } else {
-        toKey = target.getAttribute("data-chip-list");
-      }
-      if (!config.sections[toKey]) return;
-      if (fromKey && config.sections[fromKey]) {
-        config.sections[fromKey].entities = (config.sections[fromKey].entities || []).filter(x => x !== id);
-      }
-      const to = (config.sections[toKey].entities || []).filter(x => x !== id);
-      let index = beforeId ? to.indexOf(beforeId) : -1;
-      if (index === -1) index = to.length;
-      to.splice(index, 0, id);
-      config.sections[toKey].entities = to;
-    } else {
-      const key = d.key;
-      const beforeKey = target.getAttribute("data-section-key");
-      const order = (Array.isArray(config.sectionOrder) ? config.sectionOrder : []).filter(k => k !== key);
-      let index = beforeKey ? order.indexOf(beforeKey) : -1;
-      if (index === -1) index = order.length;
-      order.splice(index, 0, key);
-      config.sectionOrder = order;
-    }
-  }
 }
 
 const NEW_DEVICE_DOMAINS = ["light", "switch", "scene", "script", "fan", "sensor", "binary_sensor", "camera", "media_player", "vacuum", "lock", "cover", "siren", "update"];
