@@ -213,6 +213,8 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
 #preview-stage [data-panel-id].drop-before { box-shadow: 0 -2px 0 var(--accent); }
 #preview-stage [data-panel-id].dragging { opacity: 0.4; }
 #preview-stage .panel-title { cursor: grab; user-select: none; touch-action: none; }
+#preview-stage [data-entity-id].drop-before { box-shadow: 0 -2px 0 var(--accent); }
+#preview-stage [data-entity-id].dragging { opacity: 0.4; }
 input, select {
   background: rgba(255,255,255,0.07); border: 1px solid var(--border); border-radius: 4px;
   padding: 8px 10px; color: var(--text); font-size: 0.9rem;
@@ -351,6 +353,14 @@ function ensureConfigPanels() {
   for (const screen of Object.keys(DEFAULT_PANELS)) {
     config.panels[screen] = effectivePanels(screen).map(col => col.slice());
   }
+}
+
+// Backing config.sections key for a section-kind panel, else null. The
+// presence panel's entities live in sections.home (filtered to
+// person.*/device_tracker.* by getPresenceEntities()), so presence -> "home".
+function panelSection(panelId) {
+  const entry = PANEL_REGISTRY[panelId];
+  return entry && entry.kind === "section" ? entry.section : null;
 }
 
 const DEFAULT_CONFIG = {
@@ -1881,6 +1891,7 @@ async function renderEditorPreview() {
   // transform doesn't affect layout: shrink the layout box to the scaled
   // footprint or the stage shows scrollbars/dead space around the preview.
   inner.style.height = (inner.scrollHeight * k) + "px";
+  decoratePreviewPanels(inner);
   if (window.updateOverflowBadges) window.updateOverflowBadges();
   initPreviewDrag();
 }
@@ -1905,16 +1916,201 @@ function applyPanelDrop(panelId, target) {
   buildSettings();
 }
 
+function refreshEditorAfterEdit() {
+  renderAll();
+  buildSettings();
+}
+
+// Entity chip for the aggregated-panel footer strip — same markup as the old
+// board's chips (drag-handle + name + ×), but wired via listeners because the
+// preview HTML is sanitized of inline handlers. The × carries .preview-remove
+// so the stage click-capture guard lets it through.
+function buildEntityChip(section, id) {
+  const chip = document.createElement("span");
+  chip.className = "entity-chip";
+  chip.setAttribute("data-section", section);
+  chip.setAttribute("data-entity", id);
+  chip.title = id;
+  const handle = document.createElement("span");
+  handle.className = "drag-handle";
+  handle.title = "Drag to reorder, move, or drag back to the palette to remove";
+  handle.textContent = "⠿";
+  chip.appendChild(handle);
+  chip.appendChild(document.createTextNode(friendlyName(id) + " "));
+  const btn = document.createElement("button");
+  btn.className = "preview-remove";
+  btn.setAttribute("data-entity", id);
+  btn.textContent = "×";
+  btn.addEventListener("click", ev => {
+    ev.stopPropagation();
+    removeSectionEntity(section, id);
+  });
+  chip.appendChild(btn);
+  return chip;
+}
+
+// Click a section-kind panel's title to edit its icon/title inline (same input
+// pattern as the old board header). Blur without a change restores the title.
+// The key is the panel id itself: builders render sectionTitle(<panelId>), so
+// the presence panel edits config.sections.presence, NOT home.
+function wireTitleEdit(title, key) {
+  if (title.dataset.editWired) return;
+  title.dataset.editWired = "1";
+  title.addEventListener("click", () => {
+    if (title.querySelector("input")) return; // already editing
+    const sec = config.sections[key] || {};
+    const original = title.innerHTML;
+    const iconInput = document.createElement("input");
+    iconInput.value = sec.icon || "";
+    iconInput.style.cssText = "width:42px;text-align:center;padding:4px;";
+    iconInput.title = "Section icon";
+    const titleInput = document.createElement("input");
+    titleInput.value = sec.title || key;
+    titleInput.style.cssText = "flex:1;min-width:80px;padding:4px 8px;";
+    titleInput.title = "Section title";
+    title.textContent = "";
+    title.appendChild(iconInput);
+    title.appendChild(titleInput);
+    titleInput.focus();
+    titleInput.select();
+    let changed = false;
+    iconInput.addEventListener("change", () => { changed = true; setSectionProp(key, "icon", iconInput.value); });
+    titleInput.addEventListener("change", () => { changed = true; setSectionProp(key, "title", titleInput.value); });
+    title.addEventListener("focusout", () => {
+      // Defer so focus moving between the two inputs doesn't restore early.
+      setTimeout(() => {
+        if (title.contains(document.activeElement)) return;
+        if (changed) buildSettings();
+        else title.innerHTML = original;
+      }, 0);
+    });
+  });
+}
+
+// Post-render editor affordances on the scaled preview: × remove overlays on
+// section-backed entity cards, registry note chips on fixed/auto/entity panel
+// titles, footer entity strips for aggregated panels (roomMonitors renders
+// per-area data-room cells, not per-entity cards), and inline title/icon
+// editing on section-kind panel titles. Runs on the sanitized DOM, so every
+// handler is attached with addEventListener.
+function decoratePreviewPanels(inner) {
+  const weatherMedia = new Set([
+    config.entities && config.entities.weather,
+    config.entities && config.entities.mediaPlayer
+  ].filter(Boolean));
+  inner.querySelectorAll("[data-panel-id]").forEach(panel => {
+    const panelId = panel.getAttribute("data-panel-id");
+    const entry = PANEL_REGISTRY[panelId];
+    if (!entry) return;
+    const title = panel.querySelector(".panel-title");
+    if (entry.note && title && !title.querySelector(".preview-note")) {
+      const note = document.createElement("span");
+      note.className = "preview-note";
+      note.style.cssText = "color:var(--text-muted);font-size:0.65rem;margin-left:8px;";
+      note.textContent = "Ⓘ " + entry.note;
+      title.appendChild(note);
+    }
+    if (entry.kind !== "section") return;
+    const section = entry.section;
+    if (title) wireTitleEdit(title, panelId);
+    const cards = panel.querySelectorAll("[data-entity-id]");
+    if (!cards.length) {
+      // Aggregated panel: no per-entity cards to drag or ×, so surface the
+      // section's entities as a footer chip strip instead.
+      const ents = (config.sections[section] && config.sections[section].entities) || [];
+      const panelBody = panel.querySelector(".panel-body") || panel;
+      if (ents.length && !panelBody.querySelector("[data-entity-strip]")) {
+        const strip = document.createElement("div");
+        strip.setAttribute("data-entity-strip", section);
+        strip.style.marginTop = "8px";
+        for (const id of ents) strip.appendChild(buildEntityChip(section, id));
+        panelBody.appendChild(strip);
+      }
+      return;
+    }
+    cards.forEach(card => {
+      const id = card.getAttribute("data-entity-id");
+      // weather/mediaPlayer are entity-kind panels: not section-editable.
+      if (weatherMedia.has(id)) return;
+      if (card.querySelector(".preview-remove")) return;
+      card.style.position = "relative";
+      const btn = document.createElement("button");
+      btn.className = "preview-remove";
+      btn.setAttribute("data-entity", id);
+      btn.style.cssText = "position:absolute;top:4px;right:4px;z-index:5;background:rgba(0,0,0,0.6);border:1px solid var(--border);color:var(--text-muted);border-radius:4px;padding:0 6px;cursor:pointer;font-family:var(--font-mono);";
+      btn.textContent = "×";
+      btn.title = "Remove from section";
+      btn.addEventListener("click", ev => {
+        ev.stopPropagation();
+        const key = sectionOfEntity(id);
+        if (key) removeSectionEntity(key, id); // re-renders dashboard + settings
+      });
+      card.appendChild(btn);
+    });
+  });
+}
+
+// Entity/palette drop: drag to the palette removes from the source section, a
+// card/chip target inserts before it in that card's section, a panel target
+// appends to the panel's section. Fixed/auto/entity panels reject the drop and
+// surface their registry note as a transient hint. Section mutation reuses the
+// old board's applyDrop splice logic.
+function applyEntityDrop(d, target) {
+  const id = d.id;
+  const fromKey = d.key;
+  if (target.id === "palette") {
+    if (fromKey && config.sections[fromKey]) {
+      config.sections[fromKey].entities = (config.sections[fromKey].entities || []).filter(x => x !== id);
+      refreshEditorAfterEdit();
+    }
+    return;
+  }
+  const panel = target.closest("[data-panel-id]");
+  if (!panel) return;
+  const panelId = panel.getAttribute("data-panel-id");
+  const entry = PANEL_REGISTRY[panelId];
+  if (!entry || entry.kind !== "section") {
+    const titleEl = panel.querySelector(".panel-title");
+    let title = panelId;
+    if (titleEl) {
+      const clone = titleEl.cloneNode(true);
+      clone.querySelectorAll(".preview-note, input").forEach(n => n.remove());
+      title = clone.textContent.trim() || panelId;
+    }
+    setSettingsStatus(`${title}: ${entry && entry.note ? entry.note : "not entity-editable"}`);
+    return;
+  }
+  const beforeId = target.getAttribute("data-entity-id") || target.getAttribute("data-entity");
+  const toKey = target.getAttribute("data-section") || entry.section;
+  if (!config.sections[toKey]) return;
+  if (fromKey && config.sections[fromKey]) {
+    config.sections[fromKey].entities = (config.sections[fromKey].entities || []).filter(x => x !== id);
+  }
+  const to = (config.sections[toKey].entities || []).filter(x => x !== id);
+  let index = beforeId ? to.indexOf(beforeId) : -1;
+  if (index === -1) index = to.length;
+  to.splice(index, 0, id);
+  config.sections[toKey].entities = to;
+  refreshEditorAfterEdit();
+  if (entry.filter === "person") {
+    const domain = id.split(".")[0];
+    if (domain !== "person" && domain !== "device_tracker") {
+      setSettingsStatus("only person/device_tracker entities render in this panel");
+    }
+  }
+}
+
 function initPreviewDrag() {
   const body = document.getElementById("settings-body");
   if (!body) return;
   const stage = document.getElementById("preview-stage");
   // Belt-and-braces against any missed inline handlers (sanitization already
-  // strips them; .panel-title clicks are wired in Task 4).
+  // strips them). .panel-title clicks (inline title editing) and
+  // .preview-remove clicks (× overlays / strip chips) are let through.
   if (stage && !stage.dataset.clickGuard) {
     stage.dataset.clickGuard = "1";
     stage.addEventListener("click", e => {
-      if (!e.target.closest(".panel-title")) {
+      if (!e.target.closest(".panel-title") && !e.target.closest(".preview-remove")) {
         e.preventDefault();
         e.stopPropagation();
       }
@@ -1928,24 +2124,61 @@ function initPreviewDrag() {
       startDrag(ev, "palette", chip);
     });
   });
-  if (stage) stage.querySelectorAll("[data-panel-id] .panel-title").forEach(title => {
-    if (title.dataset.dragWired) return;
-    title.dataset.dragWired = "1";
-    title.addEventListener("pointerdown", ev => {
-      const panel = ev.target.closest("[data-panel-id]");
-      if (panel) startDrag(ev, "panel", panel);
+  if (stage) {
+    stage.querySelectorAll("[data-panel-id] .panel-title").forEach(title => {
+      if (title.dataset.dragWired) return;
+      title.dataset.dragWired = "1";
+      title.addEventListener("pointerdown", ev => {
+        // Don't start a panel drag from the inline icon/title inputs (title
+        // edit mode) or buttons.
+        if (ev.target.closest("input") || ev.target.closest("button")) return;
+        const panel = ev.target.closest("[data-panel-id]");
+        if (panel) startDrag(ev, "panel", panel);
+      });
     });
-  });
+    // Entity drag sources: [data-entity-id] cards and footer-strip chips in
+    // section-kind panels. A card's own .panel-title stays a panel-drag handle
+    // (e.g. camera cards drag the cameras panel by their title).
+    stage.querySelectorAll("[data-entity-id], .entity-chip[data-entity]").forEach(el => {
+      if (el.dataset.dragWired) return;
+      const chipSection = el.getAttribute("data-section");
+      const panel = el.closest("[data-panel-id]");
+      const entry = panel && PANEL_REGISTRY[panel.getAttribute("data-panel-id")];
+      if (!chipSection && (!entry || entry.kind !== "section")) return;
+      el.dataset.dragWired = "1";
+      el.addEventListener("pointerdown", ev => {
+        if (ev.target.closest(".preview-remove") || ev.target.closest("input")) return;
+        if (ev.target.closest(".panel-title")) return;
+        startDrag(ev, "entity", el);
+      });
+    });
+  }
   let drag = null;
 
   function startDrag(ev, kind, el) {
     if (!el) return;
     ev.preventDefault();
-    const id = el.getAttribute(kind === "panel" ? "data-panel-id" : "data-entity");
+    let id, key = null;
+    if (kind === "panel") {
+      id = el.getAttribute("data-panel-id");
+    } else {
+      id = el.getAttribute("data-entity-id") || el.getAttribute("data-entity");
+      if (kind === "palette") {
+        key = sectionOfEntity(id);
+      } else {
+        // Source section of an entity card/chip: explicit data-section on
+        // strip chips, else the backing section of its panel.
+        key = el.getAttribute("data-section");
+        if (!key) {
+          const panel = el.closest("[data-panel-id]");
+          key = panel ? panelSection(panel.getAttribute("data-panel-id")) : null;
+        }
+      }
+    }
     drag = {
       kind,
       el,
-      key: kind === "palette" ? sectionOfEntity(id) : null,
+      key,
       id,
       pointerId: ev.pointerId,
       startX: ev.clientX,
@@ -2012,15 +2245,24 @@ function initPreviewDrag() {
     const d = drag;
     drag = null;
     cleanupDrag(d);
-    if (d.moved && target && d.kind === "panel") {
-      applyPanelDrop(d.id, target);
+    if (d.moved && target) {
+      if (d.kind === "panel") applyPanelDrop(d.id, target);
+      else applyEntityDrop(d, target);
     }
   }
 
   function findDropTarget(ev) {
-    if (drag.kind !== "panel") return null; // palette drags no-op until Task 4
     const el = document.elementFromPoint(ev.clientX, ev.clientY);
     if (!el || !stage) return null;
+    if (drag.kind === "entity" || drag.kind === "palette") {
+      const palette = el.closest("#palette");
+      if (palette) return palette;
+      const card = el.closest("[data-entity-id], .entity-chip[data-entity]");
+      if (card && stage.contains(card) && card !== drag.el) return card;
+      const panel = el.closest("[data-panel-id]");
+      if (panel && stage.contains(panel)) return panel;
+      return null;
+    }
     const panel = el.closest("[data-panel-id]");
     if (panel && stage.contains(panel) && panel !== drag.el) return panel;
     const colEl = el.closest("[data-preview-col]");
