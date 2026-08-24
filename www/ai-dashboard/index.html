@@ -2155,10 +2155,12 @@ function decoratePreviewPanels(inner) {
 // Entity/palette drop: drag to the palette removes from the source section, a
 // card/chip target inserts before it in that card's section, a panel target
 // appends to the panel's section. Fixed/auto/entity panels reject the drop and
-// surface their registry note as a transient hint.
+// surface their registry note as a transient hint. Palette drags ADD (copy) —
+// an entity may live in multiple sections — while card/chip drags MOVE.
 function applyEntityDrop(d, target) {
   const id = d.id;
-  const fromKey = d.key;
+  const isAdd = d.kind === "palette";
+  const fromKey = isAdd ? null : d.key;
   if (target.id === "palette") {
     if (fromKey && config.sections[fromKey]) {
       config.sections[fromKey].entities = (config.sections[fromKey].entities || []).filter(x => x !== id);
