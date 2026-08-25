@@ -402,6 +402,11 @@ let config = {};
 let token = "";
 let ws = null;
 let reconnectDelay = 1000;
+let reconnectTimer = null;
+let pingTimer = null;
+let awaitingPong = false;
+let pongSeen = false;
+let hiddenAt = null;
 let states = {};
 let areas = [];
 let entities = [];
@@ -732,7 +737,6 @@ function setStatus(cls) {
 }
 
 function toggleEntity(entityId) {
-  if (!ws) return;
   const domain = entityId.split(".")[0];
   let service = "toggle";
   if (["scene","script","button"].includes(domain)) service = "turn_on";
@@ -741,18 +745,16 @@ function toggleEntity(entityId) {
     const st = states[entityId] && states[entityId].state;
     service = st === "locked" ? "unlock" : "lock";
   }
-  ws.send(JSON.stringify({ id: Date.now(), type: "call_service", domain, service, service_data: { entity_id: entityId } }));
+  sendWs({ id: Date.now(), type: "call_service", domain, service, service_data: { entity_id: entityId } });
 }
 
 function mediaCmd(eid, service) {
-  if (!ws) return;
-  ws.send(JSON.stringify({ id: Date.now(), type: "call_service", domain: "media_player", service, service_data: { entity_id: eid } }));
+  sendWs({ id: Date.now(), type: "call_service", domain: "media_player", service, service_data: { entity_id: eid } });
 }
 
 function setBrightness(entityId, pct) {
-  if (!ws) return;
   const value = Math.round((parseInt(pct, 10) / 100) * 255);
-  ws.send(JSON.stringify({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, brightness: value } }));
+  sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, brightness: value } });
 }
 
 async function fetchRegistry() {
@@ -2486,12 +2488,76 @@ function logout() {
 
 // ---- Connection ----
 
+// Force an immediate reconnect with fresh backoff. If the socket looks open we
+// close it and let onclose schedule the reconnect; if it is already closed we
+// connect now (clearing any pending backoff timer first).
+function forceReconnect() {
+  reconnectDelay = 1000;
+  if (!ws || ws.readyState === WebSocket.CLOSED) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+    connect();
+    return;
+  }
+  try { ws.close(); } catch (e) {}
+}
+
+// Send a message over the live socket. If the socket is not open (half-open
+// connections look fine until a write), surface the disconnect and kick off a
+// reconnect immediately instead of silently discarding the command.
+function sendWs(obj) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    setStatus("disconnected");
+    forceReconnect();
+    return false;
+  }
+  ws.send(JSON.stringify(obj));
+  return true;
+}
+
+// App-level ping watchdog. The proxy answers {type:"ping"} with {type:"pong"}
+// (HA's own WS API does the same natively). If no pong arrives between pings
+// the socket is presumed half-open and closed to trigger reconnect. The
+// watchdog only arms after the first pong is ever seen, so an old proxy that
+// doesn't answer pings degrades gracefully instead of flapping.
+function startPingWatchdog() {
+  clearInterval(pingTimer);
+  awaitingPong = false;
+  pingTimer = setInterval(() => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (awaitingPong && pongSeen) {
+      try { ws.close(); } catch (e) {}
+      return;
+    }
+    awaitingPong = true;
+    ws.send(JSON.stringify({ id: Date.now(), type: "ping" }));
+  }, 25000);
+}
+
+function stopPingWatchdog() {
+  clearInterval(pingTimer);
+  pingTimer = null;
+  awaitingPong = false;
+}
+
+// A suspended wall-panel tablet (iOS freezes timers/sockets) wakes with a dead
+// connection. Reconnect immediately on wake rather than waiting for a tap to
+// discover it.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  const wasHiddenMs = hiddenAt ? Date.now() - hiddenAt : 0;
+  hiddenAt = null;
+  if (wasHiddenMs > 60000 || !ws || ws.readyState !== WebSocket.OPEN) forceReconnect();
+});
+window.addEventListener("pageshow", ev => { if (ev.persisted) forceReconnect(); });
+
 function connectProxy() {
   setStatus("connecting");
   const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ai-dashboard/ws";
   ws = new WebSocket(url);
   ws.onopen = () => {
     setStatus("connected");
+    startPingWatchdog();
     // The proxy pushes the full state list ({id: 1, type: "result"}) on connect
     // and forwards every state_changed event unprompted, so the client sends
     // neither get_states nor subscribe_events here.
@@ -2504,6 +2570,7 @@ function connectProxy() {
       console.warn("dropping malformed WS frame", e);
       return;
     }
+    if (msg.type === "pong") { awaitingPong = false; pongSeen = true; return; }
     if (msg.type === "result" && msg.id === 1 && msg.success) {
       states = {};
       for (const s of msg.result) states[s.entity_id] = s;
@@ -2517,8 +2584,10 @@ function connectProxy() {
     }
   };
   ws.onclose = () => {
+    stopPingWatchdog();
     setStatus("disconnected");
-    setTimeout(connectProxy, Math.min(reconnectDelay, 30000));
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connectProxy, Math.min(reconnectDelay, 30000));
     reconnectDelay *= 2;
   };
   ws.onerror = () => { setStatus("disconnected"); ws.close(); };
@@ -2538,8 +2607,10 @@ function connect() {
       console.warn("dropping malformed WS frame", e);
       return;
     }
+    if (msg.type === "pong") { awaitingPong = false; pongSeen = true; return; }
     if (msg.type === "auth_ok") {
       setStatus("connected");
+      startPingWatchdog();
       ws.send(JSON.stringify({ id: 1, type: "get_states" }));
       ws.send(JSON.stringify({ id: 2, type: "subscribe_events", event_type: "state_changed" }));
       await fetchRegistry();
@@ -2556,8 +2627,10 @@ function connect() {
     }
   };
   ws.onclose = () => {
+    stopPingWatchdog();
     setStatus("disconnected");
-    setTimeout(connect, Math.min(reconnectDelay, 30000));
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connect, Math.min(reconnectDelay, 30000));
     reconnectDelay *= 2;
   };
   ws.onerror = () => { setStatus("disconnected"); ws.close(); };

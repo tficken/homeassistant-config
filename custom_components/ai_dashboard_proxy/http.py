@@ -238,6 +238,16 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
                 # The proxy is already authenticated to HA; ignore client auth.
                 continue
 
+            if msg_type == "ping":
+                # App-level heartbeat: lets the dashboard client detect and
+                # recover half-open sockets (e.g. after a tablet wakes from
+                # sleep) instead of waiting for a failed write.
+                await ws.send_json(
+                    {"id": data.get("id", 0), "type": "pong"},
+                    dumps=json_dumps,
+                )
+                continue
+
             if msg_type == "call_service":
                 domain = data.get("domain")
                 service = data.get("service")
