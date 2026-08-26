@@ -1000,7 +1000,10 @@ async function initRadarMap() {
     const useFrames = frames.slice(-8);
     const layers = useFrames.map(f =>
       window.L.tileLayer(`${data.host}${f.path}/256/{z}/{x}/{y}/7/1_1.png`, {
-        opacity: 0, maxZoom: 10, minZoom: 3
+        // RainViewer renders radar natively only up to z7 — past that it
+        // serves a "zoom not supported" placeholder. maxNativeZoom upscales
+        // the z7 tiles instead.
+        opacity: 0, maxZoom: 10, maxNativeZoom: 7, minZoom: 3
       }).addTo(map)
     );
 
