@@ -293,6 +293,45 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     return ws
 
 
+async def cam_stream_handler(request: web.Request) -> web.StreamResponse:
+    """Proxy a camera's live MJPEG stream for the dashboard.
+
+    /api/camera_proxy_stream requires a signed token or Bearer auth — neither
+    of which the dashboard browser session has through the remote relay (the
+    browser gets 403). This view authenticates with the dashboard's own rules
+    and hands the request to HA's internal stream helper instead.
+    """
+    try:
+        secret = request.app.get("ai_dashboard_secret")
+        if not _is_authorized(request, secret):
+            return web.Response(status=401, text="Unauthorized")
+
+        hass: HomeAssistant = request.app["hass"]
+        entity_id = request.match_info["entity_id"]
+        if not entity_id.startswith("camera."):
+            return web.Response(status=400, text="Not a camera entity")
+
+        try:
+            from homeassistant.components.camera import async_get_mjpeg_stream
+        except ImportError:
+            return web.Response(status=501, text="MJPEG streaming not supported by this HA version")
+
+        component = hass.data.get("camera")
+        camera = component.get_entity(entity_id) if component else None
+        if camera is None:
+            return web.Response(status=404, text=f"Unknown camera: {entity_id}")
+
+        resp = await async_get_mjpeg_stream(hass, request, camera)
+        if resp is None:
+            return web.Response(status=502, text=f"Camera {entity_id} cannot stream right now")
+        return resp
+    except Exception as e:
+        return web.Response(
+            status=500,
+            text=f"Camera stream proxy error: {e}\n{traceback.format_exc()}",
+        )
+
+
 async def forecast_handler(request: web.Request) -> web.StreamResponse:
     """Server-side forecast fetch so the dashboard doesn't need its own HA token."""
     try:
@@ -485,6 +524,7 @@ async def async_setup_http(hass: HomeAssistant, secret: str | None) -> None:
     hass.bus.async_listen(EVENT_ENTITY_REGISTRY_UPDATED, _refresh_areas)
     # Register specific routes before the catch-all static route.
     app.router.add_get("/ai-dashboard/ws", websocket_handler)
+    app.router.add_get("/ai-dashboard/cam_stream/{entity_id}", cam_stream_handler)
     app.router.add_post("/ai-dashboard/api/forecast", forecast_handler)
     app.router.add_post("/ai-dashboard/api/history", history_handler)
     app.router.add_post("/ai-dashboard/api/config", config_save_handler)

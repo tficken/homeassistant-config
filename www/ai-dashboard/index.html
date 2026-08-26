@@ -913,9 +913,11 @@ function renderCameraFeed(entityId) {
     src = snapshotImgUrl(srcEntity);
     snapshotLastRefresh[entityId] = Date.now();
   } else if (window.HA_INTEGRATION_PROXY) {
-    // No snapshot config = live view camera. Stream it; entity_picture is only
-    // a still Ring refreshes on activity (it froze the backyard cam for days).
-    src = `/api/camera_proxy_stream/${entityId}`;
+    // No snapshot config = live view camera. Stream through the dashboard
+    // proxy: /api/camera_proxy_stream 403s for the remote browser session,
+    // and entity_picture is only a still Ring refreshes on activity (it froze
+    // the backyard cam for days).
+    src = `/ai-dashboard/cam_stream/${entityId}`;
     isStream = true;
   } else if (state && state.attributes && state.attributes.entity_picture) {
     src = state.attributes.entity_picture;
@@ -949,7 +951,9 @@ function streamFeedFallback(img, entityId) {
   setTimeout(() => {
     if (!img.isConnected) return;
     delete img.dataset.streamFallback;
-    img.src = `/api/camera_proxy_stream/${entityId}${window.HA_INTEGRATION_PROXY ? "" : "?token=" + encodeURIComponent(token)}`;
+    img.src = window.HA_INTEGRATION_PROXY
+      ? `/ai-dashboard/cam_stream/${entityId}`
+      : `/api/camera_proxy_stream/${entityId}?token=${encodeURIComponent(token)}`;
   }, 60000);
 }
 
@@ -1863,7 +1867,7 @@ function sanitizePreviewHtml(html) {
   return html
     .replace(/ id="/g, ' data-pid="')
     .replace(/ on\w+="[^"]*"/g, "")
-    .replace(/src="\/api\/camera_proxy_stream\/([^"?]+)[^"]*"/g, (m, eid) => {
+    .replace(/src="\/(?:api\/camera_proxy_stream|ai-dashboard\/cam_stream)\/([^"?]+)[^"]*"/g, (m, eid) => {
       const st = states[eid];
       const pic = st && st.attributes && st.attributes.entity_picture;
       return pic ? `src="${pic}"` : m;
@@ -2721,7 +2725,7 @@ async function init() {
     const screenEl = document.getElementById(currentScreen + "-screen");
     if (!screenEl) return;
     screenEl.querySelectorAll("img.camera-feed:not([data-snapshot-camera])").forEach(img => {
-      if (!img.src.includes("/api/camera_proxy_stream/")) return;
+      if (!/(camera_proxy_stream|cam_stream)\//.test(img.src)) return;
       const base = img.src.replace(/([?&])ts=\d+/, "").replace(/[?&]$/, "");
       img.src = `${base}${base.includes("?") ? "&" : "?"}ts=${Date.now()}`;
     });
