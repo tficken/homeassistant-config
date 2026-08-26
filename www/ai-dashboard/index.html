@@ -908,27 +908,49 @@ function renderCameraFeed(entityId) {
     </div>`;
   }
   let src = "";
+  let isStream = false;
   if (snap) {
     src = snapshotImgUrl(srcEntity);
     snapshotLastRefresh[entityId] = Date.now();
+  } else if (window.HA_INTEGRATION_PROXY) {
+    // No snapshot config = live view camera. Stream it; entity_picture is only
+    // a still Ring refreshes on activity (it froze the backyard cam for days).
+    src = `/api/camera_proxy_stream/${entityId}`;
+    isStream = true;
   } else if (state && state.attributes && state.attributes.entity_picture) {
     src = state.attributes.entity_picture;
-  } else if (window.HA_INTEGRATION_PROXY) {
-    src = `/api/camera_proxy_stream/${entityId}`;
   } else {
     src = `/api/camera_proxy_stream/${entityId}?token=${encodeURIComponent(token)}`;
+    isStream = true;
   }
   const lastEventMs = snap ? snapshotLastActivityMs(snap) : 0;
   const lastEventLabel = lastEventMs ? relativeTime(new Date(lastEventMs).toISOString()) : "";
   const titleSuffix = snap && lastEventLabel
     ? ` <span style="color:var(--text-muted);font-size:0.75rem;">· LAST EVENT ${escapeHtml(lastEventLabel)}</span>`
     : "";
+  const onerr = isStream ? ` onerror="streamFeedFallback(this,'${entityId}')"` : "";
   return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
     <div class="panel-title">${escapeHtml(name)}${titleSuffix}</div>
     <div class="panel-body" style="padding:0;">
-      <img class="camera-feed" ${snap ? `data-snapshot-camera="${entityId}"` : ""} src="${src}" style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
+      <img class="camera-feed" ${snap ? `data-snapshot-camera="${entityId}"` : ""} src="${src}"${onerr} style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
     </div>
   </div>`;
+}
+
+// A dead MJPEG stream otherwise strands a frozen frame / broken image forever:
+// fall back to the camera's still, then retry the stream in 60s (the element
+// may be gone after a re-render; the retry is a no-op then).
+function streamFeedFallback(img, entityId) {
+  if (img.dataset.streamFallback) return; // already failed once; let the retry handle it
+  img.dataset.streamFallback = "1";
+  const st = states[entityId];
+  const pic = st && st.attributes && st.attributes.entity_picture;
+  if (pic) img.src = pic;
+  setTimeout(() => {
+    if (!img.isConnected) return;
+    delete img.dataset.streamFallback;
+    img.src = `/api/camera_proxy_stream/${entityId}${window.HA_INTEGRATION_PROXY ? "" : "?token=" + encodeURIComponent(token)}`;
+  }, 60000);
 }
 
 function renderRadarFrame() {
@@ -1831,9 +1853,18 @@ function initLayoutEditor() {
 }
 
 // Kill duplicate-id interference with the live #clock/#radar-map/#doors-panel
-// and neutralize inline onclick/onchange handlers inside the preview.
+// and neutralize inline onclick/onchange handlers inside the preview. Live
+// camera streams are swapped for their current still so the preview doesn't
+// open duplicate MJPEG streams.
 function sanitizePreviewHtml(html) {
-  return html.replace(/ id="/g, ' data-pid="').replace(/ on\w+="[^"]*"/g, "");
+  return html
+    .replace(/ id="/g, ' data-pid="')
+    .replace(/ on\w+="[^"]*"/g, "")
+    .replace(/src="\/api\/camera_proxy_stream\/([^"?]+)[^"]*"/g, (m, eid) => {
+      const st = states[eid];
+      const pic = st && st.attributes && st.attributes.entity_picture;
+      return pic ? `src="${pic}"` : m;
+    });
 }
 
 const PREVIEW_BUILDERS = {
