@@ -3,6 +3,49 @@
     "backgroundImage": "",
     "accentColor": "#2dd4bf"
   },
+  "panels": {
+    "home": [
+      [
+        "clock",
+        "presence",
+        "oncall"
+      ],
+      [
+        "weather",
+        "roomMonitors"
+      ],
+      [
+        "radar",
+        "doors"
+      ]
+    ],
+    "control": [
+      [
+        "scenes"
+      ],
+      [
+        "quickControls",
+        "media"
+      ],
+      [
+        "scripts"
+      ]
+    ],
+    "security": [
+      [
+        "cameras",
+        "security"
+      ]
+    ],
+    "status": [
+      [
+        "environment"
+      ],
+      [
+        "system"
+      ]
+    ]
+  },
   "layout": {
     "clock24h": false
   },
@@ -57,8 +100,8 @@
       "entities": [
         "light.ceiling_fan",
         "light.living_room_ceiling_fan",
-        "light.p1s_01p00a412300832_chamber_light",
-        "light.travis_office_p1s_uno_chamber_light"
+        "light.travis_office_p1s_uno_chamber_light",
+        "light.p1s_01p00a412300832_chamber_light"
       ]
     },
     "cameras": {
@@ -73,7 +116,8 @@
           "preferEntity": "camera.front_door_last_recording",
           "activityEntities": [
             "event.front_door_motion",
-            "event.front_door_ding"
+            "event.front_door_ding",
+            "sensor.front_door_last_activity"
           ]
         }
       }
@@ -85,7 +129,6 @@
         "switch.front_door_motion_detection",
         "switch.downstairs_motion_detection",
         "sensor.front_door_battery",
-        "sensor.downstairs_battery",
         "siren.downstairs_siren",
         "siren.downstairs_siren_2",
         "sensor.front_door_last_activity",
@@ -107,7 +150,9 @@
         "sensor.hobeian_zg_204zx_temperature",
         "sensor.hobeian_zg_204zx_humidity",
         "sensor.hobeian_zg_204zx_temperature_2",
-        "sensor.hobeian_zg_204zx_humidity_2"
+        "sensor.hobeian_zg_204zx_humidity_2",
+        "sensor.hobeian_zg_204zx_temperature_3",
+        "sensor.hobeian_zg_204zx_humidity_3"
       ]
     },
     "environment": {
@@ -119,7 +164,10 @@
         "sensor.hobeian_zg_204zx_illuminance",
         "sensor.hobeian_zg_204zx_temperature_2",
         "sensor.hobeian_zg_204zx_humidity_2",
-        "sensor.hobeian_zg_204zx_illuminance_2"
+        "sensor.hobeian_zg_204zx_illuminance_2",
+        "sensor.hobeian_zg_204zx_temperature_3",
+        "sensor.hobeian_zg_204zx_humidity_3",
+        "sensor.hobeian_zg_204zx_illuminance_3"
       ]
     },
     "presence": {
@@ -143,12 +191,6 @@
         "update.home_assistant_supervisor_update"
       ]
     }
-  },
-  "panels": {
-    "home": [["clock", "presence", "oncall"], ["weather", "roomMonitors"], ["radar", "doors"]],
-    "control": [["scenes"], ["quickControls", "media"], ["scripts"]],
-    "security": [["cameras", "security"]],
-    "status": [["environment"], ["system"]]
   },
   "dock": {
     "items": [
