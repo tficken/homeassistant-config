@@ -109,7 +109,7 @@
       "icon": "📷",
       "entities": [
         "camera.front_door_live_view",
-        "camera.downstairs_live_view"
+        "camera.backyard_rtsp_live"
       ],
       "snapshot": {
         "camera.front_door_live_view": {
@@ -119,13 +119,10 @@
             "event.front_door_ding",
             "sensor.front_door_last_activity"
           ]
-        },
-        "camera.downstairs_live_view": {
-          "activityEntities": [
-            "event.downstairs_motion",
-            "sensor.downstairs_last_activity"
-          ]
         }
+      },
+      "livestream": {
+        "camera.backyard_rtsp_live": "switch.downstairs_live_stream"
       }
     },
     "security": {
@@ -215,6 +212,6 @@
     "binary_sensor.living_room_front_door": "Front Door",
     "binary_sensor.backdoor": "Back Door",
     "camera.front_door_live_view": "Front Door (Last Activity)",
-    "camera.downstairs_live_view": "Backyard (Last Activity)"
+    "camera.backyard_rtsp_live": "Backyard (Live)"
   }
 }

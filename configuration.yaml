@@ -91,6 +91,18 @@ command_line:
       value_template: "{{ value | int(0) }}"
       scan_interval: 300
 
+# True live view for the backyard Ring cam: ring-mqtt (add-on) bridges the
+# Ring cloud WebRTC session to RTSP; this camera transcodes it to MJPEG for
+# the AI dashboard's /ai-dashboard/cam_stream proxy. The RTSP stream only
+# exists while switch.downstairs_live_stream is on (Ring is on-demand only).
+ffmpeg:
+
+camera:
+  - platform: ffmpeg
+    name: Backyard RTSP Live
+    input: -rtsp_transport tcp -i rtsp://03cabcc9-ring-mqtt:8554/343ea446d53f_live
+    extra_arguments: -pred 1 -vf fps=2 -q:v 6
+
 # Reduce noisy integration logs while keeping errors visible
 logger:
   default: info

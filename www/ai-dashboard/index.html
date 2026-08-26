@@ -380,7 +380,7 @@ const DEFAULT_CONFIG = {
     scenes: { title: "Scenes", icon: "🎨", entities: ["scene.all_lights_off", "scene.relax_mode", "scene.movie_mode", "scene.focus_mode", "scene.living_room_focus_mode", "scene.living_room_relax_mode", "scene.living_room_all_lights_off"] },
     scripts: { title: "Scripts", icon: "▶️", entities: ["script.goodnight", "script.focus_mode", "script.movie_mode", "script.relax_mode", "script.pause_all_media", "script.living_room_lights_on", "script.living_room_lights_off", "script.travis_office_lights_on", "script.travis_office_lights_off", "script.goodnight_door_check", "script.goodnight_dim_lights", "script.goodnight_enable_security"] },
     quickControls: { title: "Quick Controls", icon: "🎛️", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan", "light.p1s_01p00a412300832_chamber_light", "light.travis_office_p1s_uno_chamber_light"] },
-    cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.downstairs_live_view"], snapshot: { "camera.front_door_live_view": { preferEntity: "camera.front_door_last_recording", activityEntities: ["event.front_door_motion", "event.front_door_ding", "sensor.front_door_last_activity"] }, "camera.downstairs_live_view": { activityEntities: ["event.downstairs_motion", "sensor.downstairs_last_activity"] } } },
+    cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.backyard_rtsp_live"], snapshot: { "camera.front_door_live_view": { preferEntity: "camera.front_door_last_recording", activityEntities: ["event.front_door_motion", "event.front_door_ding", "sensor.front_door_last_activity"] } }, livestream: { "camera.backyard_rtsp_live": "switch.downstairs_live_stream" } },
     security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2", "sensor.front_door_last_activity", "sensor.downstairs_last_activity"] },
     doors: { title: "Doors", icon: "🚪", entities: ["binary_sensor.living_room_front_door", "binary_sensor.backdoor"] },
     roomMonitors: { title: "Room Monitors", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2"] },
@@ -893,12 +893,18 @@ function renderEnvMetric(entityId) {
   </div>`;
 }
 
+function livestreamSwitchFor(cameraId) {
+  const cams = (config.sections && config.sections.cameras) || {};
+  return (cams.livestream && cams.livestream[cameraId]) || null;
+}
+
 function renderCameraFeed(entityId) {
   const name = friendlyName(entityId);
   const snap = cameraSnapshotConfig(entityId);
   const srcEntity = snap ? snapshotSourceEntity(entityId) : entityId;
   const state = states[srcEntity];
   const offline = isUnavailable(state);
+  const liveSwitch = !snap && livestreamSwitchFor(entityId);
   if (offline) {
     return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
       <div class="panel-title">${escapeHtml(name)}${renderOfflineBadge()}</div>
@@ -912,6 +918,16 @@ function renderCameraFeed(entityId) {
   if (snap) {
     src = snapshotImgUrl(srcEntity);
     snapshotLastRefresh[entityId] = Date.now();
+  } else if (liveSwitch && window.HA_INTEGRATION_PROXY) {
+    // On-demand Ring live stream: the src is attached by startLivestreamCameras()
+    // only after the camera's live-stream switch has spun the session up. If the
+    // switch is already on (e.g. a state-update re-render mid-viewing), attach
+    // immediately — otherwise the re-render would strand the "starting" overlay.
+    const sw = states[liveSwitch];
+    if (sw && sw.state === "on") {
+      src = `/ai-dashboard/cam_stream/${entityId}?ts=${Date.now()}`;
+    }
+    isStream = true;
   } else if (window.HA_INTEGRATION_PROXY) {
     // No snapshot config = live view camera. Stream through the dashboard
     // proxy: /api/camera_proxy_stream 403s for the remote browser session,
@@ -931,12 +947,51 @@ function renderCameraFeed(entityId) {
     ? ` <span style="color:var(--text-muted);font-size:0.75rem;">· LAST EVENT ${escapeHtml(lastEventLabel)}</span>`
     : "";
   const onerr = isStream ? ` onerror="streamFeedFallback(this,'${entityId}')"` : "";
+  const liveAttrs = liveSwitch && !src ? ` data-livestream-camera="${entityId}"` : "";
+  const pendingOverlay = liveSwitch && !src
+    ? `<div class="livestream-pending" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000;color:var(--text-muted);font-family:var(--font-mono);font-size:0.85rem;letter-spacing:0.1em;">STARTING LIVE STREAM…</div>`
+    : "";
   return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
     <div class="panel-title">${escapeHtml(name)}${titleSuffix}</div>
-    <div class="panel-body" style="padding:0;">
-      <img class="camera-feed" ${snap ? `data-snapshot-camera="${entityId}"` : ""} src="${src}"${onerr} style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
+    <div class="panel-body" style="padding:0;${liveSwitch ? "position:relative;" : ""}">
+      <img class="camera-feed" ${snap ? `data-snapshot-camera="${entityId}"` : ""}${liveAttrs}${src ? ` src="${src}"` : ""}${onerr} style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
+      ${pendingOverlay}
     </div>
   </div>`;
+}
+
+// On-demand Ring live streams (ring-mqtt): the RTSP feed only exists while the
+// camera's live-stream switch is on, so streams start when the screen showing
+// them opens and stop when it closes. Leaving them running would suppress
+// Ring motion/ding events and hit Ring's ~10 minute stream kill anyway.
+const LIVESTREAM_STARTUP_DELAY_MS = 6000;
+const livestreamStartTimers = {};
+
+function startLivestreamCameras() {
+  if (!window.HA_INTEGRATION_PROXY) return;
+  const cams = (config.sections && config.sections.cameras) || {};
+  for (const [cameraId, switchId] of Object.entries(cams.livestream || {})) {
+    sendWs({ id: Date.now(), type: "call_service", domain: "switch", service: "turn_on", service_data: { entity_id: switchId } });
+    clearTimeout(livestreamStartTimers[cameraId]);
+    livestreamStartTimers[cameraId] = setTimeout(() => {
+      const img = document.querySelector(`img.camera-feed[data-livestream-camera="${cameraId}"]`);
+      if (!img) return;
+      img.src = `/ai-dashboard/cam_stream/${cameraId}?ts=${Date.now()}`;
+      const overlay = img.parentElement && img.parentElement.querySelector(".livestream-pending");
+      if (overlay) overlay.remove();
+    }, LIVESTREAM_STARTUP_DELAY_MS);
+  }
+}
+
+function stopLivestreamCameras() {
+  if (!window.HA_INTEGRATION_PROXY) return;
+  const cams = (config.sections && config.sections.cameras) || {};
+  for (const [cameraId, switchId] of Object.entries(cams.livestream || {})) {
+    clearTimeout(livestreamStartTimers[cameraId]);
+    sendWs({ id: Date.now(), type: "call_service", domain: "switch", service: "turn_off", service_data: { entity_id: switchId } });
+    const img = document.querySelector(`img.camera-feed[data-livestream-camera="${cameraId}"]`);
+    if (img) img.removeAttribute("src");
+  }
 }
 
 // A dead MJPEG stream otherwise strands a frozen frame / broken image forever:
@@ -1511,15 +1566,17 @@ function renderSecurityScreen() {
 }
 
 async function showScreen(name) {
+  const prevScreen = currentScreen;
   document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
   const target = document.getElementById(name + "-screen");
   if (!target) return;
   target.classList.add("active");
   currentScreen = name;
+  if (prevScreen === "security" && name !== "security") stopLivestreamCameras();
   document.getElementById("dock").innerHTML = renderDock();
   if (name === "home") renderHomeScreen();
   else if (name === "control") renderControlScreen();
-  else if (name === "security") renderSecurityScreen();
+  else if (name === "security") { renderSecurityScreen(); startLivestreamCameras(); }
   else if (name === "status") await renderStatusScreen();
 }
 

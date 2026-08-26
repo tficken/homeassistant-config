@@ -173,7 +173,7 @@ Common device families in this instance (entity IDs follow these prefixes):
 - **Lights / Ceiling fans**: `light.ceiling_fan`, `light.living_room_ceiling_fan`, `light.third_reality_inc_3rcb01057z*`, `light.*_chamber_light`
 - **Bedroom bulbs**: Sylvania Smart+ WiFi A19 — Alexa-only, not integrable with HA (Tuya white-label lock). Slated for replacement; see `docs/sylvania-smartplus-wifi-notes.md`.
 - **Bambu Lab 3D printers**: `sensor.p1s_*`, `binary_sensor.p1s_*`, `fan.p1s_*`, `light.p1s_*_chamber_light`, `camera.p1s_*_camera`, etc.
-- **Cameras**: `camera.front_door_live_view`, `camera.downstairs_live_view`, `camera.p1s_*_camera`
+- **Cameras**: `camera.front_door_live_view`, `camera.downstairs_live_view`, `camera.backyard_rtsp_live` (ffmpeg camera in `configuration.yaml` — transcoded MJPEG of the ring-mqtt RTSP feed, used by the AI dashboard Security screen), `camera.backyard_live_stream` (generic camera on the same RTSP feed — HLS for the HA UI), `camera.p1s_*_camera`
 - **Environmental sensors**: `sensor.hobeian_zg_204zx_*`, `binary_sensor.hobeian_zg_204zx*`
 - **Motion / security**: `switch.front_door_motion_detection`, `switch.downstairs_motion_detection`, `event.front_door_*`, `event.downstairs_motion`, `siren.downstairs_siren*`
 - **Door / window sensors**: `binary_sensor.living_room_front_door`, `binary_sensor.backdoor`
@@ -186,6 +186,12 @@ Common device families in this instance (entity IDs follow these prefixes):
 - **Host / add-on diagnostics**: `sensor.home_assistant_core_*`, `sensor.home_assistant_host_*`, `sensor.home_assistant_supervisor_*`, `sensor.*_cpu_percent`, `sensor.*_memory_percent`, `sensor.ha_disk_usage`
 
 For the full current entity list, parse `//HOMEASSISTANT/config/.storage/core.entity_registry`.
+
+### Ring cameras: official integration vs ring-mqtt (add-on)
+
+The official Ring integration has **no true live view** — its `camera.*_live_view` entities replay the last cloud recording, and its `event.*_motion` entities are unreliable. The **ring-mqtt add-on** (`03cabcc9_ring_mqtt`, repo `https://github.com/tsightler/ring-mqtt-ha-addon`, auth via its web UI on ingress port 55123, bundles go2rtc) bridges Ring's on-demand WebRTC sessions to local RTSP at `rtsp://03cabcc9-ring-mqtt:8554/<camera_id>_live` and publishes its own `*_snapshot` cameras, motion binary sensors, and per-camera switches over MQTT.
+
+Key constraints (Ring-side, not configurable): streams are **on-demand only** — `switch.<cam>_live_stream` must be on for the RTSP path to exist; Ring kills any stream after ~10 minutes and suppresses motion/ding events while streaming. The AI dashboard Security screen turns `switch.downstairs_live_stream` on when opened and off when closed (`livestream` map in the cameras section config), so never leave these switches on permanently. Every live view also creates a recording in the Ring app when the account has Ring Protect.
 
 ---
 
