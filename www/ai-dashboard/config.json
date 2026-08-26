@@ -119,6 +119,12 @@
             "event.front_door_ding",
             "sensor.front_door_last_activity"
           ]
+        },
+        "camera.downstairs_live_view": {
+          "activityEntities": [
+            "event.downstairs_motion",
+            "sensor.downstairs_last_activity"
+          ]
         }
       }
     },
@@ -209,6 +215,6 @@
     "binary_sensor.living_room_front_door": "Front Door",
     "binary_sensor.backdoor": "Back Door",
     "camera.front_door_live_view": "Front Door (Last Activity)",
-    "camera.downstairs_live_view": "Backyard (Live)"
+    "camera.downstairs_live_view": "Backyard (Last Activity)"
   }
 }
