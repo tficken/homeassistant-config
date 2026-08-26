@@ -980,8 +980,8 @@ async function initRadarMap() {
     const data = await res.json();
     const frames = data.radar && data.radar.past;
     if (!frames || !frames.length) throw new Error("no radar frames");
-    const map = window.L.map(el, { zoomControl: false, maxZoom: 7 }).setView(
-      [haConfig.latitude, haConfig.longitude], 7
+    const map = window.L.map(el, { zoomControl: false, maxZoom: 10 }).setView(
+      [haConfig.latitude, haConfig.longitude], 8
     );
     // Esri's dark gray canvas is keyless (CARTO's basemaps now watermark
     // "API KEY REQUIRED"); radar overlay is RainViewer (also keyless). The
@@ -1000,7 +1000,7 @@ async function initRadarMap() {
     const useFrames = frames.slice(-8);
     const layers = useFrames.map(f =>
       window.L.tileLayer(`${data.host}${f.path}/256/{z}/{x}/{y}/7/1_1.png`, {
-        opacity: 0, maxZoom: 7, minZoom: 3
+        opacity: 0, maxZoom: 10, minZoom: 3
       }).addTo(map)
     );
 
@@ -2710,6 +2710,19 @@ async function init() {
       if (idleLongEnough && stale) refreshCameraSnapshot(cameraId);
     }
   }, SNAPSHOT_CHECK_MS);
+  // Restart live camera streams periodically: a stalled MJPEG <img> shows the
+  // last frame forever without firing onerror, and browsers expose no stall
+  // event. Scoped to the active screen; the ts= cache-buster forces a fresh
+  // connection. Snapshot cameras are untouched (they have their own refresh).
+  setInterval(() => {
+    const screenEl = document.getElementById(currentScreen + "-screen");
+    if (!screenEl) return;
+    screenEl.querySelectorAll("img.camera-feed:not([data-snapshot-camera])").forEach(img => {
+      if (!img.src.includes("/api/camera_proxy_stream/")) return;
+      const base = img.src.replace(/([?&])ts=\d+/, "").replace(/[?&]$/, "");
+      img.src = `${base}${base.includes("?") ? "&" : "?"}ts=${Date.now()}`;
+    });
+  }, 10 * 60 * 1000);
 }
 
 document.addEventListener("DOMContentLoaded", init);
