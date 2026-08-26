@@ -380,3 +380,46 @@
         entity_id: media_player.master_bedroom_echo_dot
       continue_on_error: true
   mode: single
+
+- id: ring_snapshot_archive_front_door
+  alias: Ring snapshot archive - front door
+  description: Save a snapshot to the AI dashboard history archive on front door motion or ding
+  triggers:
+    - trigger: state
+      entity_id:
+        - binary_sensor.front_door_motion
+        - binary_sensor.front_door_ding
+      to: "on"
+  conditions: []
+  actions:
+    # ring-mqtt pulls the event snapshot from Ring cloud a few seconds after the event
+    - delay: "00:00:08"
+    - action: camera.snapshot
+      target:
+        entity_id: camera.front_door_snapshot
+      data:
+        filename: "/config/www/ai-dashboard/snapshots/front_door/{{ now().strftime('%Y-%m-%d_%H-%M-%S') }}.jpg"
+      continue_on_error: true
+  mode: queued
+  max: 5
+
+- id: ring_snapshot_archive_backyard
+  alias: Ring snapshot archive - backyard
+  description: Save a snapshot to the AI dashboard history archive on backyard motion
+  triggers:
+    - trigger: state
+      entity_id:
+        - binary_sensor.downstairs_motion
+      to: "on"
+  conditions: []
+  actions:
+    # ring-mqtt pulls the event snapshot from Ring cloud a few seconds after the event
+    - delay: "00:00:08"
+    - action: camera.snapshot
+      target:
+        entity_id: camera.downstairs_snapshot
+      data:
+        filename: "/config/www/ai-dashboard/snapshots/backyard/{{ now().strftime('%Y-%m-%d_%H-%M-%S') }}.jpg"
+      continue_on_error: true
+  mode: queued
+  max: 5

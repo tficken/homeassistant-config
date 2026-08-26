@@ -123,6 +123,10 @@
       },
       "livestream": {
         "camera.backyard_rtsp_live": "switch.downstairs_live_stream"
+      },
+      "history": {
+        "camera.front_door_live_view": "front_door",
+        "camera.backyard_rtsp_live": "backyard"
       }
     },
     "security": {

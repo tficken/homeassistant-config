@@ -380,7 +380,7 @@ const DEFAULT_CONFIG = {
     scenes: { title: "Scenes", icon: "🎨", entities: ["scene.all_lights_off", "scene.relax_mode", "scene.movie_mode", "scene.focus_mode", "scene.living_room_focus_mode", "scene.living_room_relax_mode", "scene.living_room_all_lights_off"] },
     scripts: { title: "Scripts", icon: "▶️", entities: ["script.goodnight", "script.focus_mode", "script.movie_mode", "script.relax_mode", "script.pause_all_media", "script.living_room_lights_on", "script.living_room_lights_off", "script.travis_office_lights_on", "script.travis_office_lights_off", "script.goodnight_door_check", "script.goodnight_dim_lights", "script.goodnight_enable_security"] },
     quickControls: { title: "Quick Controls", icon: "🎛️", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan", "light.p1s_01p00a412300832_chamber_light", "light.travis_office_p1s_uno_chamber_light"] },
-    cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.backyard_rtsp_live"], snapshot: { "camera.front_door_live_view": { preferEntity: "camera.front_door_last_recording", activityEntities: ["event.front_door_motion", "event.front_door_ding", "sensor.front_door_last_activity"] } }, livestream: { "camera.backyard_rtsp_live": "switch.downstairs_live_stream" } },
+    cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.backyard_rtsp_live"], snapshot: { "camera.front_door_live_view": { preferEntity: "camera.front_door_last_recording", activityEntities: ["event.front_door_motion", "event.front_door_ding", "sensor.front_door_last_activity"] } }, livestream: { "camera.backyard_rtsp_live": "switch.downstairs_live_stream" }, history: { "camera.front_door_live_view": "front_door", "camera.backyard_rtsp_live": "backyard" } },
     security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2", "sensor.front_door_last_activity", "sensor.downstairs_last_activity"] },
     doors: { title: "Doors", icon: "🚪", entities: ["binary_sensor.living_room_front_door", "binary_sensor.backdoor"] },
     roomMonitors: { title: "Room Monitors", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2"] },
@@ -898,6 +898,11 @@ function livestreamSwitchFor(cameraId) {
   return (cams.livestream && cams.livestream[cameraId]) || null;
 }
 
+function cameraHistoryKey(cameraId) {
+  const cams = (config.sections && config.sections.cameras) || {};
+  return (cams.history && cams.history[cameraId]) || null;
+}
+
 function renderCameraFeed(entityId) {
   const name = friendlyName(entityId);
   const snap = cameraSnapshotConfig(entityId);
@@ -951,8 +956,12 @@ function renderCameraFeed(entityId) {
   const pendingOverlay = liveSwitch && !src
     ? `<div class="livestream-pending" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000;color:var(--text-muted);font-family:var(--font-mono);font-size:0.85rem;letter-spacing:0.1em;">STARTING LIVE STREAM…</div>`
     : "";
+  const historyKey = cameraHistoryKey(entityId);
+  const historyChip = historyKey
+    ? ` <span class="history-chip" style="cursor:pointer;color:var(--accent,#2dd4bf);font-size:0.7rem;border:1px solid currentColor;padding:1px 6px;margin-left:6px;" onclick="event.stopPropagation();openSnapshotHistory('${historyKey}','${entityId}')">HISTORY</span>`
+    : "";
   return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
-    <div class="panel-title">${escapeHtml(name)}${titleSuffix}</div>
+    <div class="panel-title">${escapeHtml(name)}${titleSuffix}${historyChip}</div>
     <div class="panel-body" style="padding:0;${liveSwitch ? "position:relative;" : ""}">
       <img class="camera-feed" ${snap ? `data-snapshot-camera="${entityId}"` : ""}${liveAttrs}${src ? ` src="${src}"` : ""}${onerr} style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
       ${pendingOverlay}
@@ -992,6 +1001,95 @@ function stopLivestreamCameras() {
     const img = document.querySelector(`img.camera-feed[data-livestream-camera="${cameraId}"]`);
     if (img) img.removeAttribute("src");
   }
+}
+
+// Snapshot history viewer: motion/ding snapshots archived by the
+// ring_snapshot_archive_* automations, listed by GET /ai-dashboard/api/snapshots.
+const snapshotHistory = { key: null, entityId: null, files: [], idx: 0, loading: false };
+
+function snapshotTsLabel(file) {
+  // "2026-08-26_14-32-05.jpg" -> "Aug 26, 2:32:05 PM" (filenames are local time)
+  const m = file.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})\.jpg$/);
+  if (!m) return file;
+  const d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" });
+}
+
+async function openSnapshotHistory(key, entityId) {
+  snapshotHistory.key = key;
+  snapshotHistory.entityId = entityId;
+  snapshotHistory.idx = 0;
+  snapshotHistory.loading = true;
+  renderSnapshotHistory();
+  try {
+    const resp = await fetch(`/ai-dashboard/api/snapshots?camera=${encodeURIComponent(key)}`);
+    const data = await resp.json();
+    if (snapshotHistory.key !== key) return; // closed or switched meanwhile
+    snapshotHistory.files = (data.snapshots || []).map(s => s.file);
+  } catch (e) {
+    snapshotHistory.files = [];
+  }
+  snapshotHistory.loading = false;
+  renderSnapshotHistory();
+}
+
+function closeSnapshotHistory() {
+  snapshotHistory.key = null;
+  renderSnapshotHistory();
+}
+
+function stepSnapshotHistory(delta) {
+  const n = snapshotHistory.files.length;
+  if (!n) return;
+  snapshotHistory.idx = (snapshotHistory.idx + delta + n) % n;
+  renderSnapshotHistory();
+}
+
+function snapshotHistoryKeydown(ev) {
+  if (!snapshotHistory.key) return;
+  if (ev.key === "Escape") closeSnapshotHistory();
+  else if (ev.key === "ArrowLeft") stepSnapshotHistory(-1);   // older
+  else if (ev.key === "ArrowRight") stepSnapshotHistory(1);   // newer
+}
+document.addEventListener("keydown", snapshotHistoryKeydown);
+
+function renderSnapshotHistory() {
+  let el = document.getElementById("snapshot-history-overlay");
+  if (!snapshotHistory.key) {
+    if (el) el.remove();
+    return;
+  }
+  const name = friendlyName(snapshotHistory.entityId || "");
+  const n = snapshotHistory.files.length;
+  const file = n ? snapshotHistory.files[snapshotHistory.idx] : null;
+  const body = snapshotHistory.loading
+    ? `<div style="color:var(--text-muted);font-family:var(--font-mono);padding:60px 0;">LOADING…</div>`
+    : !n
+      ? `<div style="color:var(--text-muted);font-family:var(--font-mono);padding:60px 0;">NO SNAPSHOTS YET — saved on the next motion/ding event</div>`
+      : `<img src="/ai-dashboard/snapshots/${encodeURIComponent(snapshotHistory.key)}/${encodeURIComponent(file)}" style="max-width:88vw;max-height:70vh;object-fit:contain;display:block;border:1px solid var(--green);" alt="">
+         <div style="font-family:var(--font-mono);color:var(--green);margin-top:8px;font-size:0.9rem;">${escapeHtml(snapshotTsLabel(file))} <span style="color:var(--text-muted);">· ${snapshotHistory.idx + 1} / ${n}</span></div>`;
+  const nav = n > 1
+    ? `<div style="display:flex;gap:12px;margin-top:10px;font-family:var(--font-mono);">
+         <button class="bottom-btn" style="padding:8px 18px;cursor:pointer;" onclick="stepSnapshotHistory(-1)">◀ OLDER</button>
+         <button class="bottom-btn" style="padding:8px 18px;cursor:pointer;" onclick="stepSnapshotHistory(1)">NEWER ▶</button>
+       </div>`
+    : "";
+  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:1000;display:flex;align-items:center;justify-content:center;" onclick="closeSnapshotHistory()">
+    <div style="display:flex;flex-direction:column;align-items:center;max-width:92vw;" onclick="event.stopPropagation()">
+      <div style="font-family:var(--font-mono);color:var(--green);letter-spacing:0.1em;margin-bottom:8px;align-self:stretch;display:flex;justify-content:space-between;">
+        <span>⌂ ${escapeHtml(name)} — SNAPSHOT HISTORY</span>
+        <span style="cursor:pointer;color:var(--text-muted);" onclick="closeSnapshotHistory()">[ CLOSE ✕ ]</span>
+      </div>
+      ${body}
+      ${nav}
+    </div>
+  </div>`;
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "snapshot-history-overlay";
+    document.body.appendChild(el);
+  }
+  el.innerHTML = html;
 }
 
 // A dead MJPEG stream otherwise strands a frozen frame / broken image forever:

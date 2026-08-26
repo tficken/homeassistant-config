@@ -7,6 +7,7 @@ import json
 import logging
 import mimetypes
 import os
+import re
 import traceback
 from datetime import timedelta
 from typing import Any
@@ -24,6 +25,9 @@ from homeassistant.helpers.json import json_dumps
 from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
+
+SNAPSHOT_MAX_AGE_DAYS = 14
+SNAPSHOT_MAX_FILES = 100
 
 
 def _is_local_ip(ip: str | None) -> bool:
@@ -507,6 +511,72 @@ async def config_save_handler(request: web.Request) -> web.StreamResponse:
         )
 
 
+async def snapshots_handler(request: web.Request) -> web.StreamResponse:
+    """List archived motion/ding snapshots for a camera, pruning old ones.
+
+    Snapshots are written by the ring_snapshot_archive_* automations to
+    www/ai-dashboard/snapshots/<camera_key>/<local timestamp>.jpg and served
+    as plain static files by the dashboard catch-all route.
+    """
+    try:
+        secret = request.app.get("ai_dashboard_secret")
+        if not _is_authorized(request, secret):
+            return web.Response(status=401, text="Unauthorized")
+
+        hass: HomeAssistant = request.app["hass"]
+        camera = request.query.get("camera", "")
+        if not re.fullmatch(r"[a-z0-9_\-]+", camera):
+            return web.Response(status=400, text="Invalid camera key")
+
+        snap_dir = os.path.join(
+            hass.config.config_dir, "www", "ai-dashboard", "snapshots", camera
+        )
+
+        def list_and_prune() -> list[str]:
+            if not os.path.isdir(snap_dir):
+                return []
+            # Filenames are local timestamps, so name order == time order.
+            files = sorted(
+                (f for f in os.listdir(snap_dir) if f.endswith(".jpg")),
+                reverse=True,
+            )
+            cutoff = dt_util.now() - timedelta(days=SNAPSHOT_MAX_AGE_DAYS)
+            kept: list[str] = []
+            for idx, name in enumerate(files):
+                path = os.path.join(snap_dir, name)
+                too_many = idx >= SNAPSHOT_MAX_FILES
+                try:
+                    too_old = dt_util.as_local(
+                        dt_util.utc_from_timestamp(os.path.getmtime(path))
+                    ) < cutoff
+                except OSError:
+                    continue
+                if too_many or too_old:
+                    try:
+                        os.remove(path)
+                    except OSError:
+                        pass
+                else:
+                    kept.append(name)
+            return kept
+
+        files = await hass.async_add_executor_job(list_and_prune)
+        return web.json_response(
+            {
+                "camera": camera,
+                "snapshots": [
+                    {"file": f, "url": f"/ai-dashboard/snapshots/{camera}/{f}"}
+                    for f in files
+                ],
+            }
+        )
+    except Exception as e:
+        return web.Response(
+            status=500,
+            text=f"Snapshots list failed: {e}\n{traceback.format_exc()}",
+        )
+
+
 async def async_setup_http(hass: HomeAssistant, secret: str | None) -> None:
     """Register the dashboard routes on the Home Assistant HTTP app."""
     app = hass.http.app
@@ -522,6 +592,7 @@ async def async_setup_http(hass: HomeAssistant, secret: str | None) -> None:
     # Register specific routes before the catch-all static route.
     app.router.add_get("/ai-dashboard/ws", websocket_handler)
     app.router.add_get("/ai-dashboard/cam_stream/{entity_id}", cam_stream_handler)
+    app.router.add_get("/ai-dashboard/api/snapshots", snapshots_handler)
     app.router.add_post("/ai-dashboard/api/forecast", forecast_handler)
     app.router.add_post("/ai-dashboard/api/history", history_handler)
     app.router.add_post("/ai-dashboard/api/config", config_save_handler)
