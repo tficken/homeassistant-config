@@ -316,12 +316,9 @@ async def cam_stream_handler(request: web.Request) -> web.StreamResponse:
         except ImportError:
             return web.Response(status=501, text="MJPEG streaming not supported by this HA version")
 
-        component = hass.data.get("camera")
-        camera = component.get_entity(entity_id) if component else None
-        if camera is None:
-            return web.Response(status=404, text=f"Unknown camera: {entity_id}")
-
-        resp = await async_get_mjpeg_stream(hass, request, camera)
+        # async_get_mjpeg_stream does its own entity lookup (entity_id string,
+        # not a Camera object) and raises HomeAssistantError for unknown cams.
+        resp = await async_get_mjpeg_stream(hass, request, entity_id)
         if resp is None:
             return web.Response(status=502, text=f"Camera {entity_id} cannot stream right now")
         return resp
