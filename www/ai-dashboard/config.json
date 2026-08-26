@@ -207,6 +207,8 @@
   },
   "labels": {
     "binary_sensor.living_room_front_door": "Front Door",
-    "binary_sensor.backdoor": "Back Door"
+    "binary_sensor.backdoor": "Back Door",
+    "camera.front_door_live_view": "Front Door (Last Activity)",
+    "camera.downstairs_live_view": "Backyard (Live)"
   }
 }

@@ -221,6 +221,7 @@ input, select {
 select, select option { background: #0d140d; color: var(--text); }
 input[type="range"] { accent-color: var(--green); }
 .leaflet-container { background: #000; }
+.radar-basemap { filter: brightness(0.45) contrast(1.15); }
 #radar-map { width: 100%; height: 100%; position: relative; }
 @keyframes clockPulse {
   0%, 100% { text-shadow: 0 0 24px rgba(20,254,23,0.45); opacity: 1; }
@@ -961,10 +962,16 @@ async function initRadarMap() {
       [haConfig.latitude, haConfig.longitude], 7
     );
     // Esri's dark gray canvas is keyless (CARTO's basemaps now watermark
-    // "API KEY REQUIRED"); radar overlay is RainViewer (also keyless).
+    // "API KEY REQUIRED"); radar overlay is RainViewer (also keyless). The
+    // base layer is CSS-darkened toward black (see .radar-basemap) and a
+    // separate reference layer adds light city labels on top.
     window.L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
-      { maxZoom: 16, attribution: "Esri, HERE, Garmin, FAO, NOAA, USGS" }
+      { maxZoom: 16, className: "radar-basemap", attribution: "Esri, HERE, Garmin, FAO, NOAA, USGS" }
+    ).addTo(map);
+    window.L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 16, zIndex: 10 } // above the animated radar frames
     ).addTo(map);
 
     // Use the last 8 frames (~80 min) to keep tile count reasonable.

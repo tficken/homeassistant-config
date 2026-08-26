@@ -363,7 +363,7 @@
 
 - id: goodnight_morning_reset
   alias: Goodnight morning reset
-  description: Turn off night_mode, disable motion detection, and stop brown noise at sunrise
+  description: Turn off night_mode and stop brown noise at sunrise (motion detection stays on 24/7 so doorbell recordings keep updating)
   triggers:
     - trigger: sun
       event: sunrise
@@ -375,12 +375,6 @@
     - action: input_boolean.turn_off
       target:
         entity_id: input_boolean.night_mode
-    - action: switch.turn_off
-      target:
-        entity_id:
-          - switch.front_door_motion_detection
-          - switch.downstairs_motion_detection
-      continue_on_error: true
     - action: media_player.media_stop
       target:
         entity_id: media_player.master_bedroom_echo_dot
