@@ -1172,11 +1172,11 @@ async function initRadarMap() {
     ).addTo(map);
     window.L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
-      { maxZoom: 16, zIndex: 10, className: "radar-roads" } // above the animated radar frames
+      { maxZoom: 16, zIndex: 10, className: "radar-roads", opacity: 0.55 } // above the animated radar frames
     ).addTo(map);
     window.L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places_Alternate/MapServer/tile/{z}/{y}/{x}",
-      { maxZoom: 16, zIndex: 11, className: "radar-labels" } // labels/boundaries on top of roads
+      { maxZoom: 16, zIndex: 11, className: "radar-labels", opacity: 0.8 } // labels/boundaries on top of roads
     ).addTo(map);
 
     // Use the last 8 frames (~80 min) to keep tile count reasonable.
