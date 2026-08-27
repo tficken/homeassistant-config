@@ -231,6 +231,11 @@ select, select option { background: #0d140d; color: var(--text); }
 input[type="range"] { accent-color: var(--green); }
 .leaflet-container { background: #000; }
 .radar-basemap { filter: brightness(0.45) contrast(1.15); }
+/* Recolor the Esri reference tiles: hue-rotate shifts the orange roads to
+   shades of green (shields/casing are near-white and keep their value),
+   and the label layer is brightened to pure-white city names. */
+.radar-roads { filter: hue-rotate(100deg) saturate(1.3); }
+.radar-labels { filter: brightness(1.5) contrast(1.2); }
 #radar-map { width: 100%; height: 100%; position: relative; }
 @keyframes clockPulse {
   0%, 100% { text-shadow: 0 0 24px rgba(20,254,23,0.45); opacity: 1; }
@@ -1159,18 +1164,19 @@ async function initRadarMap() {
     // canvas, CSS-darkened toward black (see .radar-basemap). Above the
     // animated radar frames: World_Transportation adds bold highways/
     // interstates, and Boundaries_and_Places_Alternate (the light-on-dark
-    // variant) adds state lines and city labels.
+    // variant) adds state lines and city labels. Both are recolored via
+    // CSS filters (see .radar-roads / .radar-labels).
     window.L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
       { maxZoom: 16, className: "radar-basemap", attribution: "Esri, HERE, Garmin, FAO, NOAA, USGS" }
     ).addTo(map);
     window.L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
-      { maxZoom: 16, zIndex: 10 } // above the animated radar frames
+      { maxZoom: 16, zIndex: 10, className: "radar-roads" } // above the animated radar frames
     ).addTo(map);
     window.L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places_Alternate/MapServer/tile/{z}/{y}/{x}",
-      { maxZoom: 16, zIndex: 11 } // labels/boundaries on top of roads
+      { maxZoom: 16, zIndex: 11, className: "radar-labels" } // labels/boundaries on top of roads
     ).addTo(map);
 
     // Use the last 8 frames (~80 min) to keep tile count reasonable.
