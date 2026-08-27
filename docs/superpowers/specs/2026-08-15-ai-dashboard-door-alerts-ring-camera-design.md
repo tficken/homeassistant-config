@@ -1,5 +1,7 @@
 # AI Dashboard: Door Activity Alerts & Ring Camera Snapshot Design
 
+> **Note (2026-08-26):** The camera/snapshot design here (official-Ring `preferEntity`, `event.front_door_*` triggers) was superseded by the ring-mqtt add-on setup — see AGENTS.md "Ring cameras: official integration vs ring-mqtt". Door-alerts design remains as built.
+
 Date: 2026-08-15
 Status: Approved by user (2026-08-15)
 

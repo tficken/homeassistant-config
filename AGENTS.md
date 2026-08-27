@@ -93,7 +93,7 @@ The intended reader of this file is an AI coding agent that has no prior context
 
 ### Automations, Scripts, and Scenes
 
-- `automations.yaml`: Contains user automations (e.g., motion-activated siren, low-battery notifications).
+- `automations.yaml`: Contains user automations (e.g., PagerDuty high-urgency Echo alerts, Ring snapshot archiving, low-battery notifications).
 - `scripts.yaml`: Contains user scripts for lighting/media presets and HA actions (e.g., `all_lights_off`, `goodnight`, `movie_mode`).
 - `scenes.yaml`: Contains user scenes for lighting presets (e.g., `movie_mode`, `focus_mode`, `relax_mode`).
 
@@ -131,7 +131,7 @@ Stored under `blueprints/`. These are Home Assistant-provided reusable templates
 
 ### Current Dashboards
 
-- **`www/ai-dashboard/`**: Custom retro-terminal wall dashboard served at `/ai-dashboard/`. Built as a standalone HTML/JS/CSS app proxied through `custom_components/ai_dashboard_proxy/`. Designed for landscape wall-mounted iPads / tablets. Four screens are switched via a bottom dock (which also renders the quick-action buttons configured in `config.dock.items`, e.g. All off / Goodnight): **HOME** (clock, weather + room monitors, radar + presence + doors), **CONTROL HUB** (scenes, scripts, lights, cameras), **SECURITY** (alarm-related sensors and events), and **STATUS MONITOR** (per-area environment sensors with 24-hour sparklines for temperature/humidity, plus host/system metrics).
+- **`www/ai-dashboard/`**: Custom retro-terminal wall dashboard served at `/ai-dashboard/`. Built as a standalone HTML/JS/CSS app proxied through `custom_components/ai_dashboard_proxy/`. Designed for landscape wall-mounted iPads / tablets. Four screens are switched via a bottom dock (which also renders the quick-action buttons configured in `config.dock.items`, e.g. All off / Goodnight): **HOME** (clock, weather + room monitors, radar + presence + doors), **CONTROL HUB** (scenes, scripts, lights, media), **SECURITY** (camera feeds — front door last-activity snapshot, backyard true live MJPEG that auto-starts/stops with the screen, plus a HISTORY chip per camera opening the motion/ding snapshot archive modal — and alarm-related sensors), and **STATUS MONITOR** (per-area environment sensors with 24-hour sparklines for temperature/humidity, plus host/system metrics). The radar is a RainViewer overlay on a keyless Esri dark-gray basemap (city labels via the Esri reference layer); camera feeds render above the CRT scanline/vignette overlays for clarity.
 - **`ipad-wall-panel.yaml`**: YAML-managed Lovelace dashboard for the wall-mounted iPad in the Living Room. Registered in `configuration.yaml` under `lovelace.dashboards.ipad-wall-panel`.
 - **Original UI dashboard**: Backed up as `dashboard-backup-*.json` from `.storage/lovelace.dashboard_dashboard`.
 
@@ -276,7 +276,7 @@ Each integration is a Home Assistant standard package with a `manifest.json`, `_
 ### `uix`
 
 - **Purpose**: UI eXtension for Home Assistant (custom Lovelace/frontend extension).
-- **Version**: `8.0.1`.
+- **Version**: `8.1.0`.
 - **Integration Type**: `service`.
 - **Key Modules**:
   - `__init__.py` — frontend script registration and cleanup.

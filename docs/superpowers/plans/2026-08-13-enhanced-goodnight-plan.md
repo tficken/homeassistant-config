@@ -1,5 +1,7 @@
 # Enhanced Goodnight Routine Implementation Plan
 
+> **Note (2026-08-26):** Motion detection is no longer disabled at sunrise (stays on 24/7); see the design spec's note for details.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Replace the existing `script.goodnight` with a modular routine that checks doors/windows, smoothly dims lights, stops media, arms overnight monitoring, plays brown noise, and resets itself in the morning.

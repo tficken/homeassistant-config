@@ -1,5 +1,7 @@
 # AI Dashboard: Door Alerts & Ring Camera Snapshot Implementation Plan
 
+> **Note (2026-08-26):** Completed and shipped (checkboxes were left unchecked during execution). The camera half has since been superseded: ring-mqtt now provides snapshot cameras and reliable motion binary_sensors, the backyard cam is a true live ffmpeg/RTSP feed (`camera.backyard_rtsp_live`), and motion snapshots are archived with a HISTORY viewer. The door-alerts half is still accurate.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Stop door last-activity entries from permanently occupying the alert banner (show a self-dismissing RECENT highlight in the Doors section instead), and switch the battery-powered front door Ring camera on the SECURITY screen from a live stream to an event-refreshed still snapshot.

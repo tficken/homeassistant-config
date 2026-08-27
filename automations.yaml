@@ -256,7 +256,7 @@
 
 - id: '1786652844327'
   alias: PD New Incident
-  description: Flash the office ceiling fan red 3 times when a new PagerDuty incident is assigned, then restore prior state.
+  description: Flash the office ceiling fan red 3 times when a new high-urgency PagerDuty incident is assigned, then restore prior state.
   triggers:
   - trigger: state
     entity_id:
@@ -264,6 +264,10 @@
   conditions:
   - condition: template
     value_template: "{{ trigger.from_state is not none and trigger.to_state.state | int(0) > trigger.from_state.state | int(0) }}"
+  - condition: template
+    value_template: >-
+      {% set incs = state_attr('sensor.pagerduty_p2wm8b3_pagerduty_assigned_incidents', 'assigned_incidents') or [] %}
+      {{ incs | length > 0 and incs[0].urgency == 'high' }}
   actions:
   - action: scene.create
     data:

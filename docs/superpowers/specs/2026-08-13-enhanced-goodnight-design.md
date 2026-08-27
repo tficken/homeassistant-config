@@ -1,5 +1,7 @@
 # Enhanced Goodnight Routine
 
+> **Note (2026-08-26):** The sunrise reset described below no longer turns camera motion detection off — both Ring motion-detection switches stay on 24/7 so recordings/snapshot archiving keep working; night-only notification gating via `input_boolean.night_mode` is unchanged.
+
 ## Overview
 
 Replace the existing `script.goodnight` with a modular, voice/dashboard-friendly routine that:

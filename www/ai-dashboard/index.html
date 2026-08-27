@@ -64,6 +64,10 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
   position: fixed; inset: 0; z-index: 999; pointer-events: none;
   background: radial-gradient(circle at center, transparent 55%, rgba(0,0,0,0.55) 100%);
 }
+/* Camera feeds render above the scanlines/vignette CRT overlays for a clear
+   image; the retro effect stays on everything else. Scoped to .screen so the
+   settings editor preview and modal backdrops are unaffected. */
+.screen .camera-feed { position: relative; z-index: 1001; }
 .terminal-panel {
   background: var(--panel-bg);
   border: 1px solid var(--border);
@@ -1074,7 +1078,7 @@ function renderSnapshotHistory() {
          <button class="bottom-btn" style="padding:8px 18px;cursor:pointer;" onclick="stepSnapshotHistory(1)">NEWER ▶</button>
        </div>`
     : "";
-  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:1000;display:flex;align-items:center;justify-content:center;" onclick="closeSnapshotHistory()">
+  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:1200;display:flex;align-items:center;justify-content:center;" onclick="closeSnapshotHistory()">
     <div style="display:flex;flex-direction:column;align-items:center;max-width:92vw;" onclick="event.stopPropagation()">
       <div style="font-family:var(--font-mono);color:var(--green);letter-spacing:0.1em;margin-bottom:8px;align-self:stretch;display:flex;justify-content:space-between;">
         <span>⌂ ${escapeHtml(name)} — SNAPSHOT HISTORY</span>

@@ -1,5 +1,7 @@
 # Bug Fixes + Proxy/Dashboard Hardening Implementation Plan
 
+> **Note (2026-08-26):** All tasks completed and shipped (checkboxes were left unchecked during execution). One detail is stale: the radar basemap is now keyless Esri World Dark Gray + RainViewer overlay (not CartoCDN), so tile requests in verification checklists should read accordingly.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Apply the approved four-batch fix set (HA YAML fixes, dashboard live-update bugs, proxy hardening, dashboard code quality) from `docs/superpowers/specs/2026-08-18-bugfixes-and-hardening-design.md`.

@@ -1,5 +1,7 @@
 # Visual Layout Editor with Rearrangeable Panels — Design Spec
 
+> **Note (2026-08-26):** Shipped, except cross-screen panel moves were **not** implemented — each screen's builder only builds its own panels, and the defensive `DEFAULT_PANELS` merge re-appends misplaced panels on their default screen. The "all four renderers become generic panel assemblers" idea below does not reflect the shipped code. See AGENTS.md for current behavior.
+
 **Date:** 2026-08-19
 **Status:** Approved (design), pending implementation plan
 **Scope:** Replace the AI dashboard Settings → Layout section-box board with a visual preview editor: real rendered panels, entity-level drag add/remove/rearrange, panel-level drag rearrangement per screen, and a measured overflow check. Approved by user 2026-08-19.
