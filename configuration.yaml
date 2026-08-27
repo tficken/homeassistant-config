@@ -102,6 +102,15 @@ camera:
     name: Backyard RTSP Live
     input: -rtsp_transport tcp -i rtsp://03cabcc9-ring-mqtt:8554/343ea446d53f_live
     extra_arguments: -pred 1 -vf fps=2 -q:v 6
+  # Front door Ring cam RTSP (ring-mqtt) — used only for recording 10s motion/
+  # ding clips to the AI dashboard history archive via camera.record; the
+  # dashboard itself shows last-activity stills (battery cam, no live view).
+  # The RTSP path exists only while switch.front_door_live_stream is on.
+  # ffmpeg platform (not generic): generic validates the source at setup and
+  # never creates the entity while the stream is off; ffmpeg connects lazily.
+  - platform: ffmpeg
+    name: Front Door RTSP Live
+    input: -rtsp_transport tcp -i rtsp://03cabcc9-ring-mqtt:8554/343ea435ca6d_live
 
 # Reduce noisy integration logs while keeping errors visible
 logger:

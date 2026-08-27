@@ -1022,13 +1022,13 @@ function stopLivestreamCameras() {
   }
 }
 
-// Snapshot history viewer: motion/ding snapshots archived by the
+// Clip history viewer: 10s mp4 clips (plus legacy jpg stills) archived by the
 // ring_snapshot_archive_* automations, listed by GET /ai-dashboard/api/snapshots.
 const snapshotHistory = { key: null, entityId: null, files: [], idx: 0, loading: false };
 
 function snapshotTsLabel(file) {
-  // "2026-08-26_14-32-05.jpg" -> "Aug 26, 2:32:05 PM" (filenames are local time)
-  const m = file.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})\.jpg$/);
+  // "2026-08-26_14-32-05.mp4" -> "Aug 26, 2:32:05 PM" (filenames are local time)
+  const m = file.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})\.(jpg|mp4)$/);
   if (!m) return file;
   const d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
   return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" });
@@ -1081,11 +1081,16 @@ function renderSnapshotHistory() {
   const name = friendlyName(snapshotHistory.entityId || "");
   const n = snapshotHistory.files.length;
   const file = n ? snapshotHistory.files[snapshotHistory.idx] : null;
+  const mediaUrl = file ? `/ai-dashboard/snapshots/${encodeURIComponent(snapshotHistory.key)}/${encodeURIComponent(file)}` : "";
+  // mp4 = 10s clip from the ring-mqtt RTSP feed; jpg = legacy event still
+  const media = file && file.endsWith(".mp4")
+    ? `<video src="${mediaUrl}" style="max-width:88vw;max-height:70vh;display:block;border:1px solid var(--green);" controls autoplay muted loop playsinline></video>`
+    : `<img src="${mediaUrl}" style="max-width:88vw;max-height:70vh;object-fit:contain;display:block;border:1px solid var(--green);" alt="">`;
   const body = snapshotHistory.loading
     ? `<div style="color:var(--text-muted);font-family:var(--font-mono);padding:60px 0;">LOADING…</div>`
     : !n
-      ? `<div style="color:var(--text-muted);font-family:var(--font-mono);padding:60px 0;">NO SNAPSHOTS YET — saved on the next motion/ding event</div>`
-      : `<img src="/ai-dashboard/snapshots/${encodeURIComponent(snapshotHistory.key)}/${encodeURIComponent(file)}" style="max-width:88vw;max-height:70vh;object-fit:contain;display:block;border:1px solid var(--green);" alt="">
+      ? `<div style="color:var(--text-muted);font-family:var(--font-mono);padding:60px 0;">NO CLIPS YET — saved on the next motion/ding event</div>`
+      : `${media}
          <div style="font-family:var(--font-mono);color:var(--green);margin-top:8px;font-size:0.9rem;">${escapeHtml(snapshotTsLabel(file))} <span style="color:var(--text-muted);">· ${snapshotHistory.idx + 1} / ${n}</span></div>`;
   const nav = n > 1
     ? `<div style="display:flex;gap:12px;margin-top:10px;font-family:var(--font-mono);">
@@ -1096,7 +1101,7 @@ function renderSnapshotHistory() {
   const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:1200;display:flex;align-items:center;justify-content:center;" onclick="closeSnapshotHistory()">
     <div style="display:flex;flex-direction:column;align-items:center;max-width:92vw;" onclick="event.stopPropagation()">
       <div style="font-family:var(--font-mono);color:var(--green);letter-spacing:0.1em;margin-bottom:8px;align-self:stretch;display:flex;justify-content:space-between;">
-        <span>⌂ ${escapeHtml(name)} — SNAPSHOT HISTORY</span>
+        <span>⌂ ${escapeHtml(name)} — EVENT HISTORY</span>
         <span style="cursor:pointer;color:var(--text-muted);" onclick="closeSnapshotHistory()">[ CLOSE ✕ ]</span>
       </div>
       ${body}

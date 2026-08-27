@@ -164,7 +164,41 @@ async def dashboard_handler(request: web.Request) -> web.StreamResponse:
                 proxy_script + config_script + areas_script + b"</head>",
             )
 
-        return web.Response(body=body, content_type=content_type)
+        # Single-range support: Chrome's media stack seeks in fragmented mp4s
+        # (the motion/ding clips) via Range requests and stalls forever on a
+        # plain 200 full-body response.
+        range_header = request.headers.get("Range", "")
+        if range_header.startswith("bytes="):
+            total = len(body)
+            try:
+                spec = range_header[6:].partition(",")[0].strip()
+                start_s, _, end_s = spec.partition("-")
+                if start_s:
+                    start = int(start_s)
+                    end = int(end_s) if end_s else total - 1
+                else:  # suffix range: last N bytes
+                    start = max(0, total - int(end_s))
+                    end = total - 1
+                end = min(end, total - 1)
+                if start > end or start >= total:
+                    raise ValueError("unsatisfiable")
+            except ValueError:
+                return web.Response(status=416, text="Range not satisfiable")
+            return web.Response(
+                status=206,
+                body=body[start:end + 1],
+                content_type=content_type,
+                headers={
+                    "Content-Range": f"bytes {start}-{end}/{total}",
+                    "Accept-Ranges": "bytes",
+                },
+            )
+
+        return web.Response(
+            body=body,
+            content_type=content_type,
+            headers={"Accept-Ranges": "bytes"},
+        )
     except Exception as e:
         return web.Response(
             status=500,
@@ -512,11 +546,12 @@ async def config_save_handler(request: web.Request) -> web.StreamResponse:
 
 
 async def snapshots_handler(request: web.Request) -> web.StreamResponse:
-    """List archived motion/ding snapshots for a camera, pruning old ones.
+    """List archived motion/ding clips for a camera, pruning old ones.
 
-    Snapshots are written by the ring_snapshot_archive_* automations to
-    www/ai-dashboard/snapshots/<camera_key>/<local timestamp>.jpg and served
-    as plain static files by the dashboard catch-all route.
+    The ring_snapshot_archive_* automations record 10s mp4 clips from the
+    ring-mqtt RTSP feed into www/ai-dashboard/snapshots/<camera_key>/<local
+    timestamp>.mp4 (older .jpg stills are listed too), served as plain
+    static files by the dashboard catch-all route.
     """
     try:
         secret = request.app.get("ai_dashboard_secret")
@@ -536,8 +571,10 @@ async def snapshots_handler(request: web.Request) -> web.StreamResponse:
             if not os.path.isdir(snap_dir):
                 return []
             # Filenames are local timestamps, so name order == time order.
+            # .mp4 = 10s clips recorded by the ring_snapshot_archive_*
+            # automations; .jpg = legacy stills from the old snapshot version.
             files = sorted(
-                (f for f in os.listdir(snap_dir) if f.endswith(".jpg")),
+                (f for f in os.listdir(snap_dir) if f.endswith((".jpg", ".mp4"))),
                 reverse=True,
             )
             cutoff = dt_util.now() - timedelta(days=SNAPSHOT_MAX_AGE_DAYS)

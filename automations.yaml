@@ -396,7 +396,7 @@
 
 - id: ring_snapshot_archive_front_door
   alias: Ring snapshot archive - front door
-  description: Save a snapshot to the AI dashboard history archive on front door motion or ding
+  description: Record a 10s video clip to the AI dashboard history archive on front door motion or ding
   triggers:
     - trigger: state
       entity_id:
@@ -405,20 +405,31 @@
       to: "on"
   conditions: []
   actions:
-    # ring-mqtt pulls the event snapshot from Ring cloud a few seconds after the event
-    - delay: "00:00:08"
-    - action: camera.snapshot
+    # ring-mqtt's RTSP path only exists while the live-stream switch is on:
+    # spin it up, record a clip, then shut it back down (Ring kills streams
+    # after ~10 min and suppresses events while streaming anyway)
+    - action: switch.turn_on
       target:
-        entity_id: camera.front_door_snapshot
+        entity_id: switch.front_door_live_stream
+      continue_on_error: true
+    - delay: "00:00:08"
+    - action: camera.record
+      target:
+        entity_id: camera.front_door_rtsp_live
       data:
-        filename: "/config/www/ai-dashboard/snapshots/front_door/{{ now().strftime('%Y-%m-%d_%H-%M-%S') }}.jpg"
+        filename: "/config/www/ai-dashboard/snapshots/front_door/{{ now().strftime('%Y-%m-%d_%H-%M-%S') }}.mp4"
+        duration: 10
+      continue_on_error: true
+    - action: switch.turn_off
+      target:
+        entity_id: switch.front_door_live_stream
       continue_on_error: true
   mode: queued
   max: 5
 
 - id: ring_snapshot_archive_backyard
   alias: Ring snapshot archive - backyard
-  description: Save a snapshot to the AI dashboard history archive on backyard motion
+  description: Record a 10s video clip to the AI dashboard history archive on backyard motion
   triggers:
     - trigger: state
       entity_id:
@@ -426,13 +437,22 @@
       to: "on"
   conditions: []
   actions:
-    # ring-mqtt pulls the event snapshot from Ring cloud a few seconds after the event
-    - delay: "00:00:08"
-    - action: camera.snapshot
+    # Same on-demand RTSP spin-up as the front door
+    - action: switch.turn_on
       target:
-        entity_id: camera.downstairs_snapshot
+        entity_id: switch.downstairs_live_stream
+      continue_on_error: true
+    - delay: "00:00:08"
+    - action: camera.record
+      target:
+        entity_id: camera.backyard_live_stream
       data:
-        filename: "/config/www/ai-dashboard/snapshots/backyard/{{ now().strftime('%Y-%m-%d_%H-%M-%S') }}.jpg"
+        filename: "/config/www/ai-dashboard/snapshots/backyard/{{ now().strftime('%Y-%m-%d_%H-%M-%S') }}.mp4"
+        duration: 10
+      continue_on_error: true
+    - action: switch.turn_off
+      target:
+        entity_id: switch.downstairs_live_stream
       continue_on_error: true
   mode: queued
   max: 5
