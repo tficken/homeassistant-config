@@ -344,6 +344,7 @@
   - variables:
       name: "{{ trigger.to_state.attributes.friendly_name | default(trigger.to_state.name) }}"
       message: "{{ name }} is open"
+      prev_volume: "{{ state_attr('media_player.master_bedroom_echo_dot', 'volume_level') }}"
   - action: media_player.volume_set
     target:
       entity_id: media_player.master_bedroom_echo_dot
@@ -354,6 +355,14 @@
       message: "{{ message }}"
       data:
         type: announce
+  - delay: "00:00:08"
+  - condition: template
+    value_template: "{{ prev_volume is not none }}"
+  - action: media_player.volume_set
+    target:
+      entity_id: media_player.master_bedroom_echo_dot
+    data:
+      volume_level: "{{ prev_volume }}"
   - choose:
     - conditions:
       - condition: template
