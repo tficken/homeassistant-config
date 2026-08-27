@@ -64,10 +64,15 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
   position: fixed; inset: 0; z-index: 999; pointer-events: none;
   background: radial-gradient(circle at center, transparent 55%, rgba(0,0,0,0.55) 100%);
 }
-/* Camera feeds render above the scanlines/vignette CRT overlays for a clear
-   image; the retro effect stays on everything else. Scoped to .screen so the
-   settings editor preview and modal backdrops are unaffected. */
-.screen .camera-feed { position: relative; z-index: 1001; }
+/* Camera feeds and the radar map render above the scanlines/vignette CRT
+   overlays for a clear image; the retro effect stays on everything else.
+   Scoped to .screen so the settings editor preview and modal backdrops are
+   unaffected. The overlay divs must live INSIDE #app for this to work:
+   #app forms its own stacking context (position:fixed + z-index:1), so an
+   overlay outside it would paint above app content no matter what z-index
+   the content uses. */
+.screen .camera-feed,
+.screen #radar-map { position: relative; z-index: 1001; }
 .terminal-panel {
   background: var(--panel-bg);
   border: 1px solid var(--border);
@@ -265,8 +270,6 @@ input[type="range"] { accent-color: var(--green); }
 </style>
 </head>
 <body>
-<div class="scanlines"></div>
-<div class="vignette"></div>
 <div id="status-led" class="status-led" style="position:fixed;top:14px;left:14px;z-index:50;"></div>
 <div id="status-text" style="position:fixed;top:12px;left:32px;z-index:50;font-family:var(--font-mono);font-size:0.75rem;color:var(--text-muted);">CONNECTING</div>
 <div id="conn-banner" style="display:none;position:fixed;top:0;left:0;right:0;z-index:60;background:rgba(255,174,0,0.12);border:1px solid var(--amber);color:var(--amber);font-family:var(--font-mono);padding:10px 14px;letter-spacing:0.05em;text-align:center;">! CONNECTION LOST — RETRYING</div>
@@ -277,6 +280,13 @@ input[type="range"] { accent-color: var(--green); }
   <div id="security-screen" class="screen">SECURITY</div>
   <div id="status-screen" class="screen">STATUS MONITOR</div>
   <div id="dock" style="display:flex;gap:14px;height:82px;flex-shrink:0;"></div>
+  <!-- CRT overlays must be the last children of #app: #app forms its own
+       stacking context, so overlays outside it would paint above ALL app
+       content and the camera-feed/radar-map z-index:1001 lift could never
+       win. Inside #app, z-index 999/1000 still covers normal content while
+       1001 elements (camera feeds, radar map) render clear. -->
+  <div class="vignette"></div>
+  <div class="scanlines"></div>
 </div>
 
 <div id="settings-overlay" style="position:fixed;inset:0;z-index:100;background:rgba(0,0,0,0.75);display:none;align-items:center;justify-content:center;">
@@ -1144,17 +1154,23 @@ async function initRadarMap() {
     const map = window.L.map(el, { zoomControl: false, maxZoom: 10 }).setView(
       [haConfig.latitude, haConfig.longitude], 8
     );
-    // Esri's dark gray canvas is keyless (CARTO's basemaps now watermark
-    // "API KEY REQUIRED"); radar overlay is RainViewer (also keyless). The
-    // base layer is CSS-darkened toward black (see .radar-basemap) and a
-    // separate reference layer adds light city labels on top.
+    // Keyless Esri stack (CARTO's basemaps now watermark "API KEY REQUIRED");
+    // radar overlay is RainViewer (also keyless). Base is the dark gray
+    // canvas, CSS-darkened toward black (see .radar-basemap). Above the
+    // animated radar frames: World_Transportation adds bold highways/
+    // interstates, and Boundaries_and_Places_Alternate (the light-on-dark
+    // variant) adds state lines and city labels.
     window.L.tileLayer(
       "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
       { maxZoom: 16, className: "radar-basemap", attribution: "Esri, HERE, Garmin, FAO, NOAA, USGS" }
     ).addTo(map);
     window.L.tileLayer(
-      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
       { maxZoom: 16, zIndex: 10 } // above the animated radar frames
+    ).addTo(map);
+    window.L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places_Alternate/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 16, zIndex: 11 } // labels/boundaries on top of roads
     ).addTo(map);
 
     // Use the last 8 frames (~80 min) to keep tile count reasonable.
