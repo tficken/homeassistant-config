@@ -652,6 +652,68 @@ function relativeTime(isoString) {
   return `${days}d ago`;
 }
 
+// Recorder-backed "last event" times. state.last_changed resets to the HA
+// restart time for restored entities, so door "last opened" and presence
+// "last seen" would falsely read "minutes ago" after every reboot. The cache
+// is seeded from recorder history (POST /ai-dashboard/api/history, survives
+// restarts) and then kept current by tracking real state transitions from WS
+// events — restart republishes arrive with an unchanged state and are ignored.
+const lastEventCache = {}; // entity_id -> ms epoch
+
+function doorEntityIds() {
+  return (config.sections && config.sections.doors && config.sections.doors.entities) || [];
+}
+
+function lastEventTime(id) {
+  const ms = lastEventCache[id];
+  if (ms) return new Date(ms).toISOString();
+  const st = states[id];
+  return st ? st.last_changed : null;
+}
+
+// Re-primed (merged, newest wins) on every full states reload so events that
+// happened while the socket was down (e.g. mid-restart) are picked up.
+async function primeLastEventCache() {
+  if (!window.HA_INTEGRATION_PROXY) return;
+  const doorIds = doorEntityIds();
+  const personIds = getPresenceEntities();
+  const ids = [...new Set([...doorIds, ...personIds])];
+  if (!ids.length) return;
+  try {
+    const resp = await fetch("/ai-dashboard/api/history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entity_ids: ids, hours: 168 }),
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const now = Date.now();
+    for (const id of ids) {
+      const rows = data[id] || [];
+      let ms = null;
+      if (doorIds.includes(id)) {
+        // last time the door was OPEN (not just last open/close flip)
+        for (let i = rows.length - 1; i >= 0; i--) {
+          if (String(rows[i].state).toLowerCase() === "on") { ms = Date.parse(rows[i].last_changed); break; }
+        }
+      } else if (rows.length) {
+        ms = Date.parse(rows[rows.length - 1].last_changed);
+      }
+      if (ms && ms <= now) lastEventCache[id] = Math.max(lastEventCache[id] || 0, ms);
+    }
+  } catch (e) { /* cache stays as-is; renderers fall back to last_changed */ }
+}
+
+function trackLastEvent(prev, next) {
+  if (!prev || !next || prev.state === next.state) return;
+  const id = next.entity_id;
+  if (doorEntityIds().includes(id)) {
+    if (String(next.state).toLowerCase() === "on") lastEventCache[id] = Date.now();
+  } else if (getPresenceEntities().includes(id)) {
+    lastEventCache[id] = Date.now();
+  }
+}
+
 const DOOR_RECENT_WINDOW_MS = 10 * 60 * 1000;
 
 function recentDoorIds() {
@@ -1375,7 +1437,7 @@ function renderDoors() {
     const statusColor = offline ? "var(--text-muted)" : (open ? "var(--danger)" : "var(--green)");
     const ledState = offline ? "off" : (open ? "danger" : "on");
 
-    const lastActivity = state && !offline ? relativeTime(state.last_changed) : "";
+    const lastActivity = state && !offline ? relativeTime(lastEventTime(id)) : "";
     const isRecent = recentDoors.includes(id);
 
     return `
@@ -1384,7 +1446,7 @@ function renderDoors() {
           ${renderStatusLed(ledState)}
           <div>
             <div style="font-family:var(--font-mono);font-size:1rem;color:var(--text);">${escapeHtml(label)}</div>
-            ${lastActivity ? `<div style="font-size:0.75rem;color:var(--text-muted);">${isRecent ? '<span style="color:var(--amber);font-family:var(--font-mono);">RECENT&nbsp;</span>' : ""}${escapeHtml(lastActivity)}</div>` : ""}
+            ${lastActivity ? `<div style="font-size:0.75rem;color:var(--text-muted);">${isRecent ? '<span style="color:var(--amber);font-family:var(--font-mono);">RECENT&nbsp;</span>' : ""}OPENED ${escapeHtml(lastActivity)}</div>` : ""}
           </div>
         </div>
         <span style="font-family:var(--font-mono);font-size:1.1rem;color:${statusColor};">${statusText}</span>
@@ -1458,7 +1520,7 @@ function buildHomePanels() {
         break;
       }
     }
-    const lastSeen = state ? relativeTime(state.last_changed) : "";
+    const lastSeen = state ? relativeTime(lastEventTime(id)) : "";
     return `
       <div class="terminal-panel" data-entity-id="${id}" style="display:flex;align-items:center;gap:12px;padding:14px;">
         <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:1.6rem;color:var(--green);box-shadow:0 0 12px rgba(20,254,23,0.15);flex-shrink:0;">${initial}</div>
@@ -2809,11 +2871,12 @@ function connectProxy() {
       for (const s of msg.result) states[s.entity_id] = s;
       await fetchRegistry();
       await refreshForecast();
+      await primeLastEventCache();
       renderAll();
     }
     if (msg.type === "event" && msg.event && msg.event.event_type === "state_changed") {
       const s = msg.event.data.new_state;
-      if (s) { states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
+      if (s) { trackLastEvent(states[s.entity_id], s); states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
     }
   };
   ws.onclose = () => {
@@ -2856,7 +2919,7 @@ function connect() {
     }
     if (msg.type === "event" && msg.event && msg.event.event_type === "state_changed") {
       const s = msg.event.data.new_state;
-      if (s) { states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
+      if (s) { trackLastEvent(states[s.entity_id], s); states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
     }
   };
   ws.onclose = () => {
