@@ -839,6 +839,14 @@ function setBrightness(entityId, pct) {
   sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, brightness: value } });
 }
 
+function setColorTemp(entityId, kelvin) {
+  sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, color_temp_kelvin: parseInt(kelvin, 10) } });
+}
+
+function setLightColor(entityId, rgb) {
+  sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, rgb_color: rgb } });
+}
+
 async function fetchRegistry() {
   if (window.HA_INTEGRATION_PROXY) {
     // Proxied dashboard has no HA token; the registry endpoints would 401.
@@ -905,12 +913,34 @@ function renderLightCard(entityId) {
   const active = state ? isActive(state.state) : false;
   const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
   const pct = Math.round((brightness / 255) * 100);
+  // Color/temp controls for capable lights, shown alongside the brightness
+  // slider while the light is on (mirrors HA's more-info dialog).
+  let colorControls = "";
+  if (active && !offline && state && state.attributes) {
+    const modes = state.attributes.supported_color_modes || [];
+    if (modes.includes("color_temp")) {
+      const minK = state.attributes.min_color_temp_kelvin || 2000;
+      const maxK = state.attributes.max_color_temp_kelvin || 6500;
+      const curK = state.attributes.color_temp_kelvin || Math.round((minK + maxK) / 2);
+      colorControls += `<div style="display:flex;align-items:center;gap:10px;margin-top:2px;" onclick="event.stopPropagation();">
+        <span style="color:var(--amber);font-size:1rem;" title="Warm">&#9728;</span>
+        <input type="range" min="${minK}" max="${maxK}" value="${curK}" style="flex:1;min-height:36px;" onchange="setColorTemp('${entityId}', this.value)">
+        <span style="color:#7ab8ff;font-size:1rem;" title="Cool">&#10052;</span>
+      </div>`;
+    }
+    if (modes.some(m => ["hs", "rgb", "rgbw", "rgbww", "xy"].includes(m))) {
+      const swatches = [[255, 255, 255], [255, 180, 120], [255, 60, 60], [255, 150, 30], [255, 225, 60], [60, 200, 90], [50, 130, 255], [160, 70, 255]]
+        .map(c => `<button title="Set color" style="width:34px;height:34px;border-radius:50%;background:rgb(${c[0]},${c[1]},${c[2]});border:1px solid var(--border);cursor:pointer;flex-shrink:0;" onclick="event.stopPropagation();setLightColor('${entityId}', [${c[0]},${c[1]},${c[2]}])"></button>`)
+        .join("");
+      colorControls += `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;" onclick="event.stopPropagation();">${swatches}</div>`;
+    }
+  }
   return `<div class="terminal-panel" data-entity-id="${entityId}">
     <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;" onclick="toggleEntity('${entityId}')">
       <div>${renderStatusLed(offline ? "unavailable" : (active ? "on" : "off"))} <span style="font-family:var(--font-mono);">${escapeHtml(friendlyName(entityId))}</span></div>
       <div style="color:var(--text-muted);font-family:var(--font-mono);">${offline ? "OFFLINE" : (active ? "ON" : "OFF")}</div>
     </div>
-    ${active && !offline ? `<div class="panel-body" style="padding-top:0;"><input type="range" min="0" max="100" value="${pct}" style="width:100%;min-height:44px;" onchange="setBrightness('${entityId}', this.value)" onclick="event.stopPropagation();"></div>` : ""}
+    ${active && !offline ? `<div class="panel-body" style="padding-top:0;"><input type="range" min="0" max="100" value="${pct}" style="width:100%;min-height:44px;" onchange="setBrightness('${entityId}', this.value)" onclick="event.stopPropagation();">${colorControls}</div>` : ""}
   </div>`;
 }
 
