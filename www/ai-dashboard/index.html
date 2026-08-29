@@ -907,14 +907,27 @@ function renderSceneButton(entityId) {
   return `<button class="scene-btn" data-entity-id="${entityId}" onclick="toggleEntity('${entityId}')">${escapeHtml(name)}</button>`;
 }
 
+// Expanded/collapsed state for the per-light color controls (survives card
+// re-renders on state updates).
+const lightControlsOpen = {};
+
+function toggleLightControls(entityId) {
+  lightControlsOpen[entityId] = !lightControlsOpen[entityId];
+  const safeId = entityId.replace(/\./g, "-");
+  const el = document.getElementById("lc-" + safeId);
+  if (el) el.style.display = lightControlsOpen[entityId] ? "" : "none";
+  const arrow = document.getElementById("lc-arrow-" + safeId);
+  if (arrow) arrow.textContent = lightControlsOpen[entityId] ? "▾" : "▸";
+}
+
 function renderLightCard(entityId) {
   const state = states[entityId];
   const offline = isUnavailable(state);
   const active = state ? isActive(state.state) : false;
   const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
   const pct = Math.round((brightness / 255) * 100);
-  // Color/temp controls for capable lights, shown alongside the brightness
-  // slider while the light is on (mirrors HA's more-info dialog).
+  // Color/temp controls for capable lights — collapsed behind a chevron by
+  // default; the brightness slider stays always-visible while the light is on.
   let colorControls = "";
   if (active && !offline && state && state.attributes) {
     const modes = state.attributes.supported_color_modes || [];
@@ -935,12 +948,18 @@ function renderLightCard(entityId) {
       colorControls += `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;" onclick="event.stopPropagation();">${swatches}</div>`;
     }
   }
+  const safeId = entityId.replace(/\./g, "-");
+  const open = !!lightControlsOpen[entityId];
   return `<div class="terminal-panel" data-entity-id="${entityId}">
-    <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;" onclick="toggleEntity('${entityId}')">
+    <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
       <div>${renderStatusLed(offline ? "unavailable" : (active ? "on" : "off"))} <span style="font-family:var(--font-mono);">${escapeHtml(friendlyName(entityId))}</span></div>
-      <div style="color:var(--text-muted);font-family:var(--font-mono);">${offline ? "OFFLINE" : (active ? "ON" : "OFF")}</div>
+      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+        <span style="color:var(--text-muted);font-family:var(--font-mono);">${offline ? "OFFLINE" : (active ? "ON" : "OFF")}</span>
+        ${colorControls ? `<span id="lc-arrow-${safeId}" title="Color controls" style="cursor:pointer;color:var(--text-muted);font-size:1.2rem;padding:6px 10px;user-select:none;" onclick="toggleLightControls('${entityId}')">${open ? "▾" : "▸"}</span>` : ""}
+        <button title="Toggle" style="width:44px;height:44px;border-radius:50%;border:1px solid ${active ? "var(--green)" : "var(--border)"};background:transparent;color:${active ? "var(--green)" : "var(--text-muted)"};font-size:1.25rem;cursor:pointer;${active ? "box-shadow:0 0 10px rgba(20,254,23,0.25);" : ""}" onclick="toggleEntity('${entityId}')">&#x23FB;</button>
+      </div>
     </div>
-    ${active && !offline ? `<div class="panel-body" style="padding-top:0;"><input type="range" min="0" max="100" value="${pct}" style="width:100%;min-height:44px;" onchange="setBrightness('${entityId}', this.value)" onclick="event.stopPropagation();">${colorControls}</div>` : ""}
+    ${active && !offline ? `<div class="panel-body" style="padding-top:0;"><input type="range" min="0" max="100" value="${pct}" style="width:100%;min-height:44px;" onchange="setBrightness('${entityId}', this.value)">${colorControls ? `<div id="lc-${safeId}" style="display:${open ? "" : "none"};">${colorControls}</div>` : ""}</div>` : ""}
   </div>`;
 }
 
