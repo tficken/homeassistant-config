@@ -40,6 +40,10 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
   0%, 100% { opacity: 1; }
   50% { opacity: 0.985; }
 }
+@keyframes lightModalPop {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
 #app {
   position: fixed; inset: 0; z-index: 1;
   display: flex; flex-direction: column;
@@ -907,9 +911,10 @@ function renderSceneButton(entityId) {
   return `<button class="scene-btn" data-entity-id="${entityId}" onclick="toggleEntity('${entityId}')">${escapeHtml(name)}</button>`;
 }
 
-// Light cards are one big button: tap opens the settings modal, press-and-hold
-// (~500ms) cycles power. A pointer move cancels the press so scrolling on a
-// touch screen triggers neither action.
+// Light cards are one big button: tap cycles power, press-and-hold (~500ms)
+// opens the settings modal — the same gesture order as HA's native UI. A
+// pointer move cancels the press so scrolling on a touch screen triggers
+// neither action.
 const lightPress = { timer: null, held: false, x: 0, y: 0 };
 
 function lightPressStart(ev, entityId) {
@@ -918,7 +923,7 @@ function lightPressStart(ev, entityId) {
   lightPress.x = ev.clientX;
   lightPress.y = ev.clientY;
   clearTimeout(lightPress.timer);
-  lightPress.timer = setTimeout(() => { lightPress.held = true; toggleEntity(entityId); }, 500);
+  lightPress.timer = setTimeout(() => { lightPress.held = true; openLightModal(entityId); }, 500);
 }
 function lightPressMove(ev) {
   if (!lightPress.timer) return;
@@ -928,7 +933,7 @@ function lightPressEnd(ev, entityId) {
   if (ev.button != null && ev.button !== 0) return;
   clearTimeout(lightPress.timer);
   lightPress.timer = null;
-  if (!lightPress.held) openLightModal(entityId);
+  if (!lightPress.held) toggleEntity(entityId);
   lightPress.held = false;
 }
 function lightPressCancel() {
@@ -947,22 +952,28 @@ function buildLightColorControls(entityId) {
     const minK = state.attributes.min_color_temp_kelvin || 2000;
     const maxK = state.attributes.max_color_temp_kelvin || 6500;
     const curK = state.attributes.color_temp_kelvin || Math.round((minK + maxK) / 2);
-    html += `<div style="display:flex;align-items:center;gap:10px;">
-      <span style="color:var(--amber);font-size:1rem;" title="Warm">&#9728;</span>
-      <input type="range" min="${minK}" max="${maxK}" value="${curK}" style="flex:1;min-height:36px;" onchange="setColorTemp('${entityId}', this.value)">
-      <span style="color:#7ab8ff;font-size:1rem;" title="Cool">&#10052;</span>
+    html += `<div>
+      <div style="font-size:0.72rem;color:var(--text-muted);letter-spacing:0.12em;margin-bottom:6px;">COLOR TEMP · ${curK}K</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="color:var(--amber);font-size:1.1rem;" title="Warm">&#9728;</span>
+        <input type="range" min="${minK}" max="${maxK}" value="${curK}" style="flex:1;min-height:36px;accent-color:var(--amber);" onchange="setColorTemp('${entityId}', this.value)">
+        <span style="color:#7ab8ff;font-size:1.1rem;" title="Cool">&#10052;</span>
+      </div>
     </div>`;
   }
   if (modes.some(m => ["hs", "rgb", "rgbw", "rgbww", "xy"].includes(m))) {
     const swatches = [[255, 255, 255], [255, 180, 120], [255, 60, 60], [255, 150, 30], [255, 225, 60], [60, 200, 90], [50, 130, 255], [160, 70, 255]]
-      .map(c => `<button title="Set color" style="width:34px;height:34px;border-radius:50%;background:rgb(${c[0]},${c[1]},${c[2]});border:1px solid var(--border);cursor:pointer;flex-shrink:0;" onclick="setLightColor('${entityId}', [${c[0]},${c[1]},${c[2]}])"></button>`)
+      .map(c => `<button title="Set color" style="width:38px;height:38px;border-radius:50%;background:rgb(${c[0]},${c[1]},${c[2]});border:1px solid var(--border);cursor:pointer;flex-shrink:0;box-shadow:0 0 8px rgba(${c[0]},${c[1]},${c[2]},0.35);" onclick="setLightColor('${entityId}', [${c[0]},${c[1]},${c[2]}])"></button>`)
       .join("");
-    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;">${swatches}</div>`;
+    html += `<div>
+      <div style="font-size:0.72rem;color:var(--text-muted);letter-spacing:0.12em;margin-bottom:6px;">COLOR</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">${swatches}</div>
+    </div>`;
   }
   return html;
 }
 
-// Tap-target modal with a light's full controls (power / brightness / temp / color).
+// Hold-target modal with a light's full controls (brightness / temp / color).
 let lightModalEntity = null;
 
 function openLightModal(entityId) { lightModalEntity = entityId; renderLightModal(); }
@@ -981,19 +992,22 @@ function renderLightModal() {
   const active = state ? isActive(state.state) : false;
   const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
   const pct = Math.round((brightness / 255) * 100);
-  const powerBtn = `<button title="Toggle power" style="width:52px;height:52px;border-radius:50%;border:1px solid ${active ? "var(--green)" : "var(--border)"};background:transparent;color:${active ? "var(--green)" : "var(--text-muted)"};cursor:pointer;display:inline-flex;align-items:center;justify-content:center;${active ? "box-shadow:0 0 10px rgba(20,254,23,0.25);" : ""}" onclick="toggleEntity('${entityId}')"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v7"/><path d="M6.8 6.8a7.5 7.5 0 1 0 10.4 0"/></svg></button>`;
-  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1200;display:flex;align-items:center;justify-content:center;" onclick="closeLightModal()">
-    <div class="terminal-panel" style="width:min(560px,92vw);" onclick="event.stopPropagation()">
+  const powerBtn = `<button title="Toggle power" style="width:56px;height:56px;border-radius:50%;border:1px solid ${active ? "var(--green)" : "var(--border)"};background:${active ? "rgba(20,254,23,0.08)" : "transparent"};color:${active ? "var(--green)" : "var(--text-muted)"};cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:box-shadow .15s,color .15s;${active ? "box-shadow:0 0 16px rgba(20,254,23,0.35);" : ""}" onclick="toggleEntity('${entityId}')"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v7"/><path d="M6.8 6.8a7.5 7.5 0 1 0 10.4 0"/></svg></button>`;
+  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(3px);z-index:1200;display:flex;align-items:center;justify-content:center;" onclick="closeLightModal()">
+    <div class="terminal-panel" style="width:min(560px,92vw);animation:lightModalPop .12s ease-out;" onclick="event.stopPropagation()">
       <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
-        <span>${escapeHtml(friendlyName(entityId)).toUpperCase()}</span>
-        <span style="cursor:pointer;color:var(--text-muted);" onclick="closeLightModal()">[ CLOSE ✕ ]</span>
+        <span>${escapeHtml(friendlyName(entityId))}</span>
+        <span style="cursor:pointer;color:var(--text-muted);text-shadow:none;" onclick="closeLightModal()">[ CLOSE ✕ ]</span>
       </div>
-      <div class="panel-body" style="display:flex;flex-direction:column;gap:14px;">
+      <div class="panel-body" style="display:flex;flex-direction:column;gap:18px;padding:16px 18px 20px;">
         <div style="display:flex;align-items:center;justify-content:space-between;">
-          <span style="color:var(--text-muted);font-family:var(--font-mono);">${offline ? "OFFLINE" : (active ? "ON" : "OFF")}</span>
+          <span style="font-family:var(--font-mono);letter-spacing:0.1em;color:${offline ? "var(--text-muted)" : (active ? "var(--green)" : "var(--text-muted)")};${active ? "text-shadow:0 0 8px rgba(20,254,23,0.5);" : ""}">${offline ? "○ OFFLINE" : (active ? "● ON" : "○ OFF")}</span>
           ${powerBtn}
         </div>
-        ${active && !offline ? `<input type="range" min="0" max="100" value="${pct}" style="width:100%;min-height:44px;" onchange="setBrightness('${entityId}', this.value)">` : ""}
+        ${active && !offline ? `<div>
+          <div style="font-size:0.72rem;color:var(--text-muted);letter-spacing:0.12em;margin-bottom:6px;">BRIGHTNESS · ${pct}%</div>
+          <input type="range" min="0" max="100" value="${pct}" style="width:100%;min-height:44px;accent-color:var(--green);" onchange="setBrightness('${entityId}', this.value)">
+        </div>` : ""}
         ${buildLightColorControls(entityId)}
       </div>
     </div>
@@ -1010,11 +1024,15 @@ function renderLightCard(entityId) {
   const state = states[entityId];
   const offline = isUnavailable(state);
   const active = state ? isActive(state.state) : false;
-  return `<div class="terminal-panel" data-entity-id="${entityId}">
-    <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;"
+  const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
+  const pct = Math.round((brightness / 255) * 100);
+  // Active lights get a soft green tint/glow so the panel reads at a glance.
+  const lit = active && !offline;
+  return `<div class="terminal-panel" data-entity-id="${entityId}" style="${lit ? "border-color:rgba(20,254,23,0.45);background:linear-gradient(180deg,rgba(20,254,23,0.07),rgba(20,254,23,0.02));box-shadow:0 0 16px rgba(20,254,23,0.15), inset 0 0 24px rgba(20,254,23,0.04);" : ""}">
+    <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;padding:14px 16px;"
       onpointerdown="lightPressStart(event,'${entityId}')" onpointermove="lightPressMove(event)" onpointerup="lightPressEnd(event,'${entityId}')" onpointercancel="lightPressCancel()" oncontextmenu="event.preventDefault()">
-      <div>${renderStatusLed(offline ? "unavailable" : (active ? "on" : "off"))} <span style="font-family:var(--font-mono);">${escapeHtml(friendlyName(entityId))}</span></div>
-      <div style="color:var(--text-muted);font-family:var(--font-mono);">${offline ? "OFFLINE" : (active ? "ON" : "OFF")}</div>
+      <div>${renderStatusLed(offline ? "unavailable" : (active ? "on" : "off"))} <span style="font-family:var(--font-mono);${lit ? "text-shadow:0 0 8px rgba(20,254,23,0.4);" : ""}">${escapeHtml(friendlyName(entityId))}</span></div>
+      <div style="color:${lit ? "var(--green)" : "var(--text-muted)"};font-family:var(--font-mono);letter-spacing:0.08em;">${offline ? "OFFLINE" : (active ? `ON · ${pct}%` : "OFF")}</div>
     </div>
   </div>`;
 }
