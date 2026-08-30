@@ -907,59 +907,115 @@ function renderSceneButton(entityId) {
   return `<button class="scene-btn" data-entity-id="${entityId}" onclick="toggleEntity('${entityId}')">${escapeHtml(name)}</button>`;
 }
 
-// Expanded/collapsed state for the per-light color controls (survives card
-// re-renders on state updates).
-const lightControlsOpen = {};
+// Light cards are one big button: tap opens the settings modal, press-and-hold
+// (~500ms) cycles power. A pointer move cancels the press so scrolling on a
+// touch screen triggers neither action.
+const lightPress = { timer: null, held: false, x: 0, y: 0 };
 
-function toggleLightControls(entityId) {
-  lightControlsOpen[entityId] = !lightControlsOpen[entityId];
-  const safeId = entityId.replace(/\./g, "-");
-  const el = document.getElementById("lc-" + safeId);
-  if (el) el.style.display = lightControlsOpen[entityId] ? "" : "none";
-  const arrow = document.getElementById("lc-arrow-" + safeId);
-  if (arrow) arrow.textContent = lightControlsOpen[entityId] ? "▾" : "▸";
+function lightPressStart(ev, entityId) {
+  if (ev.button != null && ev.button !== 0) return;
+  lightPress.held = false;
+  lightPress.x = ev.clientX;
+  lightPress.y = ev.clientY;
+  clearTimeout(lightPress.timer);
+  lightPress.timer = setTimeout(() => { lightPress.held = true; toggleEntity(entityId); }, 500);
+}
+function lightPressMove(ev) {
+  if (!lightPress.timer) return;
+  if (Math.hypot(ev.clientX - lightPress.x, ev.clientY - lightPress.y) > 12) lightPressCancel();
+}
+function lightPressEnd(ev, entityId) {
+  if (ev.button != null && ev.button !== 0) return;
+  clearTimeout(lightPress.timer);
+  lightPress.timer = null;
+  if (!lightPress.held) openLightModal(entityId);
+  lightPress.held = false;
+}
+function lightPressCancel() {
+  clearTimeout(lightPress.timer);
+  lightPress.timer = null;
+  lightPress.held = false;
+}
+
+// Color-temp slider + swatches for capable lights (shown in the light modal).
+function buildLightColorControls(entityId) {
+  const state = states[entityId];
+  if (!state || !state.attributes || !isActive(state.state) || isUnavailable(state)) return "";
+  const modes = state.attributes.supported_color_modes || [];
+  let html = "";
+  if (modes.includes("color_temp")) {
+    const minK = state.attributes.min_color_temp_kelvin || 2000;
+    const maxK = state.attributes.max_color_temp_kelvin || 6500;
+    const curK = state.attributes.color_temp_kelvin || Math.round((minK + maxK) / 2);
+    html += `<div style="display:flex;align-items:center;gap:10px;">
+      <span style="color:var(--amber);font-size:1rem;" title="Warm">&#9728;</span>
+      <input type="range" min="${minK}" max="${maxK}" value="${curK}" style="flex:1;min-height:36px;" onchange="setColorTemp('${entityId}', this.value)">
+      <span style="color:#7ab8ff;font-size:1rem;" title="Cool">&#10052;</span>
+    </div>`;
+  }
+  if (modes.some(m => ["hs", "rgb", "rgbw", "rgbww", "xy"].includes(m))) {
+    const swatches = [[255, 255, 255], [255, 180, 120], [255, 60, 60], [255, 150, 30], [255, 225, 60], [60, 200, 90], [50, 130, 255], [160, 70, 255]]
+      .map(c => `<button title="Set color" style="width:34px;height:34px;border-radius:50%;background:rgb(${c[0]},${c[1]},${c[2]});border:1px solid var(--border);cursor:pointer;flex-shrink:0;" onclick="setLightColor('${entityId}', [${c[0]},${c[1]},${c[2]}])"></button>`)
+      .join("");
+    html += `<div style="display:flex;gap:8px;flex-wrap:wrap;">${swatches}</div>`;
+  }
+  return html;
+}
+
+// Tap-target modal with a light's full controls (power / brightness / temp / color).
+let lightModalEntity = null;
+
+function openLightModal(entityId) { lightModalEntity = entityId; renderLightModal(); }
+function closeLightModal() { lightModalEntity = null; renderLightModal(); }
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && lightModalEntity) closeLightModal(); });
+
+function renderLightModal() {
+  let el = document.getElementById("light-modal-overlay");
+  if (!lightModalEntity) { if (el) el.remove(); return; }
+  // Never yank the DOM out from under an active slider drag on state updates.
+  const ae = document.activeElement;
+  if (el && ae && ae.tagName === "INPUT" && ae.type === "range" && el.contains(ae)) return;
+  const entityId = lightModalEntity;
+  const state = states[entityId];
+  const offline = isUnavailable(state);
+  const active = state ? isActive(state.state) : false;
+  const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
+  const pct = Math.round((brightness / 255) * 100);
+  const powerBtn = `<button title="Toggle power" style="width:52px;height:52px;border-radius:50%;border:1px solid ${active ? "var(--green)" : "var(--border)"};background:transparent;color:${active ? "var(--green)" : "var(--text-muted)"};cursor:pointer;display:inline-flex;align-items:center;justify-content:center;${active ? "box-shadow:0 0 10px rgba(20,254,23,0.25);" : ""}" onclick="toggleEntity('${entityId}')"><svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v7"/><path d="M6.8 6.8a7.5 7.5 0 1 0 10.4 0"/></svg></button>`;
+  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1200;display:flex;align-items:center;justify-content:center;" onclick="closeLightModal()">
+    <div class="terminal-panel" style="width:min(560px,92vw);" onclick="event.stopPropagation()">
+      <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>${escapeHtml(friendlyName(entityId)).toUpperCase()}</span>
+        <span style="cursor:pointer;color:var(--text-muted);" onclick="closeLightModal()">[ CLOSE ✕ ]</span>
+      </div>
+      <div class="panel-body" style="display:flex;flex-direction:column;gap:14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="color:var(--text-muted);font-family:var(--font-mono);">${offline ? "OFFLINE" : (active ? "ON" : "OFF")}</span>
+          ${powerBtn}
+        </div>
+        ${active && !offline ? `<input type="range" min="0" max="100" value="${pct}" style="width:100%;min-height:44px;" onchange="setBrightness('${entityId}', this.value)">` : ""}
+        ${buildLightColorControls(entityId)}
+      </div>
+    </div>
+  </div>`;
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "light-modal-overlay";
+    document.body.appendChild(el);
+  }
+  el.innerHTML = html;
 }
 
 function renderLightCard(entityId) {
   const state = states[entityId];
   const offline = isUnavailable(state);
   const active = state ? isActive(state.state) : false;
-  const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
-  const pct = Math.round((brightness / 255) * 100);
-  // Color/temp controls for capable lights — collapsed behind a chevron by
-  // default; the brightness slider stays always-visible while the light is on.
-  let colorControls = "";
-  if (active && !offline && state && state.attributes) {
-    const modes = state.attributes.supported_color_modes || [];
-    if (modes.includes("color_temp")) {
-      const minK = state.attributes.min_color_temp_kelvin || 2000;
-      const maxK = state.attributes.max_color_temp_kelvin || 6500;
-      const curK = state.attributes.color_temp_kelvin || Math.round((minK + maxK) / 2);
-      colorControls += `<div style="display:flex;align-items:center;gap:10px;margin-top:2px;" onclick="event.stopPropagation();">
-        <span style="color:var(--amber);font-size:1rem;" title="Warm">&#9728;</span>
-        <input type="range" min="${minK}" max="${maxK}" value="${curK}" style="flex:1;min-height:36px;" onchange="setColorTemp('${entityId}', this.value)">
-        <span style="color:#7ab8ff;font-size:1rem;" title="Cool">&#10052;</span>
-      </div>`;
-    }
-    if (modes.some(m => ["hs", "rgb", "rgbw", "rgbww", "xy"].includes(m))) {
-      const swatches = [[255, 255, 255], [255, 180, 120], [255, 60, 60], [255, 150, 30], [255, 225, 60], [60, 200, 90], [50, 130, 255], [160, 70, 255]]
-        .map(c => `<button title="Set color" style="width:34px;height:34px;border-radius:50%;background:rgb(${c[0]},${c[1]},${c[2]});border:1px solid var(--border);cursor:pointer;flex-shrink:0;" onclick="event.stopPropagation();setLightColor('${entityId}', [${c[0]},${c[1]},${c[2]}])"></button>`)
-        .join("");
-      colorControls += `<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;" onclick="event.stopPropagation();">${swatches}</div>`;
-    }
-  }
-  const safeId = entityId.replace(/\./g, "-");
-  const open = !!lightControlsOpen[entityId];
   return `<div class="terminal-panel" data-entity-id="${entityId}">
-    <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+    <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;"
+      onpointerdown="lightPressStart(event,'${entityId}')" onpointermove="lightPressMove(event)" onpointerup="lightPressEnd(event,'${entityId}')" onpointercancel="lightPressCancel()" oncontextmenu="event.preventDefault()">
       <div>${renderStatusLed(offline ? "unavailable" : (active ? "on" : "off"))} <span style="font-family:var(--font-mono);">${escapeHtml(friendlyName(entityId))}</span></div>
-      <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
-        <span style="color:var(--text-muted);font-family:var(--font-mono);">${offline ? "OFFLINE" : (active ? "ON" : "OFF")}</span>
-        ${colorControls ? `<span id="lc-arrow-${safeId}" title="Color controls" style="cursor:pointer;color:var(--text-muted);font-size:1.2rem;padding:6px 10px;user-select:none;" onclick="toggleLightControls('${entityId}')">${open ? "▾" : "▸"}</span>` : ""}
-        <button title="Toggle" style="width:44px;height:44px;border-radius:50%;border:1px solid ${active ? "var(--green)" : "var(--border)"};background:transparent;color:${active ? "var(--green)" : "var(--text-muted)"};cursor:pointer;display:inline-flex;align-items:center;justify-content:center;${active ? "box-shadow:0 0 10px rgba(20,254,23,0.25);" : ""}" onclick="toggleEntity('${entityId}')"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v7"/><path d="M6.8 6.8a7.5 7.5 0 1 0 10.4 0"/></svg></button>
-      </div>
+      <div style="color:var(--text-muted);font-family:var(--font-mono);">${offline ? "OFFLINE" : (active ? "ON" : "OFF")}</div>
     </div>
-    ${active && !offline ? `<div class="panel-body" style="padding-top:0;"><input type="range" min="0" max="100" value="${pct}" style="width:100%;min-height:44px;" onchange="setBrightness('${entityId}', this.value)">${colorControls ? `<div id="lc-${safeId}" style="display:${open ? "" : "none"};">${colorControls}</div>` : ""}</div>` : ""}
   </div>`;
 }
 
@@ -1899,6 +1955,7 @@ function updateEntityCardInPlace(entityId) {
 }
 
 async function updateCard(state) {
+  if (lightModalEntity === state.entity_id) renderLightModal();
   if (!entityBelongsToScreen(state.entity_id, currentScreen)) return;
   if (updateEntityCardInPlace(state.entity_id)) return;
   if (currentScreen === "home") renderHomeScreen();
