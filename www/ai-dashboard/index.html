@@ -942,7 +942,19 @@ function lightPressCancel() {
   lightPress.held = false;
 }
 
-// Color-temp slider + swatches for capable lights (shown in the light modal).
+// Click position on the color wheel -> hs_color (conic-gradient hue 0° is at
+// 12 o'clock running clockwise; atan2 measures from 3 o'clock, hence +90).
+function lightWheelPick(ev, entityId) {
+  const rect = ev.currentTarget.getBoundingClientRect();
+  const dx = ev.clientX - (rect.left + rect.width / 2);
+  const dy = ev.clientY - (rect.top + rect.height / 2);
+  let hue = Math.round(Math.atan2(dy, dx) * 180 / Math.PI + 90);
+  hue = ((hue % 360) + 360) % 360;
+  const sat = Math.min(100, Math.round(Math.hypot(dx, dy) / (rect.width / 2) * 100));
+  sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, hs_color: [hue, sat] } });
+}
+
+// Color-temp slider and/or an HSV color wheel for capable lights (light modal).
 function buildLightColorControls(entityId) {
   const state = states[entityId];
   if (!state || !state.attributes || !isActive(state.state) || isUnavailable(state)) return "";
@@ -962,12 +974,20 @@ function buildLightColorControls(entityId) {
     </div>`;
   }
   if (modes.some(m => ["hs", "rgb", "rgbw", "rgbww", "xy"].includes(m))) {
-    const swatches = [[255, 255, 255], [255, 180, 120], [255, 60, 60], [255, 150, 30], [255, 225, 60], [60, 200, 90], [50, 130, 255], [160, 70, 255]]
-      .map(c => `<button title="Set color" style="width:38px;height:38px;border-radius:50%;background:rgb(${c[0]},${c[1]},${c[2]});border:1px solid var(--border);cursor:pointer;flex-shrink:0;box-shadow:0 0 8px rgba(${c[0]},${c[1]},${c[2]},0.35);" onclick="setLightColor('${entityId}', [${c[0]},${c[1]},${c[2]}])"></button>`)
-      .join("");
+    // Marker for the current color: hue runs clockwise from 12 o'clock,
+    // saturation is the distance from center.
+    const hs = state.attributes.hs_color;
+    let marker = "";
+    if (hs && hs.length === 2) {
+      const rad = (hs[0] - 90) * Math.PI / 180;
+      const dist = (hs[1] / 100) * 88; // 88px = wheel radius minus marker
+      const x = Math.round(Math.cos(rad) * dist);
+      const y = Math.round(Math.sin(rad) * dist);
+      marker = `<div style="position:absolute;left:calc(50% + ${x}px);top:calc(50% + ${y}px);width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.8);pointer-events:none;"></div>`;
+    }
     html += `<div>
-      <div style="font-size:0.72rem;color:var(--text-muted);letter-spacing:0.12em;margin-bottom:6px;">COLOR</div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">${swatches}</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);letter-spacing:0.12em;margin-bottom:8px;text-align:center;">COLOR · TAP WHEEL TO PICK</div>
+      <div style="position:relative;width:192px;height:192px;margin:0 auto;border-radius:50%;cursor:crosshair;border:1px solid var(--border);box-shadow:0 0 24px rgba(255,255,255,0.07), inset 0 0 12px rgba(0,0,0,0.4);background:radial-gradient(circle,#fff 0%,rgba(255,255,255,0) 62%),conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);" onclick="lightWheelPick(event,'${entityId}')">${marker}</div>
     </div>`;
   }
   return html;
@@ -1026,13 +1046,16 @@ function renderLightCard(entityId) {
   const active = state ? isActive(state.state) : false;
   const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
   const pct = Math.round((brightness / 255) * 100);
-  // Active lights get a soft green tint/glow so the panel reads at a glance.
+  // Compact grid tile: bulb icon glows green while lit. Tap toggles, hold opens
+  // the controls modal (see lightPress*).
   const lit = active && !offline;
+  const bulb = `<svg viewBox="0 0 24 24" width="36" height="36" fill="${lit ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:${lit ? "var(--green)" : "var(--text-muted)"};${lit ? "filter:drop-shadow(0 0 10px rgba(20,254,23,0.55));" : ""}"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.9.7 1.6 1.6 1.6 2.7h4c0-1.1.7-2 1.6-2.7A6 6 0 0 0 12 3z"/></svg>`;
   return `<div class="terminal-panel" data-entity-id="${entityId}" style="${lit ? "border-color:rgba(20,254,23,0.45);background:linear-gradient(180deg,rgba(20,254,23,0.07),rgba(20,254,23,0.02));box-shadow:0 0 16px rgba(20,254,23,0.15), inset 0 0 24px rgba(20,254,23,0.04);" : ""}">
-    <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;padding:14px 16px;"
+    <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;padding:14px 10px;"
       onpointerdown="lightPressStart(event,'${entityId}')" onpointermove="lightPressMove(event)" onpointerup="lightPressEnd(event,'${entityId}')" onpointercancel="lightPressCancel()" oncontextmenu="event.preventDefault()">
-      <div>${renderStatusLed(offline ? "unavailable" : (active ? "on" : "off"))} <span style="font-family:var(--font-mono);${lit ? "text-shadow:0 0 8px rgba(20,254,23,0.4);" : ""}">${escapeHtml(friendlyName(entityId))}</span></div>
-      <div style="color:${lit ? "var(--green)" : "var(--text-muted)"};font-family:var(--font-mono);letter-spacing:0.08em;">${offline ? "OFFLINE" : (active ? `ON · ${pct}%` : "OFF")}</div>
+      ${bulb}
+      <div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${lit ? "text-shadow:0 0 8px rgba(20,254,23,0.4);" : ""}">${escapeHtml(friendlyName(entityId))}</div>
+      <div style="font-family:var(--font-mono);font-size:0.72rem;letter-spacing:0.08em;color:${lit ? "var(--green)" : "var(--text-muted)"};">${offline ? "OFFLINE" : (active ? `ON · ${pct}%` : "OFF")}</div>
     </div>
   </div>`;
 }
@@ -1735,7 +1758,9 @@ function buildControlPanels() {
   const switchIds = quick.filter(id => id.startsWith("switch."));
   const lightCards = lightIds.map(id => renderLightCard(id)).join("");
   const switchCards = switchIds.map(id => renderSwitchCard(id)).join("");
-  const controlCards = lightCards + switchCards;
+  // Light tiles sit side by side in an auto-filling grid; switches keep the
+  // full-width row layout below.
+  const controlCards = (lightCards ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;align-content:start;">${lightCards}</div>` : "") + switchCards;
 
   const panels = {
     scenes: renderTerminalPanel(sectionTitle("scenes"), `<div class="stretch-btns" style="display:flex;flex-direction:column;gap:10px;height:100%;">${sceneButtons || "<div style='color:var(--text-muted)'>NO SCENES</div>"}</div>`, "fill", 'data-panel-id="scenes"'),
