@@ -320,7 +320,7 @@ input[type="range"] { accent-color: var(--green); }
 // to a different screen (hand-edited config.panels) renders an empty slot there
 // while effectivePanels re-appends it on its default screen.
 const DEFAULT_PANELS = {
-  home:    [["clock", "presence", "oncall"], ["weather", "roomMonitors"], ["radar", "doors"]],
+  home:    [["clock", "presence", "lights", "oncall"], ["weather", "roomMonitors"], ["radar", "doors"]],
   control: [["scenes"], ["quickControls", "media"], ["scripts"]],
   security: [["cameras", "security"]],
   status:  [["environment"], ["system"]]
@@ -340,6 +340,7 @@ const PANEL_REGISTRY = {
   weather:      { kind: "entity", entityKey: "weather", note: "entity set in Appearance tab" },
   media:        { kind: "entity", entityKey: "mediaPlayer", note: "entity set in Appearance tab" },
   presence:     { kind: "section", section: "home", filter: "person" },
+  lights:       { kind: "section", section: "lights" },
   roomMonitors: { kind: "section", section: "roomMonitors" },
   doors:        { kind: "section", section: "doors" },
   scenes:       { kind: "section", section: "scenes" },
@@ -403,6 +404,7 @@ const DEFAULT_CONFIG = {
     scenes: { title: "Scenes", icon: "🎨", entities: ["scene.all_lights_off", "scene.relax_mode", "scene.movie_mode", "scene.focus_mode", "scene.living_room_focus_mode", "scene.living_room_relax_mode", "scene.living_room_all_lights_off"] },
     scripts: { title: "Scripts", icon: "▶️", entities: ["script.goodnight", "script.focus_mode", "script.movie_mode", "script.relax_mode", "script.pause_all_media", "script.living_room_lights_on", "script.living_room_lights_off", "script.travis_office_lights_on", "script.travis_office_lights_off", "script.goodnight_door_check", "script.goodnight_dim_lights", "script.goodnight_enable_security"] },
     quickControls: { title: "Quick Controls", icon: "🎛️", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan", "light.p1s_01p00a412300832_chamber_light", "light.travis_office_p1s_uno_chamber_light"] },
+    lights: { title: "Lights", icon: "💡", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan"] },
     cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.backyard_rtsp_live"], snapshot: { "camera.front_door_live_view": { preferEntity: "camera.front_door_last_recording", activityEntities: ["event.front_door_motion", "event.front_door_ding", "sensor.front_door_last_activity"] } }, livestream: { "camera.backyard_rtsp_live": "switch.downstairs_live_stream" }, history: { "camera.front_door_live_view": "front_door", "camera.backyard_rtsp_live": "backyard" } },
     security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2", "sensor.front_door_last_activity", "sensor.downstairs_last_activity"] },
     doors: { title: "Doors", icon: "🚪", entities: ["binary_sensor.living_room_front_door", "binary_sensor.backdoor"] },
@@ -1712,12 +1714,20 @@ function buildHomePanels() {
       </div>`);
   }
 
+  // Home light tiles: same bulb cards as Control Hub (tap toggles, hold opens
+  // the controls modal); panel hidden until lights are added in Settings.
+  const homeLightIds = ((config.sections.lights && config.sections.lights.entities) || []).filter(id => id.startsWith("light."));
+  const lightsPanel = homeLightIds.length
+    ? renderTerminalPanel(sectionTitle("lights"), `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;">${homeLightIds.map(id => renderLightCard(id)).join("")}</div>`)
+    : "";
+
   const panels = {
     clock: `<div style="flex-shrink:0;padding:8px 0 0 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;" data-panel-id="clock">
       <div id="clock" style="font-family:var(--font-mono);font-size:clamp(4rem,9vw,6.5rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);white-space:nowrap;">${timeStrMarked}</div>
       <div id="date" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
     </div>`,
     presence: `<div style="flex:1;min-height:0;" data-panel-id="presence">${presencePanel}</div>`,
+    lights: lightsPanel ? `<div style="flex-shrink:0;" data-panel-id="lights">${lightsPanel}</div>` : "",
     oncall: oncallPanel ? `<div style="flex-shrink:0;" data-panel-id="oncall">${oncallPanel}</div>` : "",
     weather: weatherPanel,
     roomMonitors: `<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="roomMonitors">${renderTerminalPanel(sectionTitle("roomMonitors"), renderRoomMonitors(), "fill")}</div>`,
@@ -1726,7 +1736,7 @@ function buildHomePanels() {
   };
   return {
     panels,
-    gridStyle: "display:grid;grid-template-columns:0.9fr 1.2fr 1fr;gap:14px;flex:1;min-height:0;",
+    gridStyle: "display:grid;grid-template-columns:0.85fr 1fr 1.2fr;gap:14px;flex:1;min-height:0;",
     colStyles: [
       "display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;",
       "display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;",
@@ -1965,6 +1975,13 @@ function updateEntityCardInPlace(entityId) {
       if (!panel) return false;
       panel.innerHTML = renderTerminalPanel(sectionTitle("doors"), renderDoors());
       lastRecentDoorKey = recentDoorIds().join(",");
+      return true;
+    }
+    // Home light tiles update in place so a toggle doesn't rebuild the whole
+    // screen (and the radar map with it).
+    const homeLights = (config.sections.lights && config.sections.lights.entities) || [];
+    if (homeLights.includes(entityId) && el) {
+      el.outerHTML = renderLightCard(entityId);
       return true;
     }
     // Weather panel, presence cards (battery reads sibling sensors), and room
