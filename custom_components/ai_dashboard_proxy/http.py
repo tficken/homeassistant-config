@@ -476,6 +476,7 @@ ALLOWED_SERVICE_DOMAINS = {
     "fan",
     "climate",
     "input_boolean",
+    "button",
 }
 
 

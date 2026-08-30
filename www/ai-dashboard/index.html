@@ -1042,6 +1042,136 @@ function renderLightModal() {
   el.innerHTML = html;
 }
 
+// ---- Printer modal: full Bambu Lab status/camera/controls in a popup ----
+// prefix is the shared entity slug, e.g. "p1s_01p00a412300832" — every entity
+// of the printer starts with "<domain>.<prefix>_".
+let printerModalPrefix = null;
+
+function openPrinterModal(prefix) { printerModalPrefix = prefix; renderPrinterModal(); }
+function closePrinterModal() { printerModalPrefix = null; renderPrinterModal(); }
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && printerModalPrefix) closePrinterModal(); });
+
+function pressPrinterButton(entityId) {
+  sendWs({ id: Date.now(), type: "call_service", domain: "button", service: "press", service_data: { entity_id: entityId } });
+}
+
+function printerEntities(prefix, domain) {
+  return Object.keys(states).filter(id => {
+    const parts = id.split(".");
+    return parts[1] && parts[1].startsWith(prefix) && (!domain || parts[0] === domain);
+  });
+}
+
+// First entity whose id contains any keyword (in priority order), skipping ids
+// already claimed by an earlier stat.
+function findPrinterSensor(prefix, keywords, used) {
+  for (const kw of keywords) {
+    const hit = printerEntities(prefix, "sensor").find(id => id.includes(kw) && !used.has(id));
+    if (hit) { used.add(hit); return hit; }
+  }
+  return null;
+}
+
+function printerStat(entityId) {
+  const s = states[entityId];
+  if (!s) return null;
+  const unit = s.attributes && s.attributes.unit_of_measurement ? s.attributes.unit_of_measurement : "";
+  return escapeHtml(String(s.state)) + (unit ? `<span style="color:var(--text-muted);font-size:0.75rem;"> ${escapeHtml(unit)}</span>` : "");
+}
+
+function renderPrinterModal() {
+  let el = document.getElementById("printer-modal-overlay");
+  if (!printerModalPrefix) { if (el) el.remove(); return; }
+  const prefix = printerModalPrefix;
+  const statusId = printerEntities(prefix, "sensor").find(id => id.endsWith("_print_status"));
+  const printerName = friendlyName(statusId || `sensor.${prefix}_print_status`).replace(/\s*print.?status\s*/i, "").trim();
+
+  const used = new Set(statusId ? [statusId] : []);
+  const progressId = findPrinterSensor(prefix, ["print_progress"], used);
+  const progress = progressId && states[progressId] ? parseFloat(states[progressId].state) : null;
+  const layerId = findPrinterSensor(prefix, ["current_layer"], used);
+  const totalLayerId = findPrinterSensor(prefix, ["total_layer"], used);
+  const statSpecs = [
+    ["STAGE", ["current_stage", "stage"]],
+    ["TASK", ["task_name"]],
+    ["REMAINING", ["remaining_time"]],
+    ["NOZZLE", ["nozzle_temp"]],
+    ["BED", ["bed_temp"]],
+    ["CHAMBER", ["chamber_temp"]],
+    ["SPEED", ["speed_profile", "printing_speed"]],
+    ["FILAMENT", ["print_weight"]],
+  ];
+  const stats = statSpecs.map(([label, kws]) => {
+    const id = findPrinterSensor(prefix, kws, used);
+    const v = id && printerStat(id);
+    return v ? `<div style="display:flex;justify-content:space-between;gap:12px;font-family:var(--font-mono);padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-muted);font-size:0.78rem;letter-spacing:0.08em;">${label}</span><span style="color:var(--green);">${v}</span></div>` : "";
+  });
+  if (layerId && states[layerId]) {
+    const total = totalLayerId && states[totalLayerId] ? states[totalLayerId].state : null;
+    stats.splice(1, 0, `<div style="display:flex;justify-content:space-between;gap:12px;font-family:var(--font-mono);padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-muted);font-size:0.78rem;letter-spacing:0.08em;">LAYER</span><span style="color:var(--green);">${escapeHtml(states[layerId].state)}${total ? " / " + escapeHtml(total) : ""}</span></div>`);
+  }
+
+  // Chamber camera (live stream with still fallback + retry, same as Security).
+  const camId = printerEntities(prefix, "camera").find(id => id.includes("camera"));
+  const camHtml = camId ? `<img src="${window.HA_INTEGRATION_PROXY ? `/ai-dashboard/cam_stream/${camId}` : `/api/camera_proxy_stream/${camId}?token=${encodeURIComponent(token)}`}" style="width:100%;border:1px solid var(--border);display:block;background:#000;" alt="" onerror="streamFeedFallback(this, '${camId}')">` : "";
+
+  // AMS trays: colored chips from the tray entities' color/name attributes.
+  const trays = printerEntities(prefix, "sensor").filter(id => id.includes("_tray_"));
+  const amsHtml = trays.length ? `<div>
+    <div style="font-size:0.72rem;color:var(--text-muted);letter-spacing:0.12em;margin-bottom:8px;">AMS</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">${trays.map(id => {
+      const a = states[id].attributes || {};
+      const hex = a.color ? "#" + String(a.color).slice(0, 6) : "var(--border)";
+      const label = a.type || a.name || states[id].state;
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div style="width:34px;height:34px;border-radius:50%;background:${hex};border:1px solid var(--border);"></div>
+        <div style="font-size:0.65rem;color:var(--text-muted);font-family:var(--font-mono);max-width:64px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(String(label))}</div>
+      </div>`;
+    }).join("")}</div>
+  </div>` : "";
+
+  // Controls: chamber light toggle + pause/resume/stop buttons (button.press).
+  const chamberLight = printerEntities(prefix, "light").find(id => id.includes("chamber_light"));
+  const ctrlBtns = ["pause", "resume", "stop"].map(kw => printerEntities(prefix, "button").find(id => id.includes(kw))).filter(Boolean);
+  const controlsHtml = (chamberLight || ctrlBtns.length) ? `<div>
+    <div style="font-size:0.72rem;color:var(--text-muted);letter-spacing:0.12em;margin-bottom:8px;">CONTROLS</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      ${chamberLight ? `<button class="scene-btn" style="cursor:pointer;" onclick="toggleEntity('${chamberLight}')">💡 CHAMBER ${states[chamberLight] && isActive(states[chamberLight].state) ? "ON" : "OFF"}</button>` : ""}
+      ${ctrlBtns.map(id => `<button class="scene-btn" style="cursor:pointer;" onclick="pressPrinterButton('${id}')">${escapeHtml(id.split("_").pop().toUpperCase())}</button>`).join("")}
+    </div>
+  </div>` : "";
+
+  const progressHtml = progress != null && !isNaN(progress) ? `<div>
+    <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;"><span style="letter-spacing:0.08em;">PROGRESS</span><span style="color:var(--green);">${progress}%</span></div>
+    <div style="width:100%;height:10px;background:var(--green-dim);border-radius:5px;"><div style="width:${Math.min(100, Math.max(0, progress))}%;height:100%;background:var(--green);border-radius:5px;box-shadow:0 0 10px rgba(20,254,23,0.4);transition:width .3s;"></div></div>
+  </div>` : "";
+
+  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(3px);z-index:1200;display:flex;align-items:center;justify-content:center;" onclick="closePrinterModal()">
+    <div class="terminal-panel" style="width:min(720px,94vw);max-height:92vh;display:flex;flex-direction:column;animation:lightModalPop .12s ease-out;" onclick="event.stopPropagation()">
+      <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>🖨 ${escapeHtml(printerName || prefix)}</span>
+        <span style="cursor:pointer;color:var(--text-muted);text-shadow:none;" onclick="closePrinterModal()">[ CLOSE ✕ ]</span>
+      </div>
+      <div class="panel-body" style="display:grid;grid-template-columns:${camId ? "1.1fr 1fr" : "1fr"};gap:18px;overflow-y:auto;">
+        ${camId ? `<div>${camHtml}</div>` : ""}
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div style="font-family:var(--font-mono);color:${statusId && states[statusId] && isActive(states[statusId].state) ? "var(--green)" : "var(--text-muted)"};letter-spacing:0.08em;">${statusId && states[statusId] ? escapeHtml(String(states[statusId].state).toUpperCase()) : "--"}</div>
+          ${progressHtml}
+          <div>${stats.join("")}</div>
+          ${amsHtml}
+          ${controlsHtml}
+        </div>
+      </div>
+    </div>
+  </div>`;
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "printer-modal-overlay";
+    document.body.appendChild(el);
+  }
+  el.innerHTML = html;
+}
+
 function renderLightCard(entityId) {
   const state = states[entityId];
   const offline = isUnavailable(state);
@@ -1085,6 +1215,7 @@ function renderMetricCard(entityId) {
   return `<div class="terminal-panel" style="text-align:center;padding:8px;display:flex;flex-direction:column;justify-content:center;" data-entity-id="${entityId}">
     <div style="font-family:var(--font-mono);font-size:1.4rem;color:var(--green);">${offline || value}<span style="font-size:0.8rem;color:var(--text-muted);">${offline || isTimestamp ? "" : escapeHtml(unit)}</span></div>
     <div style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(friendlyName(entityId))}</div>
+    ${renderSparkline(entityId)}
   </div>`;
 }
 
@@ -1834,6 +1965,7 @@ async function buildStatusPanels() {
   const printerCards = printerIds.map(id => {
     const state = states[id];
     const base = id.replace("print_status", "").replace(/_+$/, "");
+    const prefix = base.split(".")[1];
     const progressId = Object.keys(states).find(x => x.startsWith(base) && x.includes("print_progress") && x !== id);
     const remainingId = Object.keys(states).find(x => x.startsWith(base) && x.includes("remaining_time") && x !== id);
     const progress = progressId && states[progressId] ? parseFloat(states[progressId].state) : null;
@@ -1841,7 +1973,7 @@ async function buildStatusPanels() {
     const progressBar = progress != null && !isNaN(progress)
       ? `<div style="width:100%;height:8px;background:var(--green-dim);border-radius:4px;margin:8px 0;"><div style="width:${Math.min(100, Math.max(0, progress))}%;height:100%;background:var(--green);border-radius:4px;"></div></div><div style="color:var(--text-muted);font-size:0.75rem;">${progress}% ${remaining ? "· " + escapeHtml(remaining) + " left" : ""}</div>`
       : "";
-    return `<div class="terminal-panel" data-entity-id="${id}">
+    return `<div class="terminal-panel" data-entity-id="${id}" style="cursor:pointer;" title="Tap for printer controls" onclick="openPrinterModal('${prefix}')">
       <div class="panel-body" style="font-family:var(--font-mono);">
         <div style="color:var(--green);">${state ? escapeHtml(state.state) : "--"}</div>
         ${progressBar}
@@ -1870,12 +2002,17 @@ async function buildStatusPanels() {
 
 async function renderStatusScreen() {
   const environment = (config.sections && config.sections.environment && config.sections.environment.entities) || [];
+  const system = (config.sections && config.sections.system && config.sections.system.entities) || [];
   const historyIds = environment.filter(id => {
     const s = states[id];
     const dc = s && s.attributes && s.attributes.device_class;
     return dc === "temperature" || dc === "humidity";
   });
-  await fetchHistory(historyIds, 24);
+  // System usage charts: any numeric system sensor (CPU %, memory %, disk) gets
+  // the same 24h sparkline treatment as the environment metrics.
+  const sysHistoryIds = system.filter(id =>
+    id.startsWith("sensor.") && states[id] && !isNaN(parseFloat(states[id].state)));
+  await fetchHistory(historyIds.concat(sysHistoryIds), 24);
   const b = await buildStatusPanels();
   document.getElementById("status-screen").innerHTML = assembleColumns(b.panels,
     effectivePanels("status"), b.gridStyle, b.colStyles);
@@ -2016,6 +2153,10 @@ function updateEntityCardInPlace(entityId) {
 
 async function updateCard(state) {
   if (lightModalEntity === state.entity_id) renderLightModal();
+  if (printerModalPrefix) {
+    const slug = state.entity_id.split(".")[1];
+    if (slug && slug.startsWith(printerModalPrefix)) renderPrinterModal();
+  }
   if (!entityBelongsToScreen(state.entity_id, currentScreen)) return;
   if (updateEntityCardInPlace(state.entity_id)) return;
   if (currentScreen === "home") renderHomeScreen();
