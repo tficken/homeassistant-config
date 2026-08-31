@@ -1,0 +1,32 @@
+// Shared mutable runtime state. One property per former top-level global.
+// Mutated freely by all modules; import { state } and use state.config etc.
+export const state = {
+  config: {},
+  token: "",
+  ws: null,
+  reconnectDelay: 1000,
+  reconnectTimer: null,
+  pingTimer: null,
+  awaitingPong: false,
+  pongSeen: false,
+  hiddenAt: null,
+  states: {},
+  areas: [],
+  entities: [],
+  areaMap: {},
+  entityById: {},
+  haConfig: null,
+  forecastCache: { daily: [], fetchedAt: null },
+  historyCache: {},
+  currentScreen: "home",
+  clockFontSize: null,
+  lastEventCache: {}, // entity_id -> ms epoch
+  lastRecentDoorKey: "",
+  snapshotRefreshTimers: {},
+  snapshotLastRefresh: {},
+  lightPress: { timer: null, held: false, x: 0, y: 0 },
+  livestreamStartTimers: {},
+  radarMap: null,
+  radarMapEl: null,
+  radarAnimInterval: null,
+};
