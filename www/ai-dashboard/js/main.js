@@ -1144,7 +1144,7 @@ function renderRoomMonitors() {
     const st = state.states[id];
     const deviceClass = st && st.attributes && st.attributes.device_class;
     if (deviceClass === "temperature" || deviceClass === "humidity") {
-      rooms[area][deviceClass] = { id, st };
+      rooms[area][deviceClass] = { id, state: st };
     }
   }
 
