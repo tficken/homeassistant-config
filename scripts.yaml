@@ -55,6 +55,13 @@ movie_mode:
         area_id: travis_office
       data:
         transition: 3
+    # Chamber lights may not be in the office area (folded in from the retired scene)
+    - action: light.turn_off
+      target:
+        entity_id:
+          - light.p1s_01p00a412300832_chamber_light
+          - light.travis_office_p1s_uno_chamber_light
+      continue_on_error: true
     - action: media_player.media_pause
       target:
         entity_id:
@@ -140,6 +147,34 @@ living_room_lights_off:
         transition: 2
   mode: single
   icon: mdi:lightbulb-off
+
+living_room_relax_mode:
+  alias: Living room relax mode
+  sequence:
+    - action: light.turn_on
+      target:
+        entity_id: light.living_room_ceiling_fan
+      data:
+        brightness_pct: 30
+        transition: 3
+  mode: single
+  icon: mdi:sofa
+
+living_room_movie_mode:
+  alias: Living room movie mode
+  sequence:
+    - action: light.turn_on
+      target:
+        entity_id: light.living_room_ceiling_fan
+      data:
+        brightness_pct: 10
+        transition: 3
+    - action: media_player.media_pause
+      target:
+        entity_id: media_player.living_room_fire_tv_living_room
+      continue_on_error: true
+  mode: single
+  icon: mdi:movie-open
 
 goodnight_door_check:
   alias: Goodnight door/window check

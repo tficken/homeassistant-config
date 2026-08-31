@@ -42,7 +42,6 @@ The intended reader of this file is an AI coding agent that has no prior context
 ├── configuration.yaml          # Main Home Assistant configuration
 ├── automations.yaml            # Automations (included from configuration.yaml)
 ├── scripts.yaml                # Scripts (loaded by configuration.yaml)
-├── scenes.yaml                 # Scenes (loaded by configuration.yaml)
 ├── secrets.yaml                # Secrets placeholder file (never commit)
 ├── .HA_VERSION                 # Installed Home Assistant version
 ├── .storage/                   # Home Assistant runtime registries and auth (do not hand-edit)
@@ -72,13 +71,13 @@ The intended reader of this file is an AI coding agent that has no prior context
 - Configures the `recorder` to purge data after 30 days and excludes noisy diagnostic entities.
 - Defines a `command_line` sensor for disk usage (`HA disk usage`).
 - Defines two `ffmpeg` cameras (`camera.backyard_rtsp_live`, `camera.front_door_rtsp_live`) backed by the ring-mqtt RTSP feeds — see `docs/ring-cameras.md`.
-- Includes `automations.yaml`, `scripts.yaml`, `scenes.yaml`.
+- Includes `automations.yaml` and `scripts.yaml`.
 
-### Automations, Scripts, and Scenes
+### Automations and Scripts
 
-- `automations.yaml`: User automations (e.g., PagerDuty high-urgency Echo alerts, `ring_snapshot_archive_*` Ring motion/ding clip archiving, `ring_live_stream_failsafe`, low-battery notifications, weekly backup + pruning + `stale_backup_alert`, disk space alert).
-- `scripts.yaml`: Lighting/media presets and HA actions (e.g., `all_lights_off`, `goodnight`, `movie_mode`).
-- `scenes.yaml`: Lighting presets (e.g., `movie_mode`, `focus_mode`, `relax_mode`).
+- `automations.yaml`: User automations (e.g., PagerDuty high-urgency Echo alerts, `ring_snapshot_archive_*` Ring motion/ding clip archiving, `ring_live_stream_failsafe`, low-battery notifications, weekly backup + pruning + `stale_backup_alert`, disk space alert, `away_mode` / `welcome_home` presence routines, `printer_chamber_light_auto_off`).
+- `scripts.yaml`: Lighting/media presets and HA actions (e.g., `all_lights_off`, `goodnight`, `movie_mode`, `living_room_movie_mode`).
+- **Scenes were retired** (`scenes.yaml` removed): every scene duplicated a same-named script, which created ambiguous Alexa names and divergent behavior. Scripts are the single mechanism for presets now; anything scene-only was folded into the script versions.
 
 ### Themes
 
@@ -211,7 +210,7 @@ There is no top-level test harness. Only the `bambu_lab` integration contains te
 GitHub Actions validation runs on every push/PR via `.github/workflows/validate.yml`:
 
 - **YAML lint** — `yamllint -c .yamllint.yaml .` (GitHub workflow files only; HA custom tags break standard parsers).
-- **HA YAML syntax** — `python scripts/validate_ha_yaml.py` registers `!include`, `!secret`, etc. as no-ops and parses `configuration.yaml`, `automations.yaml`, `scripts.yaml`, and `scenes.yaml`.
+- **HA YAML syntax** — `python scripts/validate_ha_yaml.py` registers `!include`, `!secret`, etc. as no-ops and parses `configuration.yaml`, `automations.yaml`, and `scripts.yaml`.
 - **JSON** — `python -m json.tool www/ai-dashboard/config.json`.
 - **HTML** — Python `html.parser` sanity check on `www/ai-dashboard/index.html`.
 - **Python** — `flake8 custom_components/ai_dashboard_proxy` and `python -m compileall custom_components/ai_dashboard_proxy`.

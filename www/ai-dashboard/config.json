@@ -67,13 +67,14 @@
       "title": "Scenes",
       "icon": "🎨",
       "entities": [
-        "scene.all_lights_off",
-        "scene.relax_mode",
-        "scene.movie_mode",
-        "scene.focus_mode",
-        "scene.living_room_focus_mode",
-        "scene.living_room_relax_mode",
-        "scene.living_room_all_lights_off"
+        "script.all_lights_off",
+        "script.relax_mode",
+        "script.movie_mode",
+        "script.focus_mode",
+        "script.living_room_lights_on",
+        "script.living_room_relax_mode",
+        "script.living_room_lights_off",
+        "script.living_room_movie_mode"
       ]
     },
     "scripts": {
@@ -87,6 +88,8 @@
         "script.pause_all_media",
         "script.living_room_lights_on",
         "script.living_room_lights_off",
+        "script.living_room_relax_mode",
+        "script.living_room_movie_mode",
         "script.travis_office_lights_on",
         "script.travis_office_lights_off",
         "script.goodnight_door_check",

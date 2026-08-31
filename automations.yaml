@@ -499,3 +499,100 @@
         title: Live stream force-stopped
         message: "{{ trigger.to_state.attributes.friendly_name | default(trigger.entity_id) }} was on for over 12 minutes and has been turned off."
   mode: single
+
+- id: away_mode
+  alias: Away mode
+  description: When everyone has been gone for 5 minutes — lights off, media stop, Ring motion detection on
+  triggers:
+    - trigger: state
+      entity_id:
+        - person.woteg
+        - person.bobbie
+      to: "not_home"
+      for: "00:05:00"
+  conditions:
+    - condition: state
+      entity_id: person.woteg
+      state: "not_home"
+    - condition: state
+      entity_id: person.bobbie
+      state: "not_home"
+  actions:
+    - action: light.turn_off
+      target:
+        entity_id: all
+      data:
+        transition: 2
+    - action: media_player.media_stop
+      target:
+        entity_id: all
+      continue_on_error: true
+    - action: switch.turn_on
+      target:
+        entity_id:
+          - switch.front_door_motion_detection
+          - switch.downstairs_motion_detection
+      continue_on_error: true
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: Away mode
+        message: "Everyone left — lights off, media stopped, motion detection on."
+  mode: single
+
+- id: welcome_home
+  alias: Welcome home
+  description: First person arrives home after everyone was away — living room lights on after sunset (motion detection intentionally untouched; it stays on 24/7)
+  triggers:
+    - trigger: state
+      entity_id:
+        - person.woteg
+        - person.bobbie
+      to: "home"
+  conditions:
+    - condition: template
+      value_template: "{{ trigger.from_state is not none and trigger.from_state.state != 'home' }}"
+    # Both were away before this arrival: the other person is still not_home
+    - condition: template
+      value_template: >
+        {% set other = 'person.bobbie' if trigger.entity_id == 'person.woteg' else 'person.woteg' %}
+        {{ is_state(other, 'not_home') }}
+  actions:
+    - if:
+        - condition: sun
+          after: sunset
+      then:
+        - action: light.turn_on
+          target:
+            entity_id: light.living_room_ceiling_fan
+          data:
+            brightness_pct: 60
+            transition: 2
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: Welcome home
+        message: "Welcome home, {{ state_attr(trigger.entity_id, 'friendly_name') | default('') }}."
+  mode: single
+
+- id: printer_chamber_light_auto_off
+  alias: Printer chamber light auto-off
+  description: Turn off the printer chamber light when a print ends (finished, idle, or failed)
+  triggers:
+    - trigger: state
+      entity_id:
+        - sensor.p1s_01p00a412300832_print_status
+        - sensor.travis_office_p1s_uno_print_status
+  conditions:
+    - condition: template
+      value_template: >
+        {{ trigger.from_state is not none and trigger.to_state is not none and
+           (trigger.from_state.state | lower) in ['running', 'printing', 'pause', 'paused'] and
+           (trigger.to_state.state | lower) in ['finish', 'finished', 'completed', 'idle', 'success', 'failed', 'error', 'fault'] }}
+  actions:
+    - action: light.turn_off
+      target:
+        entity_id: >
+          {{ 'light.p1s_01p00a412300832_chamber_light'
+             if trigger.entity_id == 'sensor.p1s_01p00a412300832_print_status'
+             else 'light.travis_office_p1s_uno_chamber_light' }}
+      continue_on_error: true
+  mode: single

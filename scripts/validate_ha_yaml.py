@@ -23,7 +23,6 @@ YAML_FILES = [
     "configuration.yaml",
     "automations.yaml",
     "scripts.yaml",
-    "scenes.yaml",
 ]
 
 errors = []
