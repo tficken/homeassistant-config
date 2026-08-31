@@ -36,6 +36,7 @@ cloud:
         - sensor.*_cpu_percent
         - sensor.*_memory_percent
         - sensor.ha_disk_usage
+        - sensor.ha_last_backup_age
         - sensor.home_assistant_*
         - sensor.exos_router_*
         - sensor.p1s_*_temperature
@@ -90,6 +91,16 @@ command_line:
       unit_of_measurement: "%"
       value_template: "{{ value | int(0) }}"
       scan_interval: 300
+  # Age of the newest Supervisor backup in days — backs the stale-backup
+  # alert, which catches the case where the weekly backup never ran at all
+  # (the backup script itself can only report failures while it runs).
+  - sensor:
+      name: "HA last backup age"
+      unique_id: ha_last_backup_age
+      command: "python3 /config/scripts/last_backup_age.py"
+      unit_of_measurement: "days"
+      value_template: "{{ value | float(9999) }}"
+      scan_interval: 3600
 
 # True live view for the backyard Ring cam: ring-mqtt (add-on) bridges the
 # Ring cloud WebRTC session to RTSP; this camera transcodes it to MJPEG for
@@ -154,13 +165,3 @@ light:
       - light.third_reality_inc_3rcb01057z_4
       - light.third_reality_inc_3rcb01057z_5
       - light.third_reality_inc_3rcb01057z_6
-
-lovelace:
-  dashboards:
-    ipad-wall-panel:
-      mode: yaml
-      title: iPad Wall Panel
-      icon: mdi:tablet-dashboard
-      show_in_sidebar: true
-      require_admin: false
-      filename: ipad-wall-panel.yaml

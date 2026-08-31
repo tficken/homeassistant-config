@@ -15,7 +15,7 @@ This instance uses **both** Ring paths, and they have very different capabilitie
 
 - Streams are **on-demand only** — `switch.<cam>_live_stream` must be ON for the RTSP path to exist.
 - Ring **kills any stream after ~10 minutes** and **suppresses motion/ding events while streaming**.
-- The AI dashboard Security screen turns `switch.downstairs_live_stream` on when opened and off when closed (`livestream` map in the cameras section config). **Never leave these switches on permanently** — and note a tablet that sleeps/crashes mid-view never sends the "close" call, so the stream runs until Ring's ~10-minute kill (with motion suppressed during that window).
+- The AI dashboard Security screen turns `switch.downstairs_live_stream` on when opened and off when closed (`livestream` map in the cameras section config). **Never leave these switches on permanently.** A tablet that sleeps/crashes mid-view never sends the "close" call, so the `ring_live_stream_failsafe` automation in `automations.yaml` force-turns any live-stream switch off after 12 minutes and sends a phone notification (belt-and-suspenders ahead of Ring's ~10-minute kill, in case a stream outlives it or restarts).
 - Every live view creates a recording in the Ring app when the account has Ring Protect.
 
 ## Recording clips
