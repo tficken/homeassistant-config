@@ -4,8 +4,9 @@
 import {
   openSettings, closeSettings, saveSettings, exportConfig, importConfig, logout,
   switchSettingsTab, setEditorScreen,
-  addLabelOverride, removeLabelOverride, setLabelOverride, removeMissingEntity,
-} from './main.js';
+} from './settings/editor.js';
+import { addLabelOverride, removeLabelOverride, setLabelOverride } from './settings/labels.js';
+import { removeMissingEntity } from './settings/layout.js';
 import { showScreen } from './screens/index.js';
 import { streamFeedFallback } from './cameras.js';
 import { toggleEntity, mediaCmd, setBrightness, setColorTemp } from './api.js';

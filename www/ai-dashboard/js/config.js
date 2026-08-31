@@ -1,9 +1,10 @@
 // Layout model, default configuration, and config load/save/theme helpers.
-// Calls back into main.js (setSettingsStatus) and api.js (apiCall) at runtime
-// only — circular function references, no top-level reads of imported bindings.
+// Calls back into settings/editor.js (setSettingsStatus) and api.js (apiCall)
+// at runtime only — circular function references, no top-level reads of
+// imported bindings.
 import { state } from './state.js';
 import { apiCall } from './api.js';
-import { setSettingsStatus } from './main.js';
+import { setSettingsStatus } from './settings/editor.js';
 
 // Layout model: screen -> array of columns -> ordered panel ids.
 // Known limitation: panels can move within/between columns of their own screen
