@@ -1,0 +1,2980 @@
+import './globals.js';
+
+// Layout model: screen -> array of columns -> ordered panel ids.
+// Known limitation: panels can move within/between columns of their own screen
+// only — each screen's builder builds only its own panels, so moving a panel
+// to a different screen (hand-edited config.panels) renders an empty slot there
+// while effectivePanels re-appends it on its default screen.
+const DEFAULT_PANELS = {
+  home:    [["clock", "presence", "lights", "oncall"], ["weather", "roomMonitors"], ["radar", "doors"]],
+  control: [["scenes"], ["quickControls", "media"], ["scripts"]],
+  security: [["cameras", "security"]],
+  status:  [["environment"], ["system"]]
+};
+
+// Panel id -> how the panel is backed. kinds:
+//   section — entities live in config.sections[section] (presence: title/icon from
+//             sections.presence but entities from sections.home filtered to
+//             person.*/device_tracker.* — see getPresenceEntities())
+//   fixed   — built-in panel, not entity-editable (clock, radar)
+//   entity  — single entity from config.entities[entityKey] (set in Appearance tab)
+//   auto    — self-populating (oncall detects calendar.* entities)
+const PANEL_REGISTRY = {
+  clock:        { kind: "fixed", note: "built in" },
+  radar:        { kind: "fixed", note: "built in" },
+  oncall:       { kind: "auto", note: "auto-detects calendar.* entities" },
+  weather:      { kind: "entity", entityKey: "weather", note: "entity set in Appearance tab" },
+  media:        { kind: "entity", entityKey: "mediaPlayer", note: "entity set in Appearance tab" },
+  presence:     { kind: "section", section: "home", filter: "person" },
+  lights:       { kind: "section", section: "lights" },
+  roomMonitors: { kind: "section", section: "roomMonitors" },
+  doors:        { kind: "section", section: "doors" },
+  scenes:       { kind: "section", section: "scenes" },
+  quickControls:{ kind: "section", section: "quickControls" },
+  scripts:      { kind: "section", section: "scripts" },
+  cameras:      { kind: "section", section: "cameras" },
+  security:     { kind: "section", section: "security" },
+  environment:  { kind: "section", section: "environment" },
+  system:       { kind: "section", section: "system" }
+};
+
+// Resolve the effective layout for a screen: config.panels if valid, else the
+// defaults; unknown panel ids dropped, missing default panels re-appended at
+// their default column/index. Pure — never mutates config.
+function effectivePanels(screen) {
+  const defaults = DEFAULT_PANELS[screen] || [];
+  const raw = config.panels && config.panels[screen];
+  const cols = (Array.isArray(raw) && raw.length && raw.every(Array.isArray))
+    ? raw.map(col => col.filter(id => PANEL_REGISTRY[id]))
+    : defaults.map(col => col.slice());
+  const present = new Set(cols.flat());
+  defaults.forEach((col, ci) => {
+    col.forEach((id, pi) => {
+      if (!present.has(id)) {
+        const target = cols[ci] || (cols[ci] = []);
+        target.splice(Math.min(pi, target.length), 0, id);
+        present.add(id);
+      }
+    });
+  });
+  return cols;
+}
+
+// Copy the resolved layout into config.panels so a later save persists the full
+// model (the editor calls this before its first mutation).
+function ensureConfigPanels() {
+  config.panels = config.panels || {};
+  for (const screen of Object.keys(DEFAULT_PANELS)) {
+    config.panels[screen] = effectivePanels(screen).map(col => col.slice());
+  }
+}
+
+// Backing config.sections key for a section-kind panel, else null. The
+// presence panel's entities live in sections.home (filtered to
+// person.*/device_tracker.* by getPresenceEntities()), so presence -> "home".
+function panelSection(panelId) {
+  const entry = PANEL_REGISTRY[panelId];
+  return entry && entry.kind === "section" ? entry.section : null;
+}
+
+const DEFAULT_CONFIG = {
+  theme: { backgroundImage: "", accentColor: "#2dd4bf" },
+  panels: DEFAULT_PANELS,
+  layout: { clock24h: false },
+  entities: {
+    weather: "weather.forecast_home",
+    mediaPlayer: "media_player.living_room_fire_tv_living_room"
+  },
+  sections: {
+    home: { title: "Home", icon: "🏠", entities: ["person.woteg", "person.bobbie", "weather.forecast_home"] },
+    scenes: { title: "Scenes", icon: "🎨", entities: ["scene.all_lights_off", "scene.relax_mode", "scene.movie_mode", "scene.focus_mode", "scene.living_room_focus_mode", "scene.living_room_relax_mode", "scene.living_room_all_lights_off"] },
+    scripts: { title: "Scripts", icon: "▶️", entities: ["script.goodnight", "script.focus_mode", "script.movie_mode", "script.relax_mode", "script.pause_all_media", "script.living_room_lights_on", "script.living_room_lights_off", "script.travis_office_lights_on", "script.travis_office_lights_off", "script.goodnight_door_check", "script.goodnight_dim_lights", "script.goodnight_enable_security"] },
+    quickControls: { title: "Quick Controls", icon: "🎛️", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan", "light.p1s_01p00a412300832_chamber_light", "light.travis_office_p1s_uno_chamber_light"] },
+    lights: { title: "Lights", icon: "💡", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan"] },
+    cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.backyard_rtsp_live"], snapshot: { "camera.front_door_live_view": { preferEntity: "camera.front_door_last_recording", activityEntities: ["event.front_door_motion", "event.front_door_ding", "sensor.front_door_last_activity"] } }, livestream: { "camera.backyard_rtsp_live": "switch.downstairs_live_stream" }, history: { "camera.front_door_live_view": "front_door", "camera.backyard_rtsp_live": "backyard" } },
+    security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2", "sensor.front_door_last_activity", "sensor.downstairs_last_activity"] },
+    doors: { title: "Doors", icon: "🚪", entities: ["binary_sensor.living_room_front_door", "binary_sensor.backdoor"] },
+    roomMonitors: { title: "Room Monitors", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2"] },
+    environment: { title: "Environment", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_illuminance", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2", "sensor.hobeian_zg_204zx_illuminance_2"] },
+    presence: { title: "Presence", icon: "👤", entities: ["binary_sensor.hobeian_zg_204zx", "binary_sensor.hobeian_zg_204zx_2"] },
+    system: { title: "System", icon: "⚙️", entities: ["sensor.home_assistant_core_cpu_percent", "sensor.home_assistant_core_memory_percent", "sensor.ha_disk_usage", "vacuum.geordi_la_forge", "vacuum.pooper_litter_box", "update.home_assistant_core_update", "update.home_assistant_operating_system_update", "update.home_assistant_supervisor_update"] }
+  },
+  dock: { items: [{ icon: "⚙️", action: "settings", label: "Settings" }] }
+};
+
+const DOMAIN_ICONS = {
+  light: { on: "💡", off: "🌑" }, switch: { on: "⚡", off: "🔌" }, fan: { on: "🌀", off: "🍃" },
+  binary_sensor: { on: "🔔", off: "🔕" }, climate: "🌡️", media_player: "📺", vacuum: "🤖",
+  sensor: "📊", weather: "🌤️", scene: "🎬", script: "▶️", button: "🔘", number: "🔢",
+  select: "☰", cover: "🪟", lock: "🔒", input_boolean: { on: "✅", off: "⬜" },
+  person: "👤", device_tracker: "📍", camera: "📷", siren: "🚨", update: "🔄", alarm_control_panel: "🛡️"
+};
+
+let config = {};
+let token = "";
+let ws = null;
+let reconnectDelay = 1000;
+let reconnectTimer = null;
+let pingTimer = null;
+let awaitingPong = false;
+let pongSeen = false;
+let hiddenAt = null;
+let states = {};
+let areas = [];
+let entities = [];
+let areaMap = {};
+let entityById = {};
+let haConfig = null;
+let forecastCache = { daily: [], fetchedAt: null };
+let historyCache = {};
+let currentScreen = "home";
+let clockFontSize = null;
+
+async function apiFetch(path) {
+  const headers = token ? { "Authorization": `Bearer ${token}` } : {};
+  try {
+    const r = await fetch(path, { headers });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    console.error("apiFetch failed", path, e);
+    return null;
+  }
+}
+
+async function apiCall(method, path, body) {
+  const headers = token ? { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
+  try {
+    const r = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    console.error("apiCall failed", method, path, e);
+    return null;
+  }
+}
+
+async function refreshForecast() {
+  const weatherId = config.entities.weather || "weather.forecast_home";
+  const state = states[weatherId];
+  // Fallback 1: entity attribute
+  if (state && state.attributes && Array.isArray(state.attributes.forecast)) {
+    forecastCache.daily = state.attributes.forecast.slice(0, 5);
+    forecastCache.fetchedAt = Date.now();
+    if (currentScreen === "home") renderHomeScreen();
+    return;
+  }
+  // Primary: server-side forecast endpoint (uses the dashboard proxy's HA auth)
+  const res = await apiCall("POST", "/ai-dashboard/api/forecast", {
+    entity_id: weatherId,
+    type: "daily"
+  });
+  if (res && res[weatherId] && Array.isArray(res[weatherId].forecast)) {
+    forecastCache.daily = res[weatherId].forecast.slice(0, 5);
+    forecastCache.fetchedAt = Date.now();
+    if (currentScreen === "home") renderHomeScreen();
+    return;
+  }
+  forecastCache.daily = [];
+}
+
+async function fetchHistory(entityIds, hours = 24) {
+  const now = Date.now();
+  const stale = entityIds.filter(id =>
+    !historyCache[id] || (now - historyCache[id].fetchedAt) > 30 * 60 * 1000
+  );
+  if (!stale.length) return;
+  const res = await apiCall("POST", "/ai-dashboard/api/history", {
+    entity_ids: stale,
+    hours: hours
+  });
+  if (!res) return;
+  for (const id of stale) {
+    if (Array.isArray(res[id])) historyCache[id] = { fetchedAt: now, data: res[id] };
+  }
+}
+
+function deepMerge(target, ...sources) {
+  for (const src of sources) {
+    if (!src) continue;
+    for (const key of Object.keys(src)) {
+      if (src[key] && typeof src[key] === "object" && !Array.isArray(src[key])) {
+        target[key] = target[key] || {};
+        deepMerge(target[key], src[key]);
+      } else {
+        target[key] = src[key];
+      }
+    }
+  }
+  return target;
+}
+
+async function loadConfig() {
+  let fileConfig = {};
+  try {
+    const r = await fetch("config.json", { cache: "no-store" });
+    if (r.ok) fileConfig = await r.json();
+  } catch (e) {}
+  const cfg = deepMerge(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), fileConfig);
+  migrateConfig(cfg);
+  return cfg;
+}
+
+function migrateConfig(cfg) {
+  if (cfg.entities && Array.isArray(cfg.entities.quickControls)) {
+    const legacy = cfg.entities.quickControls;
+    if (legacy.length &&
+        (!cfg.sections.quickControls || !Array.isArray(cfg.sections.quickControls.entities) || !cfg.sections.quickControls.entities.length)) {
+      cfg.sections.quickControls = cfg.sections.quickControls || { title: "Quick Controls", icon: "🎛️", entities: [] };
+      cfg.sections.quickControls.entities = legacy;
+    }
+    delete cfg.entities.quickControls;
+  }
+  delete cfg.sectionOrder; // superseded by config.panels
+}
+
+async function saveConfig() {
+  const res = await apiCall("POST", "/ai-dashboard/api/config", config);
+  if (res && res.success === true) return true;
+  setSettingsStatus("SAVE FAILED — changes are live but not persisted. Use Data > Export JSON as a backup.");
+  return false;
+}
+
+function setSettingsStatus(msg) {
+  const el = document.getElementById("settings-status");
+  if (el) el.textContent = msg || "";
+}
+
+function applyTheme() {
+  const accent = config.theme.accentColor || DEFAULT_CONFIG.theme.accentColor;
+  document.documentElement.style.setProperty("--accent", accent);
+}
+
+function friendlyName(entityId) {
+  if (config.labels && config.labels[entityId]) return config.labels[entityId];
+  const s = states[entityId];
+  if (s && s.attributes && s.attributes.friendly_name) return s.attributes.friendly_name;
+  const e = entityById[entityId];
+  if (e) return e.name || e.original_name || entityId;
+  return entityId.split(".").pop().replace(/_/g, " ");
+}
+
+function presenceLabel(entityId) {
+  if (config.presenceLabels && config.presenceLabels[entityId]) return config.presenceLabels[entityId];
+  return friendlyName(entityId);
+}
+
+function sectionTitle(key, fallback) {
+  const s = config.sections && config.sections[key];
+  const t = s && s.title ? String(s.title) : (fallback || key);
+  return t.toUpperCase();
+}
+
+function entityArea(entityId) {
+  return (window.HA_AREAS && window.HA_AREAS[entityId]) || "";
+}
+
+function iconFor(entityId, state) {
+  const domain = entityId.split(".")[0];
+  const s = (state || "").toLowerCase();
+  const map = DOMAIN_ICONS[domain];
+  if (typeof map === "object") {
+    if (["on","playing","open","home","heat","cool","auto","active","true"].includes(s)) return map.on || map.off;
+    return map.off || map.on;
+  }
+  return map || "●";
+}
+
+function isActive(state) {
+  return ["on","playing","open","home","heat","cool","auto","active","true","cleaning","docked","idle"].includes((state || "").toLowerCase());
+}
+
+function isUnavailable(state) {
+  if (!state) return true;
+  const s = String(state.state).toLowerCase();
+  return s === "unavailable" || s === "unknown";
+}
+
+function renderOfflineBadge() {
+  return `<span class="offline-badge">OFFLINE</span>`;
+}
+
+function isActionable(domain) {
+  return ["light","switch","fan","scene","script","button","input_boolean","cover","lock","media_player","siren"].includes(domain);
+}
+
+function formatState(state) {
+  if (!state) return "unknown";
+  const unit = state.attributes && state.attributes.unit_of_measurement ? state.attributes.unit_of_measurement : "";
+  return `${state.state} ${unit}`.trim();
+}
+
+function weatherIcon(condition) {
+  const c = (condition || "").toLowerCase();
+  if (c.includes("clear") || c.includes("sunny")) return "☀️";
+  if (c.includes("partly")) return "⛅";
+  if (c.includes("cloud")) return "☁️";
+  if (c.includes("rain") || c.includes("drizzle")) return "🌧️";
+  if (c.includes("snow")) return "❄️";
+  if (c.includes("storm") || c.includes("thunder")) return "⛈️";
+  if (c.includes("fog") || c.includes("mist")) return "🌫️";
+  return "🌤️";
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+function formatTemp(v) {
+  if (v == null || v === "unknown" || v === "unavailable") return "--";
+  return `${Math.round(v)}°`;
+}
+
+function relativeTime(isoString) {
+  if (!isoString || isoString === "unknown" || isoString === "unavailable") return "";
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return "";
+  const diff = Date.now() - date.getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+// Recorder-backed "last event" times. state.last_changed resets to the HA
+// restart time for restored entities, so door "last opened" and presence
+// "last seen" would falsely read "minutes ago" after every reboot. The cache
+// is seeded from recorder history (POST /ai-dashboard/api/history, survives
+// restarts) and then kept current by tracking real state transitions from WS
+// events — restart republishes arrive with an unchanged state and are ignored.
+const lastEventCache = {}; // entity_id -> ms epoch
+
+function doorEntityIds() {
+  return (config.sections && config.sections.doors && config.sections.doors.entities) || [];
+}
+
+function lastEventTime(id) {
+  const ms = lastEventCache[id];
+  if (ms) return new Date(ms).toISOString();
+  const st = states[id];
+  return st ? st.last_changed : null;
+}
+
+// Re-primed (merged, newest wins) on every full states reload so events that
+// happened while the socket was down (e.g. mid-restart) are picked up.
+async function primeLastEventCache() {
+  if (!window.HA_INTEGRATION_PROXY) return;
+  const doorIds = doorEntityIds();
+  const personIds = getPresenceEntities();
+  const ids = [...new Set([...doorIds, ...personIds])];
+  if (!ids.length) return;
+  try {
+    const resp = await fetch("/ai-dashboard/api/history", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ entity_ids: ids, hours: 168 }),
+    });
+    if (!resp.ok) return;
+    const data = await resp.json();
+    const now = Date.now();
+    for (const id of ids) {
+      const rows = data[id] || [];
+      let ms = null;
+      if (doorIds.includes(id)) {
+        // last time the door was OPEN (not just last open/close flip)
+        for (let i = rows.length - 1; i >= 0; i--) {
+          if (String(rows[i].state).toLowerCase() === "on") { ms = Date.parse(rows[i].last_changed); break; }
+        }
+      } else if (rows.length) {
+        ms = Date.parse(rows[rows.length - 1].last_changed);
+      }
+      if (ms && ms <= now) lastEventCache[id] = Math.max(lastEventCache[id] || 0, ms);
+    }
+  } catch (e) { /* cache stays as-is; renderers fall back to last_changed */ }
+}
+
+function trackLastEvent(prev, next) {
+  if (!prev || !next || prev.state === next.state) return;
+  const id = next.entity_id;
+  if (doorEntityIds().includes(id)) {
+    if (String(next.state).toLowerCase() === "on") lastEventCache[id] = Date.now();
+  } else if (getPresenceEntities().includes(id)) {
+    lastEventCache[id] = Date.now();
+  }
+}
+
+const DOOR_RECENT_WINDOW_MS = 10 * 60 * 1000;
+
+function recentDoorIds() {
+  const doors = (config.sections && config.sections.doors && config.sections.doors.entities) || [];
+  const recent = [];
+  for (const doorId of doors) {
+    const s = states[doorId];
+    if (!s || isUnavailable(s)) continue;
+    const t = new Date(s.last_changed).getTime();
+    if (!isNaN(t) && Date.now() - t < DOOR_RECENT_WINDOW_MS) recent.push(doorId);
+  }
+  return recent;
+}
+
+let lastRecentDoorKey = "";
+function refreshDoorRecency() {
+  const key = recentDoorIds().join(",");
+  if (key === lastRecentDoorKey) return;
+  lastRecentDoorKey = key;
+  const el = document.getElementById("doors-panel");
+  if (el && currentScreen === "home") {
+    el.innerHTML = renderTerminalPanel(sectionTitle("doors"), renderDoors());
+  }
+}
+
+const SNAPSHOT_EVENT_REFRESH_DELAY_MS = 20000;
+const SNAPSHOT_IDLE_EVENT_WINDOW_MS = 60 * 60 * 1000;
+const SNAPSHOT_IDLE_POLL_MS = 30 * 60 * 1000;
+const SNAPSHOT_CHECK_MS = 5 * 60 * 1000;
+
+const snapshotRefreshTimers = {};
+const snapshotLastRefresh = {};
+
+function cameraSnapshotConfig(cameraId) {
+  const cams = (config.sections && config.sections.cameras) || {};
+  return (cams.snapshot && cams.snapshot[cameraId]) || null;
+}
+
+function snapshotSourceEntity(cameraId) {
+  const snap = cameraSnapshotConfig(cameraId);
+  if (!snap) return cameraId;
+  const pref = snap.preferEntity;
+  if (pref && states[pref] && !isUnavailable(states[pref])) return pref;
+  return cameraId;
+}
+
+function snapshotLastActivityMs(snap) {
+  let latest = 0;
+  for (const id of (snap.activityEntities || [])) {
+    const s = states[id];
+    if (!s || isUnavailable(s)) continue;
+    const t = new Date(s.state).getTime();
+    if (!isNaN(t) && t > latest) latest = t;
+  }
+  return latest;
+}
+
+function snapshotImgUrl(srcEntity) {
+  const st = states[srcEntity];
+  let base;
+  if (st && st.attributes && st.attributes.entity_picture) {
+    base = st.attributes.entity_picture;
+  } else if (window.HA_INTEGRATION_PROXY) {
+    base = `/api/camera_proxy/${srcEntity}`;
+  } else {
+    base = `/api/camera_proxy/${srcEntity}?token=${encodeURIComponent(token)}`;
+  }
+  const sep = base.includes("?") ? "&" : "?";
+  return `${base}${sep}ts=${Date.now()}`;
+}
+
+function refreshCameraSnapshot(cameraId) {
+  const img = document.querySelector(`img.camera-feed[data-snapshot-camera="${cameraId}"]`);
+  if (!img) return;
+  snapshotLastRefresh[cameraId] = Date.now();
+  img.src = snapshotImgUrl(snapshotSourceEntity(cameraId));
+}
+
+function scheduleSnapshotRefresh(changedId) {
+  const cams = (config.sections && config.sections.cameras) || {};
+  const snapMap = cams.snapshot || {};
+  for (const cameraId of Object.keys(snapMap)) {
+    const acts = snapMap[cameraId].activityEntities || [];
+    if (!acts.includes(changedId)) continue;
+    clearTimeout(snapshotRefreshTimers[cameraId]);
+    snapshotRefreshTimers[cameraId] = setTimeout(() => refreshCameraSnapshot(cameraId), SNAPSHOT_EVENT_REFRESH_DELAY_MS);
+  }
+}
+
+function setStatus(cls) {
+  const led = document.getElementById("status-led");
+  const text = document.getElementById("status-text");
+  if (text) text.textContent = cls.toUpperCase();
+  if (led) {
+    led.className = "status-led";
+    if (cls === "connected") led.classList.add("on");
+    else if (cls === "disconnected") led.classList.add("danger");
+    else led.classList.add("warn");
+  }
+  const banner = document.getElementById("conn-banner");
+  if (banner) banner.style.display = cls === "connected" ? "none" : "block";
+  if (cls === "connected") reconnectDelay = 1000;
+}
+
+export function toggleEntity(entityId) {
+  const domain = entityId.split(".")[0];
+  let service = "toggle";
+  if (["scene","script","button"].includes(domain)) service = "turn_on";
+  else if (domain === "media_player") service = "media_play_pause";
+  else if (domain === "lock") {
+    const st = states[entityId] && states[entityId].state;
+    service = st === "locked" ? "unlock" : "lock";
+  }
+  sendWs({ id: Date.now(), type: "call_service", domain, service, service_data: { entity_id: entityId } });
+}
+
+export function mediaCmd(eid, service) {
+  sendWs({ id: Date.now(), type: "call_service", domain: "media_player", service, service_data: { entity_id: eid } });
+}
+
+export function setBrightness(entityId, pct) {
+  const value = Math.round((parseInt(pct, 10) / 100) * 255);
+  sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, brightness: value } });
+}
+
+export function setColorTemp(entityId, kelvin) {
+  sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, color_temp_kelvin: parseInt(kelvin, 10) } });
+}
+
+function setLightColor(entityId, rgb) {
+  sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, rgb_color: rgb } });
+}
+
+async function fetchRegistry() {
+  if (window.HA_INTEGRATION_PROXY) {
+    // Proxied dashboard has no HA token; the registry endpoints would 401.
+    // window.HA_AREAS (injected by the proxy) already covers area lookups.
+    areas = [];
+    entities = [];
+    areaMap = {};
+    entityById = {};
+    return;
+  }
+  const [aRes, eRes] = await Promise.all([
+    apiFetch("/api/config/area_registry/list"),
+    apiFetch("/api/config/entity_registry/list")
+  ]);
+  areas = aRes || [];
+  entities = eRes || [];
+  areaMap = {};
+  for (const a of areas) areaMap[a.area_id] = a.name;
+  entityById = {};
+  for (const e of entities) entityById[e.entity_id] = e;
+}
+
+async function fetchHAConfig() {
+  if (haConfig) return haConfig;
+  if (window.HA_CONFIG) {
+    haConfig = window.HA_CONFIG;
+    return haConfig;
+  }
+  haConfig = await apiFetch("/api/config");
+  return haConfig;
+}
+
+// ---- Component renderers ----
+
+function renderTerminalPanel(title, bodyHtml, cls, attrs) {
+  return `<div class="terminal-panel${cls ? " " + cls : ""}"${attrs ? " " + attrs : ""}>
+    <div class="panel-title">${escapeHtml(title)}</div>
+    <div class="panel-body">${bodyHtml}</div>
+  </div>`;
+}
+
+function renderStatusLed(state) {
+  let cls = "";
+  const s = String(state || "").toLowerCase();
+  if (["on","playing","open","home","heat","cool","auto","active","true","cleaning","docked","idle"].includes(s)) cls = "on";
+  else if (["unavailable","unknown","offline"].includes(s)) cls = "danger";
+  return `<span class="status-led ${cls}"></span>`;
+}
+
+function renderAlertBanner(alerts) {
+  if (!alerts || !alerts.length) return "";
+  const items = alerts.slice(0, 3).map(a => `<span style="margin-right:18px;">! ${escapeHtml(a)}</span>`).join("");
+  return `<div style="width:100%;background:rgba(255,174,0,0.12);border:1px solid var(--amber);color:var(--amber);font-family:var(--font-mono);padding:10px 14px;letter-spacing:0.05em;">${items}</div>`;
+}
+
+function renderSceneButton(entityId) {
+  const name = friendlyName(entityId);
+  return `<button class="scene-btn" data-entity-id="${entityId}" onclick="toggleEntity('${entityId}')">${escapeHtml(name)}</button>`;
+}
+
+// Light cards are one big button: tap cycles power, press-and-hold (~500ms)
+// opens the settings modal — the same gesture order as HA's native UI. A
+// pointer move cancels the press so scrolling on a touch screen triggers
+// neither action.
+const lightPress = { timer: null, held: false, x: 0, y: 0 };
+
+export function lightPressStart(ev, entityId) {
+  if (ev.button != null && ev.button !== 0) return;
+  lightPress.held = false;
+  lightPress.x = ev.clientX;
+  lightPress.y = ev.clientY;
+  clearTimeout(lightPress.timer);
+  lightPress.timer = setTimeout(() => { lightPress.held = true; openLightModal(entityId); }, 500);
+}
+function lightPressMove(ev) {
+  if (!lightPress.timer) return;
+  if (Math.hypot(ev.clientX - lightPress.x, ev.clientY - lightPress.y) > 12) lightPressCancel();
+}
+export function lightPressEnd(ev, entityId) {
+  if (ev.button != null && ev.button !== 0) return;
+  clearTimeout(lightPress.timer);
+  lightPress.timer = null;
+  if (!lightPress.held) toggleEntity(entityId);
+  lightPress.held = false;
+}
+export function lightPressCancel() {
+  clearTimeout(lightPress.timer);
+  lightPress.timer = null;
+  lightPress.held = false;
+}
+
+// Click position on the color wheel -> hs_color (conic-gradient hue 0° is at
+// 12 o'clock running clockwise; atan2 measures from 3 o'clock, hence +90).
+export function lightWheelPick(ev, entityId) {
+  const rect = ev.currentTarget.getBoundingClientRect();
+  const dx = ev.clientX - (rect.left + rect.width / 2);
+  const dy = ev.clientY - (rect.top + rect.height / 2);
+  let hue = Math.round(Math.atan2(dy, dx) * 180 / Math.PI + 90);
+  hue = ((hue % 360) + 360) % 360;
+  const sat = Math.min(100, Math.round(Math.hypot(dx, dy) / (rect.width / 2) * 100));
+  sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, hs_color: [hue, sat] } });
+}
+
+// Color-temp slider and/or an HSV color wheel for capable lights (light modal).
+function buildLightColorControls(entityId) {
+  const state = states[entityId];
+  if (!state || !state.attributes || !isActive(state.state) || isUnavailable(state)) return "";
+  const modes = state.attributes.supported_color_modes || [];
+  let html = "";
+  if (modes.includes("color_temp")) {
+    const minK = state.attributes.min_color_temp_kelvin || 2000;
+    const maxK = state.attributes.max_color_temp_kelvin || 6500;
+    const curK = state.attributes.color_temp_kelvin || Math.round((minK + maxK) / 2);
+    html += `<div>
+      <div style="font-size:0.72rem;color:var(--text-muted);letter-spacing:0.12em;margin-bottom:6px;">COLOR TEMP · ${curK}K</div>
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="color:var(--amber);font-size:1.1rem;" title="Warm">&#9728;</span>
+        <input type="range" min="${minK}" max="${maxK}" value="${curK}" style="flex:1;min-height:36px;accent-color:var(--amber);" onchange="setColorTemp('${entityId}', this.value)">
+        <span style="color:#7ab8ff;font-size:1.1rem;" title="Cool">&#10052;</span>
+      </div>
+    </div>`;
+  }
+  if (modes.some(m => ["hs", "rgb", "rgbw", "rgbww", "xy"].includes(m))) {
+    // Marker for the current color: hue runs clockwise from 12 o'clock,
+    // saturation is the distance from center.
+    const hs = state.attributes.hs_color;
+    let marker = "";
+    if (hs && hs.length === 2) {
+      const rad = (hs[0] - 90) * Math.PI / 180;
+      const dist = (hs[1] / 100) * 88; // 88px = wheel radius minus marker
+      const x = Math.round(Math.cos(rad) * dist);
+      const y = Math.round(Math.sin(rad) * dist);
+      marker = `<div style="position:absolute;left:calc(50% + ${x}px);top:calc(50% + ${y}px);width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 6px rgba(0,0,0,0.8);pointer-events:none;"></div>`;
+    }
+    html += `<div>
+      <div style="font-size:0.72rem;color:var(--text-muted);letter-spacing:0.12em;margin-bottom:8px;text-align:center;">COLOR · TAP WHEEL TO PICK</div>
+      <div style="position:relative;width:192px;height:192px;margin:0 auto;border-radius:50%;cursor:crosshair;border:1px solid var(--border);box-shadow:0 0 24px rgba(255,255,255,0.07), inset 0 0 12px rgba(0,0,0,0.4);background:radial-gradient(circle,#fff 0%,rgba(255,255,255,0) 62%),conic-gradient(#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00);" onclick="lightWheelPick(event,'${entityId}')">${marker}</div>
+    </div>`;
+  }
+  return html;
+}
+
+// Hold-target modal with a light's full controls (brightness / temp / color).
+let lightModalEntity = null;
+
+export function openLightModal(entityId) { lightModalEntity = entityId; renderLightModal(); }
+export function closeLightModal() { lightModalEntity = null; renderLightModal(); }
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && lightModalEntity) closeLightModal(); });
+
+function renderLightModal() {
+  let el = document.getElementById("light-modal-overlay");
+  if (!lightModalEntity) { if (el) el.remove(); return; }
+  // Never yank the DOM out from under an active slider drag on state updates.
+  const ae = document.activeElement;
+  if (el && ae && ae.tagName === "INPUT" && ae.type === "range" && el.contains(ae)) return;
+  const entityId = lightModalEntity;
+  const state = states[entityId];
+  const offline = isUnavailable(state);
+  const active = state ? isActive(state.state) : false;
+  const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
+  const pct = Math.round((brightness / 255) * 100);
+  const powerBtn = `<button title="Toggle power" style="width:56px;height:56px;border-radius:50%;border:1px solid ${active ? "var(--green)" : "var(--border)"};background:${active ? "rgba(20,254,23,0.08)" : "transparent"};color:${active ? "var(--green)" : "var(--text-muted)"};cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:box-shadow .15s,color .15s;${active ? "box-shadow:0 0 16px rgba(20,254,23,0.35);" : ""}" onclick="toggleEntity('${entityId}')"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 4v7"/><path d="M6.8 6.8a7.5 7.5 0 1 0 10.4 0"/></svg></button>`;
+  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(3px);z-index:1200;display:flex;align-items:center;justify-content:center;" onclick="closeLightModal()">
+    <div class="terminal-panel" style="width:min(560px,92vw);animation:lightModalPop .12s ease-out;" onclick="event.stopPropagation()">
+      <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>${escapeHtml(friendlyName(entityId))}</span>
+        <span style="cursor:pointer;color:var(--text-muted);text-shadow:none;" onclick="closeLightModal()">[ CLOSE ✕ ]</span>
+      </div>
+      <div class="panel-body" style="display:flex;flex-direction:column;gap:18px;padding:16px 18px 20px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-family:var(--font-mono);letter-spacing:0.1em;color:${offline ? "var(--text-muted)" : (active ? "var(--green)" : "var(--text-muted)")};${active ? "text-shadow:0 0 8px rgba(20,254,23,0.5);" : ""}">${offline ? "○ OFFLINE" : (active ? "● ON" : "○ OFF")}</span>
+          ${powerBtn}
+        </div>
+        ${active && !offline ? `<div>
+          <div style="font-size:0.72rem;color:var(--text-muted);letter-spacing:0.12em;margin-bottom:6px;">BRIGHTNESS · ${pct}%</div>
+          <input type="range" min="0" max="100" value="${pct}" style="width:100%;min-height:44px;accent-color:var(--green);" onchange="setBrightness('${entityId}', this.value)">
+        </div>` : ""}
+        ${buildLightColorControls(entityId)}
+      </div>
+    </div>
+  </div>`;
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "light-modal-overlay";
+    document.body.appendChild(el);
+  }
+  el.innerHTML = html;
+}
+
+// ---- Printer modal: full Bambu Lab status/camera/controls in a popup ----
+// prefix is the shared entity slug, e.g. "p1s_01p00a412300832" — every entity
+// of the printer starts with "<domain>.<prefix>_".
+let printerModalPrefix = null;
+
+export function openPrinterModal(prefix) { printerModalPrefix = prefix; renderPrinterModal(); }
+export function closePrinterModal() { printerModalPrefix = null; renderPrinterModal(); }
+document.addEventListener("keydown", ev => { if (ev.key === "Escape" && printerModalPrefix) closePrinterModal(); });
+
+export function pressPrinterButton(entityId) {
+  sendWs({ id: Date.now(), type: "call_service", domain: "button", service: "press", service_data: { entity_id: entityId } });
+}
+
+function printerEntities(prefix, domain) {
+  return Object.keys(states).filter(id => {
+    const parts = id.split(".");
+    return parts[1] && parts[1].startsWith(prefix) && (!domain || parts[0] === domain);
+  });
+}
+
+// First entity whose id contains any keyword (in priority order), skipping ids
+// already claimed by an earlier stat.
+function findPrinterSensor(prefix, keywords, used) {
+  for (const kw of keywords) {
+    const hit = printerEntities(prefix, "sensor").find(id => id.includes(kw) && !used.has(id));
+    if (hit) { used.add(hit); return hit; }
+  }
+  return null;
+}
+
+function printerStat(entityId) {
+  const s = states[entityId];
+  if (!s) return null;
+  const unit = s.attributes && s.attributes.unit_of_measurement ? s.attributes.unit_of_measurement : "";
+  return escapeHtml(String(s.state)) + (unit ? `<span style="color:var(--text-muted);font-size:0.75rem;"> ${escapeHtml(unit)}</span>` : "");
+}
+
+function renderPrinterModal() {
+  let el = document.getElementById("printer-modal-overlay");
+  if (!printerModalPrefix) { if (el) el.remove(); return; }
+  const prefix = printerModalPrefix;
+  const statusId = printerEntities(prefix, "sensor").find(id => id.endsWith("_print_status"));
+  const printerName = friendlyName(statusId || `sensor.${prefix}_print_status`).replace(/\s*print.?status\s*/i, "").trim();
+
+  const used = new Set(statusId ? [statusId] : []);
+  const progressId = findPrinterSensor(prefix, ["print_progress"], used);
+  const progress = progressId && states[progressId] ? parseFloat(states[progressId].state) : null;
+  const layerId = findPrinterSensor(prefix, ["current_layer"], used);
+  const totalLayerId = findPrinterSensor(prefix, ["total_layer"], used);
+  const statSpecs = [
+    ["STAGE", ["current_stage", "stage"]],
+    ["TASK", ["task_name"]],
+    ["REMAINING", ["remaining_time"]],
+    ["NOZZLE", ["nozzle_temp"]],
+    ["BED", ["bed_temp"]],
+    ["CHAMBER", ["chamber_temp"]],
+    ["SPEED", ["speed_profile", "printing_speed"]],
+    ["FILAMENT", ["print_weight"]],
+  ];
+  const stats = statSpecs.map(([label, kws]) => {
+    const id = findPrinterSensor(prefix, kws, used);
+    const v = id && printerStat(id);
+    return v ? `<div style="display:flex;justify-content:space-between;gap:12px;font-family:var(--font-mono);padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-muted);font-size:0.78rem;letter-spacing:0.08em;">${label}</span><span style="color:var(--green);">${v}</span></div>` : "";
+  });
+  if (layerId && states[layerId]) {
+    const total = totalLayerId && states[totalLayerId] ? states[totalLayerId].state : null;
+    stats.splice(1, 0, `<div style="display:flex;justify-content:space-between;gap:12px;font-family:var(--font-mono);padding:5px 0;border-bottom:1px solid var(--border);"><span style="color:var(--text-muted);font-size:0.78rem;letter-spacing:0.08em;">LAYER</span><span style="color:var(--green);">${escapeHtml(states[layerId].state)}${total ? " / " + escapeHtml(total) : ""}</span></div>`);
+  }
+
+  // Chamber camera (live stream with still fallback + retry, same as Security).
+  const camId = printerEntities(prefix, "camera").find(id => id.includes("camera"));
+  const camHtml = camId ? `<img src="${window.HA_INTEGRATION_PROXY ? `/ai-dashboard/cam_stream/${camId}` : `/api/camera_proxy_stream/${camId}?token=${encodeURIComponent(token)}`}" style="width:100%;border:1px solid var(--border);display:block;background:#000;" alt="" onerror="streamFeedFallback(this, '${camId}')">` : "";
+
+  // AMS trays: colored chips from the tray entities' color/name attributes.
+  const trays = printerEntities(prefix, "sensor").filter(id => id.includes("_tray_"));
+  const amsHtml = trays.length ? `<div>
+    <div style="font-size:0.72rem;color:var(--text-muted);letter-spacing:0.12em;margin-bottom:8px;">AMS</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">${trays.map(id => {
+      const a = states[id].attributes || {};
+      const hex = a.color ? "#" + String(a.color).slice(0, 6) : "var(--border)";
+      const label = a.type || a.name || states[id].state;
+      return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;">
+        <div style="width:34px;height:34px;border-radius:50%;background:${hex};border:1px solid var(--border);"></div>
+        <div style="font-size:0.65rem;color:var(--text-muted);font-family:var(--font-mono);max-width:64px;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(String(label))}</div>
+      </div>`;
+    }).join("")}</div>
+  </div>` : "";
+
+  // Controls: chamber light toggle + pause/resume/stop buttons (button.press).
+  const chamberLight = printerEntities(prefix, "light").find(id => id.includes("chamber_light"));
+  const ctrlBtns = ["pause", "resume", "stop"].map(kw => printerEntities(prefix, "button").find(id => id.includes(kw))).filter(Boolean);
+  const controlsHtml = (chamberLight || ctrlBtns.length) ? `<div>
+    <div style="font-size:0.72rem;color:var(--text-muted);letter-spacing:0.12em;margin-bottom:8px;">CONTROLS</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;">
+      ${chamberLight ? `<button class="scene-btn" style="cursor:pointer;" onclick="toggleEntity('${chamberLight}')">💡 CHAMBER ${states[chamberLight] && isActive(states[chamberLight].state) ? "ON" : "OFF"}</button>` : ""}
+      ${ctrlBtns.map(id => `<button class="scene-btn" style="cursor:pointer;" onclick="pressPrinterButton('${id}')">${escapeHtml(id.split("_").pop().toUpperCase())}</button>`).join("")}
+    </div>
+  </div>` : "";
+
+  const progressHtml = progress != null && !isNaN(progress) ? `<div>
+    <div style="display:flex;justify-content:space-between;font-family:var(--font-mono);font-size:0.78rem;color:var(--text-muted);margin-bottom:6px;"><span style="letter-spacing:0.08em;">PROGRESS</span><span style="color:var(--green);">${progress}%</span></div>
+    <div style="width:100%;height:10px;background:var(--green-dim);border-radius:5px;"><div style="width:${Math.min(100, Math.max(0, progress))}%;height:100%;background:var(--green);border-radius:5px;box-shadow:0 0 10px rgba(20,254,23,0.4);transition:width .3s;"></div></div>
+  </div>` : "";
+
+  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.85);backdrop-filter:blur(3px);z-index:1200;display:flex;align-items:center;justify-content:center;" onclick="closePrinterModal()">
+    <div class="terminal-panel" style="width:min(720px,94vw);max-height:92vh;display:flex;flex-direction:column;animation:lightModalPop .12s ease-out;" onclick="event.stopPropagation()">
+      <div class="panel-title" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>🖨 ${escapeHtml(printerName || prefix)}</span>
+        <span style="cursor:pointer;color:var(--text-muted);text-shadow:none;" onclick="closePrinterModal()">[ CLOSE ✕ ]</span>
+      </div>
+      <div class="panel-body" style="display:grid;grid-template-columns:${camId ? "1.1fr 1fr" : "1fr"};gap:18px;overflow-y:auto;">
+        ${camId ? `<div>${camHtml}</div>` : ""}
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div style="font-family:var(--font-mono);color:${statusId && states[statusId] && isActive(states[statusId].state) ? "var(--green)" : "var(--text-muted)"};letter-spacing:0.08em;">${statusId && states[statusId] ? escapeHtml(String(states[statusId].state).toUpperCase()) : "--"}</div>
+          ${progressHtml}
+          <div>${stats.join("")}</div>
+          ${amsHtml}
+          ${controlsHtml}
+        </div>
+      </div>
+    </div>
+  </div>`;
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "printer-modal-overlay";
+    document.body.appendChild(el);
+  }
+  el.innerHTML = html;
+}
+
+function renderLightCard(entityId) {
+  const state = states[entityId];
+  const offline = isUnavailable(state);
+  const active = state ? isActive(state.state) : false;
+  const brightness = state && state.attributes && state.attributes.brightness != null ? state.attributes.brightness : 0;
+  const pct = Math.round((brightness / 255) * 100);
+  // Compact grid tile: bulb icon glows green while lit. Tap toggles, hold opens
+  // the controls modal (see lightPress*).
+  const lit = active && !offline;
+  const bulb = `<svg viewBox="0 0 24 24" width="36" height="36" fill="${lit ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:${lit ? "var(--green)" : "var(--text-muted)"};${lit ? "filter:drop-shadow(0 0 10px rgba(20,254,23,0.55));" : ""}"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.9.7 1.6 1.6 1.6 2.7h4c0-1.1.7-2 1.6-2.7A6 6 0 0 0 12 3z"/></svg>`;
+  return `<div class="terminal-panel" data-entity-id="${entityId}" style="${lit ? "border-color:rgba(20,254,23,0.45);background:linear-gradient(180deg,rgba(20,254,23,0.07),rgba(20,254,23,0.02));box-shadow:0 0 16px rgba(20,254,23,0.15), inset 0 0 24px rgba(20,254,23,0.04);" : ""}">
+    <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;padding:14px 10px;"
+      onpointerdown="lightPressStart(event,'${entityId}')" onpointermove="lightPressMove(event)" onpointerup="lightPressEnd(event,'${entityId}')" onpointercancel="lightPressCancel()" oncontextmenu="event.preventDefault()">
+      ${bulb}
+      <div style="font-family:var(--font-mono);font-size:0.85rem;color:var(--text);max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${lit ? "text-shadow:0 0 8px rgba(20,254,23,0.4);" : ""}">${escapeHtml(friendlyName(entityId))}</div>
+      <div style="font-family:var(--font-mono);font-size:0.72rem;letter-spacing:0.08em;color:${lit ? "var(--green)" : "var(--text-muted)"};">${offline ? "OFFLINE" : (active ? `ON · ${pct}%` : "OFF")}</div>
+    </div>
+  </div>`;
+}
+
+function renderSwitchCard(entityId) {
+  const state = states[entityId];
+  const offline = isUnavailable(state);
+  const active = state ? isActive(state.state) : false;
+  return `<div class="terminal-panel" data-entity-id="${entityId}">
+    <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;" onclick="toggleEntity('${entityId}')">
+      <div>${renderStatusLed(offline ? "unavailable" : (active ? "on" : "off"))} <span style="font-family:var(--font-mono);">${escapeHtml(friendlyName(entityId))}</span></div>
+      <div style="color:var(--text-muted);font-family:var(--font-mono);">${offline ? "OFFLINE" : (active ? "ON" : "OFF")}</div>
+    </div>
+  </div>`;
+}
+
+function renderMetricCard(entityId) {
+  const state = states[entityId];
+  if (!state) return "";
+  const deviceClass = state.attributes && state.attributes.device_class;
+  const isTimestamp = deviceClass === "timestamp";
+  const unit = state.attributes && state.attributes.unit_of_measurement ? state.attributes.unit_of_measurement : "";
+  const offline = isUnavailable(state) ? renderOfflineBadge() : "";
+  const value = isTimestamp ? escapeHtml(relativeTime(state.state) || state.state) : escapeHtml(state.state);
+  return `<div class="terminal-panel" style="text-align:center;padding:8px;display:flex;flex-direction:column;justify-content:center;" data-entity-id="${entityId}">
+    <div style="font-family:var(--font-mono);font-size:1.4rem;color:var(--green);">${offline || value}<span style="font-size:0.8rem;color:var(--text-muted);">${offline || isTimestamp ? "" : escapeHtml(unit)}</span></div>
+    <div style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(friendlyName(entityId))}</div>
+    ${renderSparkline(entityId)}
+  </div>`;
+}
+
+function renderSparkline(entityId, width = 100, height = 20) {
+  const data = historyCache[entityId] && historyCache[entityId].data;
+  if (!data || data.length < 2) return "";
+  const values = data.map(d => parseFloat(d.state)).filter(v => !isNaN(v));
+  if (values.length < 2) return "";
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const points = values.map((v, i) => {
+    const x = (i / (values.length - 1)) * width;
+    const y = height - ((v - min) / range) * height;
+    return `${x},${y}`;
+  }).join(" ");
+  return `<svg width="${width}" height="${height}" style="display:block;margin:4px auto 0;"><polyline points="${points}" fill="none" stroke="rgba(20,254,23,0.45)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+}
+
+function renderEnvMetric(entityId) {
+  const state = states[entityId];
+  if (!state) return "";
+  const unit = state.attributes && state.attributes.unit_of_measurement ? state.attributes.unit_of_measurement : "";
+  const deviceClass = state.attributes && state.attributes.device_class;
+  const labelMap = { temperature: "TEMP", humidity: "HUM", illuminance: "LIGHT" };
+  const label = labelMap[deviceClass] || (deviceClass ? deviceClass.toUpperCase() : entityId.split("_").pop().toUpperCase());
+  const offline = isUnavailable(state) ? renderOfflineBadge() : "";
+  const sparkline = (deviceClass === "temperature" || deviceClass === "humidity")
+    ? renderSparkline(entityId)
+    : "";
+  return `<div class="terminal-panel" style="text-align:center;padding:10px 4px;display:flex;flex-direction:column;justify-content:center;" data-entity-id="${entityId}">
+    <div style="font-family:var(--font-mono);font-size:1.5rem;color:var(--green);">${offline || escapeHtml(state.state)}<span style="font-size:0.75rem;color:var(--text-muted);">${offline ? "" : escapeHtml(unit)}</span></div>
+    <div class="metric-label" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">${escapeHtml(label)}</div>
+    ${sparkline}
+  </div>`;
+}
+
+function livestreamSwitchFor(cameraId) {
+  const cams = (config.sections && config.sections.cameras) || {};
+  return (cams.livestream && cams.livestream[cameraId]) || null;
+}
+
+function cameraHistoryKey(cameraId) {
+  const cams = (config.sections && config.sections.cameras) || {};
+  return (cams.history && cams.history[cameraId]) || null;
+}
+
+function renderCameraFeed(entityId) {
+  const name = friendlyName(entityId);
+  const snap = cameraSnapshotConfig(entityId);
+  const srcEntity = snap ? snapshotSourceEntity(entityId) : entityId;
+  const state = states[srcEntity];
+  const offline = isUnavailable(state);
+  const liveSwitch = !snap && livestreamSwitchFor(entityId);
+  if (offline) {
+    return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
+      <div class="panel-title">${escapeHtml(name)}${renderOfflineBadge()}</div>
+      <div class="panel-body" style="padding:0;">
+        <div style="width:100%;aspect-ratio:16/9;display:flex;align-items:center;justify-content:center;background:#000;color:var(--danger);font-family:var(--font-mono);">CAMERA OFFLINE</div>
+      </div>
+    </div>`;
+  }
+  let src = "";
+  let isStream = false;
+  if (snap) {
+    src = snapshotImgUrl(srcEntity);
+    snapshotLastRefresh[entityId] = Date.now();
+  } else if (liveSwitch && window.HA_INTEGRATION_PROXY) {
+    // On-demand Ring live stream: the src is attached by startLivestreamCameras()
+    // only after the camera's live-stream switch has spun the session up. If the
+    // switch is already on (e.g. a state-update re-render mid-viewing), attach
+    // immediately — otherwise the re-render would strand the "starting" overlay.
+    const sw = states[liveSwitch];
+    if (sw && sw.state === "on") {
+      src = `/ai-dashboard/cam_stream/${entityId}?ts=${Date.now()}`;
+    }
+    isStream = true;
+  } else if (window.HA_INTEGRATION_PROXY) {
+    // No snapshot config = live view camera. Stream through the dashboard
+    // proxy: /api/camera_proxy_stream 403s for the remote browser session,
+    // and entity_picture is only a still Ring refreshes on activity (it froze
+    // the backyard cam for days).
+    src = `/ai-dashboard/cam_stream/${entityId}`;
+    isStream = true;
+  } else if (state && state.attributes && state.attributes.entity_picture) {
+    src = state.attributes.entity_picture;
+  } else {
+    src = `/api/camera_proxy_stream/${entityId}?token=${encodeURIComponent(token)}`;
+    isStream = true;
+  }
+  const lastEventMs = snap ? snapshotLastActivityMs(snap) : 0;
+  const lastEventLabel = lastEventMs ? relativeTime(new Date(lastEventMs).toISOString()) : "";
+  const titleSuffix = snap && lastEventLabel
+    ? ` <span style="color:var(--text-muted);font-size:0.75rem;">· LAST EVENT ${escapeHtml(lastEventLabel)}</span>`
+    : "";
+  const onerr = isStream ? ` onerror="streamFeedFallback(this,'${entityId}')"` : "";
+  const liveAttrs = liveSwitch && !src ? ` data-livestream-camera="${entityId}"` : "";
+  const pendingOverlay = liveSwitch && !src
+    ? `<div class="livestream-pending" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000;color:var(--text-muted);font-family:var(--font-mono);font-size:0.85rem;letter-spacing:0.1em;">STARTING LIVE STREAM…</div>`
+    : "";
+  const historyKey = cameraHistoryKey(entityId);
+  const historyChip = historyKey
+    ? ` <span class="history-chip" style="cursor:pointer;color:var(--accent,#2dd4bf);font-size:0.7rem;border:1px solid currentColor;padding:1px 6px;margin-left:6px;" onclick="event.stopPropagation();openSnapshotHistory('${historyKey}','${entityId}')">HISTORY</span>`
+    : "";
+  return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
+    <div class="panel-title">${escapeHtml(name)}${titleSuffix}${historyChip}</div>
+    <div class="panel-body" style="padding:0;${liveSwitch ? "position:relative;" : ""}">
+      <img class="camera-feed" ${snap ? `data-snapshot-camera="${entityId}"` : ""}${liveAttrs}${src ? ` src="${src}"` : ""}${onerr} style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
+      ${pendingOverlay}
+    </div>
+  </div>`;
+}
+
+// On-demand Ring live streams (ring-mqtt): the RTSP feed only exists while the
+// camera's live-stream switch is on, so streams start when the screen showing
+// them opens and stop when it closes. Leaving them running would suppress
+// Ring motion/ding events and hit Ring's ~10 minute stream kill anyway.
+const LIVESTREAM_STARTUP_DELAY_MS = 6000;
+const livestreamStartTimers = {};
+
+function startLivestreamCameras() {
+  if (!window.HA_INTEGRATION_PROXY) return;
+  const cams = (config.sections && config.sections.cameras) || {};
+  for (const [cameraId, switchId] of Object.entries(cams.livestream || {})) {
+    sendWs({ id: Date.now(), type: "call_service", domain: "switch", service: "turn_on", service_data: { entity_id: switchId } });
+    clearTimeout(livestreamStartTimers[cameraId]);
+    livestreamStartTimers[cameraId] = setTimeout(() => {
+      const img = document.querySelector(`img.camera-feed[data-livestream-camera="${cameraId}"]`);
+      if (!img) return;
+      img.src = `/ai-dashboard/cam_stream/${cameraId}?ts=${Date.now()}`;
+      const overlay = img.parentElement && img.parentElement.querySelector(".livestream-pending");
+      if (overlay) overlay.remove();
+    }, LIVESTREAM_STARTUP_DELAY_MS);
+  }
+}
+
+function stopLivestreamCameras() {
+  if (!window.HA_INTEGRATION_PROXY) return;
+  const cams = (config.sections && config.sections.cameras) || {};
+  for (const [cameraId, switchId] of Object.entries(cams.livestream || {})) {
+    clearTimeout(livestreamStartTimers[cameraId]);
+    sendWs({ id: Date.now(), type: "call_service", domain: "switch", service: "turn_off", service_data: { entity_id: switchId } });
+    const img = document.querySelector(`img.camera-feed[data-livestream-camera="${cameraId}"]`);
+    if (img) img.removeAttribute("src");
+  }
+}
+
+// Clip history viewer: 10s mp4 clips (plus legacy jpg stills) archived by the
+// ring_snapshot_archive_* automations, listed by GET /ai-dashboard/api/snapshots.
+const snapshotHistory = { key: null, entityId: null, files: [], idx: 0, loading: false };
+
+function snapshotTsLabel(file) {
+  // "2026-08-26_14-32-05.mp4" -> "Aug 26, 2:32:05 PM" (filenames are local time)
+  const m = file.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})-(\d{2})-(\d{2})\.(jpg|mp4)$/);
+  if (!m) return file;
+  const d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+  return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", second: "2-digit" });
+}
+
+async function openSnapshotHistory(key, entityId) {
+  snapshotHistory.key = key;
+  snapshotHistory.entityId = entityId;
+  snapshotHistory.idx = 0;
+  snapshotHistory.loading = true;
+  renderSnapshotHistory();
+  try {
+    const resp = await fetch(`/ai-dashboard/api/snapshots?camera=${encodeURIComponent(key)}`);
+    const data = await resp.json();
+    if (snapshotHistory.key !== key) return; // closed or switched meanwhile
+    snapshotHistory.files = (data.snapshots || []).map(s => s.file);
+  } catch (e) {
+    snapshotHistory.files = [];
+  }
+  snapshotHistory.loading = false;
+  renderSnapshotHistory();
+}
+
+export function closeSnapshotHistory() {
+  snapshotHistory.key = null;
+  renderSnapshotHistory();
+}
+
+export function stepSnapshotHistory(delta) {
+  const n = snapshotHistory.files.length;
+  if (!n) return;
+  snapshotHistory.idx = (snapshotHistory.idx + delta + n) % n;
+  renderSnapshotHistory();
+}
+
+function snapshotHistoryKeydown(ev) {
+  if (!snapshotHistory.key) return;
+  if (ev.key === "Escape") closeSnapshotHistory();
+  else if (ev.key === "ArrowLeft") stepSnapshotHistory(-1);   // older
+  else if (ev.key === "ArrowRight") stepSnapshotHistory(1);   // newer
+}
+document.addEventListener("keydown", snapshotHistoryKeydown);
+
+function renderSnapshotHistory() {
+  let el = document.getElementById("snapshot-history-overlay");
+  if (!snapshotHistory.key) {
+    if (el) el.remove();
+    return;
+  }
+  const name = friendlyName(snapshotHistory.entityId || "");
+  const n = snapshotHistory.files.length;
+  const file = n ? snapshotHistory.files[snapshotHistory.idx] : null;
+  const mediaUrl = file ? `/ai-dashboard/snapshots/${encodeURIComponent(snapshotHistory.key)}/${encodeURIComponent(file)}` : "";
+  // mp4 = 10s clip from the ring-mqtt RTSP feed; jpg = legacy event still
+  const media = file && file.endsWith(".mp4")
+    ? `<video src="${mediaUrl}" style="max-width:88vw;max-height:70vh;display:block;border:1px solid var(--green);" controls autoplay muted loop playsinline></video>`
+    : `<img src="${mediaUrl}" style="max-width:88vw;max-height:70vh;object-fit:contain;display:block;border:1px solid var(--green);" alt="">`;
+  const body = snapshotHistory.loading
+    ? `<div style="color:var(--text-muted);font-family:var(--font-mono);padding:60px 0;">LOADING…</div>`
+    : !n
+      ? `<div style="color:var(--text-muted);font-family:var(--font-mono);padding:60px 0;">NO CLIPS YET — saved on the next motion/ding event</div>`
+      : `${media}
+         <div style="font-family:var(--font-mono);color:var(--green);margin-top:8px;font-size:0.9rem;">${escapeHtml(snapshotTsLabel(file))} <span style="color:var(--text-muted);">· ${snapshotHistory.idx + 1} / ${n}</span></div>`;
+  const nav = n > 1
+    ? `<div style="display:flex;gap:12px;margin-top:10px;font-family:var(--font-mono);">
+         <button class="bottom-btn" style="padding:8px 18px;cursor:pointer;" onclick="stepSnapshotHistory(-1)">◀ OLDER</button>
+         <button class="bottom-btn" style="padding:8px 18px;cursor:pointer;" onclick="stepSnapshotHistory(1)">NEWER ▶</button>
+       </div>`
+    : "";
+  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:1200;display:flex;align-items:center;justify-content:center;" onclick="closeSnapshotHistory()">
+    <div style="display:flex;flex-direction:column;align-items:center;max-width:92vw;" onclick="event.stopPropagation()">
+      <div style="font-family:var(--font-mono);color:var(--green);letter-spacing:0.1em;margin-bottom:8px;align-self:stretch;display:flex;justify-content:space-between;">
+        <span>⌂ ${escapeHtml(name)} — EVENT HISTORY</span>
+        <span style="cursor:pointer;color:var(--text-muted);" onclick="closeSnapshotHistory()">[ CLOSE ✕ ]</span>
+      </div>
+      ${body}
+      ${nav}
+    </div>
+  </div>`;
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "snapshot-history-overlay";
+    document.body.appendChild(el);
+  }
+  el.innerHTML = html;
+}
+
+// A dead MJPEG stream otherwise strands a frozen frame / broken image forever:
+// fall back to the camera's still, then retry the stream in 60s (the element
+// may be gone after a re-render; the retry is a no-op then).
+export function streamFeedFallback(img, entityId) {
+  if (img.dataset.streamFallback) return; // already failed once; let the retry handle it
+  img.dataset.streamFallback = "1";
+  const st = states[entityId];
+  const pic = st && st.attributes && st.attributes.entity_picture;
+  if (pic) img.src = pic;
+  setTimeout(() => {
+    if (!img.isConnected) return;
+    delete img.dataset.streamFallback;
+    img.src = window.HA_INTEGRATION_PROXY
+      ? `/ai-dashboard/cam_stream/${entityId}`
+      : `/api/camera_proxy_stream/${entityId}?token=${encodeURIComponent(token)}`;
+  }, 60000);
+}
+
+function renderRadarFrame() {
+  if (!haConfig || haConfig.latitude == null) return `<div class="terminal-panel"><div class="panel-body" style="color:var(--text-muted);">RADAR UNAVAILABLE</div></div>`;
+  return `<div class="terminal-panel" style="height:100%;display:flex;flex-direction:column;">
+    <div class="panel-title">WEATHER RADAR</div>
+    <div class="panel-body" style="flex:1;padding:0;min-height:0;">
+      <div id="radar-map">INITIALIZING RADAR...</div>
+    </div>
+  </div>`;
+}
+
+let radarMap = null;
+let radarMapEl = null;
+let radarAnimInterval = null;
+async function initRadarMap() {
+  const el = document.getElementById("radar-map");
+  if (!el || !window.L || !haConfig) return;
+  // Init once per #radar-map element: renderHomeScreen() replaces the element
+  // on a full home re-render, in which case we rebuild; plain state updates
+  // leave the element (and the map) untouched.
+  if (radarMap && radarMapEl === el) return;
+  if (radarMap) { radarMap.remove(); radarMap = null; radarMapEl = null; }
+  if (radarAnimInterval) { clearInterval(radarAnimInterval); radarAnimInterval = null; }
+  try {
+    const res = await fetch("https://api.rainviewer.com/public/weather-maps.json", { cache: "no-store" });
+    const data = await res.json();
+    const frames = data.radar && data.radar.past;
+    if (!frames || !frames.length) throw new Error("no radar frames");
+    const map = window.L.map(el, { zoomControl: false, maxZoom: 10 }).setView(
+      [haConfig.latitude, haConfig.longitude], 8
+    );
+    // Keyless Esri stack (CARTO's basemaps now watermark "API KEY REQUIRED");
+    // radar overlay is RainViewer (also keyless). Base is the dark gray
+    // canvas, CSS-darkened toward black (see .radar-basemap). Above the
+    // animated radar frames: World_Transportation adds bold highways/
+    // interstates, and Boundaries_and_Places_Alternate (the light-on-dark
+    // variant) adds state lines and city labels. Both are recolored via
+    // CSS filters (see .radar-roads / .radar-labels).
+    window.L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 16, className: "radar-basemap", attribution: "Esri, HERE, Garmin, FAO, NOAA, USGS" }
+    ).addTo(map);
+    window.L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Transportation/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 16, zIndex: 10, className: "radar-roads", opacity: 0.35 } // above the animated radar frames
+    ).addTo(map);
+    window.L.tileLayer(
+      "https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places_Alternate/MapServer/tile/{z}/{y}/{x}",
+      { maxZoom: 16, zIndex: 11, className: "radar-labels", opacity: 0.6 } // labels/boundaries on top of roads
+    ).addTo(map);
+
+    // Use the last 8 frames (~80 min) to keep tile count reasonable.
+    const useFrames = frames.slice(-8);
+    const layers = useFrames.map(f =>
+      window.L.tileLayer(`${data.host}${f.path}/256/{z}/{x}/{y}/7/1_1.png`, {
+        // RainViewer renders radar natively only up to z7 — past that it
+        // serves a "zoom not supported" placeholder. maxNativeZoom upscales
+        // the z7 tiles instead.
+        opacity: 0, maxZoom: 10, maxNativeZoom: 7, minZoom: 3
+      }).addTo(map)
+    );
+
+    const timestamp = document.createElement("div");
+    timestamp.className = "radar-timestamp";
+    el.appendChild(timestamp);
+
+    let idx = layers.length - 1;
+    layers[idx].setOpacity(0.65);
+    timestamp.textContent = "RADAR UPDATED " + new Date(useFrames[idx].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+    radarAnimInterval = setInterval(() => {
+      layers[idx].setOpacity(0);
+      idx = (idx + 1) % layers.length;
+      layers[idx].setOpacity(0.65);
+      timestamp.textContent = "RADAR UPDATED " + new Date(useFrames[idx].time * 1000).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+    }, 700);
+
+    setTimeout(() => map.invalidateSize(), 150);
+    radarMap = map;
+    radarMapEl = el;
+  } catch (e) {
+    console.error("radar init failed", e);
+    el.innerHTML = '<div style="color:var(--text-muted);padding:14px;">RADAR OFFLINE</div>';
+  }
+}
+
+function renderMediaCard(entityId) {
+  const state = states[entityId];
+  if (!state) return "";
+  const title = state.attributes && (state.attributes.media_title || state.attributes.friendly_name) || friendlyName(entityId);
+  const artist = state.attributes && state.attributes.media_artist ? state.attributes.media_artist : state.state;
+  const playing = state.state === "playing";
+  return `<div class="terminal-panel" data-entity-id="${entityId}">
+    <div class="panel-title">${escapeHtml(friendlyName(entityId))}</div>
+    <div class="panel-body" style="font-family:var(--font-mono);">
+      <div style="color:var(--green);">${escapeHtml(title)}</div>
+      <div style="color:var(--text-muted);font-size:0.85rem;">${escapeHtml(artist)}</div>
+      <div style="display:flex;gap:10px;margin-top:10px;">
+        <button class="btn" onclick="mediaCmd('${entityId}','media_previous_track')">⏮</button>
+        <button class="btn" onclick="mediaCmd('${entityId}','${playing ? "media_pause" : "media_play"}')">${playing ? "⏸" : "▶"}</button>
+        <button class="btn" onclick="mediaCmd('${entityId}','media_next_track')">⏭</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderBottomButton(label, target, active = false) {
+  const cls = active ? "bottom-btn active-dock-btn" : "bottom-btn";
+  return `<button class="${cls}" onclick="showScreen('${target}')">${escapeHtml(label)}</button>`;
+}
+
+function renderDockItem(item) {
+  const icon = item.icon ? escapeHtml(item.icon) + " " : "";
+  const label = escapeHtml(item.label || item.entityId || "");
+  if (item.action === "settings") {
+    return `<button class="bottom-btn" onclick="openSettings()">${icon}${label}</button>`;
+  }
+  if (item.entityId) {
+    return `<button class="bottom-btn" onclick="toggleEntity('${item.entityId}')">${icon}${label}</button>`;
+  }
+  return "";
+}
+
+function renderDock() {
+  const screens = renderBottomButton("HOME", "home", currentScreen === "home") +
+    renderBottomButton("CONTROL HUB", "control", currentScreen === "control") +
+    renderBottomButton("SECURITY", "security", currentScreen === "security") +
+    renderBottomButton("STATUS MONITOR", "status", currentScreen === "status");
+  const items = ((config.dock && config.dock.items) || []).map(renderDockItem).join("");
+  return screens + items;
+}
+
+// Assemble a screen grid from prebuilt panel HTML. `columns` is an array of
+// columns, each an ordered array of panel ids; every panel string's outermost
+// element carries data-panel-id (inert live, used by the layout editor). The
+// outer grid div carries data-screen-grid so the editor's overflow check can
+// measure the live grid's available height.
+function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
+  const cols = columns.map((col, i) =>
+    `<div style="${colStyles[i]}">${col.map(id => panelHtml[id] || "").join("")}</div>`
+  ).join("");
+  return `<div data-screen-grid style="${gridStyle}">${cols}</div>`;
+}
+
+// ---- Screens ----
+
+function getPresenceEntities() {
+  const homeSection = (config.sections && config.sections.home && config.sections.home.entities) || [];
+  return homeSection.filter(id => {
+    const domain = id.split(".")[0];
+    return domain === "person" || domain === "device_tracker";
+  });
+}
+
+function getAlerts() {
+  const alerts = [];
+  const sec = config.sections && config.sections.security ? config.sections.security.entities : [];
+  for (const id of sec) {
+    const state = states[id];
+    if (!state) continue;
+    const domain = id.split(".")[0];
+    const deviceClass = state.attributes && state.attributes.device_class;
+    if (domain === "binary_sensor" && deviceClass === "motion" && isActive(state.state)) {
+      alerts.push(`${friendlyName(id)} detected`);
+    }
+    if (domain === "siren" && isActive(state.state)) {
+      alerts.push(`${friendlyName(id)} active`);
+    }
+    if (domain === "sensor" && deviceClass === "battery") {
+      const val = parseFloat(state.state);
+      if (!isNaN(val) && val < 20) alerts.push(`${friendlyName(id)} low`);
+    }
+  }
+  const sys = config.sections && config.sections.system ? config.sections.system.entities : [];
+  for (const id of sys) {
+    if (id.startsWith("update.") && states[id] && states[id].state === "on") {
+      alerts.push(`${friendlyName(id)} available`);
+    }
+  }
+  return alerts;
+}
+
+function renderRoomMonitors() {
+  const roomMonitors = (config.sections && config.sections.roomMonitors && config.sections.roomMonitors.entities) || [];
+  if (!roomMonitors.length) return "<div style='color:var(--text-muted);font-family:var(--font-mono);'>NO ROOM DATA</div>";
+
+  const rooms = {};
+  const order = [];
+  for (const id of roomMonitors) {
+    const area = entityArea(id) || friendlyName(id);
+    if (!rooms[area]) {
+      rooms[area] = {};
+      order.push(area);
+    }
+    const state = states[id];
+    const deviceClass = state && state.attributes && state.attributes.device_class;
+    if (deviceClass === "temperature" || deviceClass === "humidity") {
+      rooms[area][deviceClass] = { id, state };
+    }
+  }
+
+  const cards = order.map(area => {
+    const temp = rooms[area].temperature;
+    const hum = rooms[area].humidity;
+    const tempOffline = temp && isUnavailable(temp.state);
+    const humOffline = hum && isUnavailable(hum.state);
+    const tempValue = temp ? (tempOffline ? renderOfflineBadge() : `${escapeHtml(temp.state.state)}<span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(temp.state.attributes && temp.state.attributes.unit_of_measurement || "")}</span>`) : "--";
+    const humValue = hum ? (humOffline ? renderOfflineBadge() : `${escapeHtml(hum.state.state)}<span style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(hum.state.attributes && hum.state.attributes.unit_of_measurement || "")}</span>`) : "--";
+    return `
+      <div class="terminal-panel" style="padding:10px;display:flex;flex-direction:column;justify-content:center;" data-room="${escapeHtml(area)}">
+        <div style="font-family:var(--font-mono);font-size:0.75rem;color:var(--green);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">${escapeHtml(area)}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div style="text-align:center;">
+            <div style="font-family:var(--font-mono);font-size:1.4rem;color:var(--green);">${tempValue}</div>
+            <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">TEMP</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-family:var(--font-mono);font-size:1.4rem;color:var(--green);">${humValue}</div>
+            <div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">HUM</div>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+
+  return `<div style="display:grid;grid-template-columns:1fr;gap:10px;grid-auto-rows:1fr;height:100%;">${cards}</div>`;
+}
+
+function renderDoors() {
+  const doorIds = (config.sections && config.sections.doors && config.sections.doors.entities) || [];
+  if (!doorIds.length) return "<div style='color:var(--text-muted);font-family:var(--font-mono);'>NO DOOR DATA</div>";
+
+  const recentDoors = recentDoorIds();
+
+  const cards = doorIds.map(id => {
+    const state = states[id];
+    const offline = isUnavailable(state);
+    const open = state && String(state.state).toLowerCase() === "on";
+    const label = friendlyName(id);
+    const statusText = offline ? "OFFLINE" : (open ? "OPEN" : "CLOSED");
+    const statusColor = offline ? "var(--text-muted)" : (open ? "var(--danger)" : "var(--green)");
+    const ledState = offline ? "off" : (open ? "danger" : "on");
+
+    const lastActivity = state && !offline ? relativeTime(lastEventTime(id)) : "";
+    const isRecent = recentDoors.includes(id);
+
+    return `
+      <div class="terminal-panel" style="display:flex;align-items:center;justify-content:space-between;padding:12px 14px;${isRecent ? "border-left:3px solid var(--amber);" : ""}" data-entity-id="${id}">
+        <div style="display:flex;align-items:center;gap:10px;">
+          ${renderStatusLed(ledState)}
+          <div>
+            <div style="font-family:var(--font-mono);font-size:1rem;color:var(--text);">${escapeHtml(label)}</div>
+            ${lastActivity ? `<div style="font-size:0.75rem;color:var(--text-muted);">${isRecent ? '<span style="color:var(--amber);font-family:var(--font-mono);">RECENT&nbsp;</span>' : ""}OPENED ${escapeHtml(lastActivity)}</div>` : ""}
+          </div>
+        </div>
+        <span style="font-family:var(--font-mono);font-size:1.1rem;color:${statusColor};">${statusText}</span>
+      </div>`;
+  }).join("");
+
+  return `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${cards}</div>`;
+}
+
+function buildHomePanels() {
+  const weatherId = config.entities.weather || "weather.forecast_home";
+  const weather = states[weatherId];
+  const temp = weather && weather.attributes && weather.attributes.temperature != null ? `${weather.attributes.temperature}°` : "--";
+  const humidity = weather && weather.attributes && weather.attributes.humidity != null ? `${weather.attributes.humidity}%` : "--";
+  const condition = weather ? weather.state.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase()) : "--";
+  const icon = weatherIcon(weather ? weather.state : "");
+
+  const weatherAttr = weather ? weather.attributes || {} : {};
+  const high = formatTemp(weatherAttr.temperature);
+  const todayForecast = forecastCache.daily && forecastCache.daily[0];
+  const low = formatTemp(weatherAttr.templow != null ? weatherAttr.templow : (todayForecast ? todayForecast.templow : null));
+  const wind = weatherAttr.wind_speed != null ? `${Math.round(weatherAttr.wind_speed)} ${weatherAttr.wind_speed_unit || ""}`.trim() : "--";
+
+  const forecastHtml = forecastCache.daily.length
+    ? `<div style="display:flex;gap:14px;justify-content:space-between;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);">
+        ${forecastCache.daily.map(day => {
+          const date = day.datetime ? new Date(day.datetime) : null;
+          const dayName = date ? date.toLocaleDateString([], { weekday: "short" }).toUpperCase() : "--";
+          const icon = weatherIcon(day.condition);
+          const maxT = formatTemp(day.temperature);
+          const minT = formatTemp(day.templow);
+          return `<div style="text-align:center;flex:1;">
+            <div style="font-size:0.7rem;color:var(--text-muted);font-family:var(--font-mono);">${dayName}</div>
+            <div style="font-size:1.6rem;margin:4px 0;">${icon}</div>
+            <div style="font-size:1rem;color:var(--green);font-family:var(--font-mono);">${maxT}</div>
+            <div style="font-size:1rem;color:var(--text-muted);font-family:var(--font-mono);">${minT}</div>
+          </div>`;
+        }).join("")}
+      </div>`
+    : "";
+
+  const weatherPanel = renderTerminalPanel("WEATHER", `
+    <div style="display:flex;align-items:center;gap:14px;">
+      <div style="font-size:3.5rem;">${icon}</div>
+      <div>
+        <div style="font-size:2.4rem;color:var(--green);">${temp}</div>
+        <div style="color:var(--text-muted);font-family:var(--font-mono);">${escapeHtml(condition)} · HUM ${humidity}</div>
+        <div style="color:var(--text-muted);font-family:var(--font-mono);font-size:0.8rem;margin-top:2px;">HI ${high} · LO ${low} · WIND ${wind}</div>
+      </div>
+    </div>
+    ${forecastHtml}
+  `, "", 'data-panel-id="weather"');
+
+  const presence = getPresenceEntities().map(id => {
+    const state = states[id];
+    const home = state ? isActive(state.state) : false;
+    const label = presenceLabel(id);
+    const initial = label.charAt(0).toUpperCase();
+    const zone = state && state.state && state.state !== "home" && state.state !== "not_home"
+      ? state.state.replace(/_/g, " ") : "";
+    let battery = "";
+    const trackers = (state && state.attributes && Array.isArray(state.attributes.device_trackers))
+      ? state.attributes.device_trackers : [];
+    for (const t of trackers) {
+      const baseId = String(t).split(".").pop();
+      const lvl = states[`sensor.${baseId}_battery_level`];
+      const battState = states[`sensor.${baseId}_battery_state`];
+      if (lvl && !isUnavailable(lvl)) {
+        const charging = battState && /charging/i.test(battState.state) && !/not/i.test(battState.state);
+        battery = `${lvl.state}%${charging ? " ⚡" : ""}`;
+        break;
+      }
+    }
+    const lastSeen = state ? relativeTime(lastEventTime(id)) : "";
+    return `
+      <div class="terminal-panel" data-entity-id="${id}" style="display:flex;align-items:center;gap:12px;padding:14px;">
+        <div style="width:48px;height:48px;border-radius:50%;border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--font-mono);font-size:1.6rem;color:var(--green);box-shadow:0 0 12px rgba(20,254,23,0.15);flex-shrink:0;">${initial}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(label)}</div>
+          <div style="display:flex;align-items:center;gap:8px;margin-top:6px;">
+            ${renderStatusLed(home ? "home" : "off")}
+            <span style="font-family:var(--font-mono);font-size:0.85rem;color:${home ? 'var(--green)' : 'var(--text-muted)'};">${home ? "HOME" : (zone ? escapeHtml(zone.toUpperCase()) : "AWAY")}</span>
+          </div>
+        </div>
+        <div style="text-align:right;font-family:var(--font-mono);flex-shrink:0;">
+          ${battery ? `<div style="color:var(--green);font-size:1rem;">${escapeHtml(battery)}</div>` : ""}
+          ${lastSeen ? `<div style="color:var(--text-muted);font-size:0.75rem;margin-top:4px;">${escapeHtml(lastSeen)}</div>` : ""}
+        </div>
+      </div>`;
+  }).join("");
+
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit", hour12: !config.layout.clock24h });
+  const timeStrMarked = escapeHtml(timeStr).replace(/:/g, '<span class="colon">:</span>');
+  const dateStr = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
+
+  const presencePanel = renderTerminalPanel(sectionTitle("presence"), `<div style="display:flex;flex-direction:column;gap:10px;height:100%;justify-content:space-evenly;">${presence}</div>`, "fill");
+  const doorsPanel = `<div id="doors-panel">${renderTerminalPanel(sectionTitle("doors"), renderDoors())}</div>`;
+
+  const calStates = Object.keys(states).filter(id => id.startsWith("calendar.")).map(id => states[id]).filter(Boolean);
+  const cal = calStates.find(s => s.state === "on") || calStates.find(s => s.attributes && s.attributes.message);
+  let oncallPanel = "";
+  if (cal) {
+    const isOn = cal.state === "on";
+    const who = (cal.attributes && (cal.attributes.location || cal.attributes.message)) || "";
+    const fmtWhen = d => d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+    const end = cal.attributes && cal.attributes.end_time ? new Date(cal.attributes.end_time.replace(" ", "T")) : null;
+    const start = cal.attributes && cal.attributes.start_time ? new Date(cal.attributes.start_time.replace(" ", "T")) : null;
+    const label = isOn ? (who || "ACTIVE SHIFT") : (who ? `NEXT: ${who}` : "NO UPCOMING SHIFT");
+    const when = isOn
+      ? (end && !isNaN(end.getTime()) ? `until ${fmtWhen(end)}` : "")
+      : (start && !isNaN(start.getTime()) ? `starts ${fmtWhen(start)}` : "");
+    oncallPanel = renderTerminalPanel("ON CALL", `
+      <div style="display:flex;align-items:center;justify-content:space-between;font-family:var(--font-mono);gap:10px;">
+        <span style="color:${isOn ? 'var(--green)' : 'var(--text-muted)'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(label)}</span>
+        ${when ? `<span style="color:var(--text-muted);font-size:0.8rem;flex-shrink:0;">${escapeHtml(when)}</span>` : ""}
+      </div>`);
+  }
+
+  // Home light tiles: same bulb cards as Control Hub (tap toggles, hold opens
+  // the controls modal); panel hidden until lights are added in Settings.
+  const homeLightIds = ((config.sections.lights && config.sections.lights.entities) || []).filter(id => id.startsWith("light."));
+  const lightsPanel = homeLightIds.length
+    ? renderTerminalPanel(sectionTitle("lights"), `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;">${homeLightIds.map(id => renderLightCard(id)).join("")}</div>`)
+    : "";
+
+  const panels = {
+    clock: `<div style="flex-shrink:0;padding:8px 0 0 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;" data-panel-id="clock">
+      <div id="clock" style="font-family:var(--font-mono);font-size:clamp(4rem,9vw,6.5rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);white-space:nowrap;">${timeStrMarked}</div>
+      <div id="date" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
+    </div>`,
+    presence: `<div style="flex:1;min-height:0;" data-panel-id="presence">${presencePanel}</div>`,
+    lights: lightsPanel ? `<div style="flex-shrink:0;" data-panel-id="lights">${lightsPanel}</div>` : "",
+    oncall: oncallPanel ? `<div style="flex-shrink:0;" data-panel-id="oncall">${oncallPanel}</div>` : "",
+    weather: weatherPanel,
+    roomMonitors: `<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="roomMonitors">${renderTerminalPanel(sectionTitle("roomMonitors"), renderRoomMonitors(), "fill")}</div>`,
+    radar: `<div style="flex:1;min-height:0;" data-panel-id="radar">${renderRadarFrame()}</div>`,
+    doors: `<div style="flex-shrink:0;" data-panel-id="doors"><div id="doors-panel">${renderTerminalPanel(sectionTitle("doors"), renderDoors())}</div></div>`,
+  };
+  return {
+    panels,
+    gridStyle: "display:grid;grid-template-columns:0.85fr 1fr 1.2fr;gap:14px;flex:1;min-height:0;",
+    colStyles: [
+      "display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;",
+      "display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;",
+      "display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;",
+    ],
+  };
+}
+
+function renderHomeScreen() {
+  const b = buildHomePanels();
+  const main = `${renderAlertBanner(getAlerts())}${assembleColumns(b.panels,
+    effectivePanels("home"),
+    b.gridStyle, b.colStyles)}`;
+  document.getElementById("home-screen").innerHTML = main;
+  initRadarMap();
+  measureClock();
+  lastRecentDoorKey = recentDoorIds().join(",");
+}
+
+function buildControlPanels() {
+  const scenes = (config.sections && config.sections.scenes && config.sections.scenes.entities) || [];
+  const scripts = (config.sections && config.sections.scripts && config.sections.scripts.entities) || [];
+  const quick = (config.sections && config.sections.quickControls && config.sections.quickControls.entities) || [];
+  const mediaId = config.entities.mediaPlayer || "media_player.living_room_fire_tv_living_room";
+
+  const sceneButtons = scenes.map(id => renderSceneButton(id)).join("");
+  const scriptButtons = scripts.map(id => renderSceneButton(id)).join("");
+  const lightIds = quick.filter(id => id.startsWith("light."));
+  const switchIds = quick.filter(id => id.startsWith("switch."));
+  const lightCards = lightIds.map(id => renderLightCard(id)).join("");
+  const switchCards = switchIds.map(id => renderSwitchCard(id)).join("");
+  // Light tiles sit side by side in an auto-filling grid; switches keep the
+  // full-width row layout below.
+  const controlCards = (lightCards ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;align-content:start;">${lightCards}</div>` : "") + switchCards;
+
+  const panels = {
+    scenes: renderTerminalPanel(sectionTitle("scenes"), `<div class="stretch-btns" style="display:flex;flex-direction:column;gap:10px;height:100%;">${sceneButtons || "<div style='color:var(--text-muted)'>NO SCENES</div>"}</div>`, "fill", 'data-panel-id="scenes"'),
+    quickControls: `<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="quickControls">${renderTerminalPanel(sectionTitle("quickControls"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${controlCards || "<div style='color:var(--text-muted)'>NO CONTROLS</div>"}</div>`, "fill")}</div>`,
+    media: `<div style="flex-shrink:0;" data-panel-id="media">${renderMediaCard(mediaId)}</div>`,
+    scripts: renderTerminalPanel(sectionTitle("scripts"), `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${scriptButtons || "<div style='color:var(--text-muted)'>NO SCRIPTS</div>"}</div>`, "", 'data-panel-id="scripts"'),
+  };
+  return {
+    panels,
+    gridStyle: "display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:14px;flex:1;min-height:0;",
+    colStyles: [
+      "display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;",
+      "display:flex;flex-direction:column;gap:10px;min-height:0;",
+      "display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;",
+    ],
+  };
+}
+
+function renderControlScreen() {
+  const b = buildControlPanels();
+  document.getElementById("control-screen").innerHTML = assembleColumns(b.panels,
+    effectivePanels("control"), b.gridStyle, b.colStyles);
+}
+
+async function buildStatusPanels() {
+  const environment = (config.sections && config.sections.environment && config.sections.environment.entities) || [];
+  const system = (config.sections && config.sections.system && config.sections.system.entities) || [];
+
+  const envGroups = {};
+  const envOrder = [];
+  for (const id of environment) {
+    const area = entityArea(id) || "Other";
+    if (!envGroups[area]) {
+      envGroups[area] = [];
+      envOrder.push(area);
+    }
+    envGroups[area].push(id);
+  }
+  const envMetrics = `<div style="display:flex;flex-direction:column;gap:12px;height:100%;">` + envOrder.map(area => {
+    const metrics = envGroups[area].map(id => renderEnvMetric(id)).join("");
+    return `<div style="flex:1;display:flex;flex-direction:column;min-height:0;">
+      <div style="font-family:var(--font-mono);font-size:0.8rem;color:var(--green);text-transform:uppercase;letter-spacing:0.1em;margin-bottom:6px;">${escapeHtml(area)}</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex:1;grid-auto-rows:1fr;">${metrics}</div>
+    </div>`;
+  }).join("") + `</div>`;
+
+  const sysMetrics = system.filter(id => id.startsWith("sensor.")).map(id => renderMetricCard(id)).join("");
+
+  const vacuumIds = system.filter(id => id.startsWith("vacuum."));
+  const vacuumCards = vacuumIds.map(id => {
+    const state = states[id];
+    return `<div class="terminal-panel" data-entity-id="${id}">
+      <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;font-family:var(--font-mono);">
+        <span>${escapeHtml(friendlyName(id))}</span>
+        <span style="color:var(--green);">${state ? escapeHtml(state.state) : "--"}</span>
+      </div>
+    </div>`;
+  }).join("");
+
+  const printerIds = Object.keys(states).filter(id => id.startsWith("sensor.") && id.endsWith("_print_status"));
+  const printerCards = printerIds.map(id => {
+    const state = states[id];
+    const base = id.replace("print_status", "").replace(/_+$/, "");
+    const prefix = base.split(".")[1];
+    const progressId = Object.keys(states).find(x => x.startsWith(base) && x.includes("print_progress") && x !== id);
+    const remainingId = Object.keys(states).find(x => x.startsWith(base) && x.includes("remaining_time") && x !== id);
+    const progress = progressId && states[progressId] ? parseFloat(states[progressId].state) : null;
+    const remaining = remainingId && states[remainingId] ? states[remainingId].state : null;
+    const progressBar = progress != null && !isNaN(progress)
+      ? `<div style="width:100%;height:8px;background:var(--green-dim);border-radius:4px;margin:8px 0;"><div style="width:${Math.min(100, Math.max(0, progress))}%;height:100%;background:var(--green);border-radius:4px;"></div></div><div style="color:var(--text-muted);font-size:0.75rem;">${progress}% ${remaining ? "· " + escapeHtml(remaining) + " left" : ""}</div>`
+      : "";
+    return `<div class="terminal-panel" data-entity-id="${id}" style="cursor:pointer;" title="Tap for printer controls" onclick="openPrinterModal('${prefix}')">
+      <div class="panel-body" style="font-family:var(--font-mono);">
+        <div style="color:var(--green);">${state ? escapeHtml(state.state) : "--"}</div>
+        ${progressBar}
+        <div style="color:var(--text-muted);font-size:0.8rem;">${escapeHtml(friendlyName(id))}</div>
+      </div>
+    </div>`;
+  }).join("");
+
+  const panels = {
+    environment: `<div style="min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="environment">${renderTerminalPanel(sectionTitle("environment"), envMetrics, "fill")}</div>`,
+    system: `<div style="min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="system">${renderTerminalPanel(sectionTitle("system"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${sysMetrics + vacuumCards + printerCards}</div>`, "fill")}</div>`,
+  };
+  return {
+    panels,
+    gridStyle: "display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0;overflow:hidden;",
+    // Single-panel columns use display:grid so each panel wrapper (a grid item)
+    // stretches to full column height exactly as it did as a direct grid item;
+    // a flex column would collapse it to content height and break the
+    // .terminal-panel.fill height:100% chain.
+    colStyles: [
+      "min-height:0;display:grid;",
+      "min-height:0;display:grid;",
+    ],
+  };
+}
+
+async function renderStatusScreen() {
+  const environment = (config.sections && config.sections.environment && config.sections.environment.entities) || [];
+  const system = (config.sections && config.sections.system && config.sections.system.entities) || [];
+  const historyIds = environment.filter(id => {
+    const s = states[id];
+    const dc = s && s.attributes && s.attributes.device_class;
+    return dc === "temperature" || dc === "humidity";
+  });
+  // System usage charts: any numeric system sensor (CPU %, memory %, disk) gets
+  // the same 24h sparkline treatment as the environment metrics.
+  const sysHistoryIds = system.filter(id =>
+    id.startsWith("sensor.") && states[id] && !isNaN(parseFloat(states[id].state)));
+  await fetchHistory(historyIds.concat(sysHistoryIds), 24);
+  const b = await buildStatusPanels();
+  document.getElementById("status-screen").innerHTML = assembleColumns(b.panels,
+    effectivePanels("status"), b.gridStyle, b.colStyles);
+}
+
+function buildSecurityPanels() {
+  const cameras = (config.sections && config.sections.cameras && config.sections.cameras.entities) || [];
+  const security = (config.sections && config.sections.security && config.sections.security.entities) || [];
+
+  const cameraFeeds = cameras.map(id => renderCameraFeed(id)).join("");
+  const securityCards = security.map(id => {
+    const domain = id.split(".")[0];
+    if (domain === "switch" || domain === "siren" || domain === "button" || domain === "script") {
+      return renderSceneButton(id);
+    }
+    return renderMetricCard(id);
+  }).join("");
+
+  const panels = {
+    cameras: `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;min-height:0;overflow:hidden;" data-panel-id="cameras">${cameraFeeds}</div>`,
+    security: `<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="security">${renderTerminalPanel(sectionTitle("security"), `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;grid-auto-rows:1fr;height:100%;">${securityCards}</div>`, "fill")}</div>`,
+  };
+  return {
+    panels,
+    gridStyle: "display:grid;grid-template-columns:1fr;gap:14px;flex:1;min-height:0;",
+    // Single column: the grid contributes no gap (one track), so the column's
+    // 14px flex gap is the only gap between the camera grid and the security
+    // panel — same as the .screen gap that separated them before.
+    colStyles: ["display:flex;flex-direction:column;gap:14px;min-height:0;"],
+  };
+}
+
+function renderSecurityScreen() {
+  const b = buildSecurityPanels();
+  document.getElementById("security-screen").innerHTML = assembleColumns(b.panels,
+    effectivePanels("security"), b.gridStyle, b.colStyles);
+}
+
+export async function showScreen(name) {
+  const prevScreen = currentScreen;
+  document.querySelectorAll(".screen").forEach(el => el.classList.remove("active"));
+  const target = document.getElementById(name + "-screen");
+  if (!target) return;
+  target.classList.add("active");
+  currentScreen = name;
+  if (prevScreen === "security" && name !== "security") stopLivestreamCameras();
+  document.getElementById("dock").innerHTML = renderDock();
+  if (name === "home") renderHomeScreen();
+  else if (name === "control") renderControlScreen();
+  else if (name === "security") { renderSecurityScreen(); startLivestreamCameras(); }
+  else if (name === "status") await renderStatusScreen();
+}
+
+function entityBelongsToScreen(entityId, screen) {
+  // Base membership derives from the effective panel layout, so moved panels
+  // keep receiving in-place card updates on their new screen.
+  const ids = [];
+  for (const col of effectivePanels(screen)) {
+    for (const pid of col) {
+      const p = PANEL_REGISTRY[pid];
+      if (!p) continue;
+      if (p.kind === "section") {
+        ids.push(...(pid === "presence"
+          ? getPresenceEntities()
+          : ((config.sections[p.section] && config.sections[p.section].entities) || [])));
+      } else if (p.kind === "entity" && config.entities[p.entityKey]) {
+        ids.push(config.entities[p.entityKey]);
+      }
+    }
+  }
+  if (ids.includes(entityId)) return true;
+  if (screen === "home") {
+    if (entityId.startsWith("calendar.")) return true;
+    const sec = (config.sections.security && config.sections.security.entities) || [];
+    const sys = (config.sections.system && config.sections.system.entities) || [];
+    if (sec.includes(entityId) || sys.includes(entityId)) return true;
+  }
+  if (screen === "status" && entityId.startsWith("sensor.") &&
+      (entityId.endsWith("_print_status") || entityId.includes("print_progress") || entityId.includes("remaining_time"))) {
+    return true;
+  }
+  return false;
+}
+
+function updateEntityCardInPlace(entityId) {
+  // Scope the lookup to the active screen: inactive screens keep their last-rendered
+  // HTML in the DOM, so a document-wide query could match a hidden screen's card.
+  const screenEl = document.getElementById(currentScreen + "-screen");
+  if (!screenEl) return false;
+  const el = screenEl.querySelector(`[data-entity-id="${CSS.escape(entityId)}"]`);
+  const domain = entityId.split(".")[0];
+  if (currentScreen === "home") {
+    if (domain === "calendar") return false; // on-call panel appears/disappears: structural
+    const doors = (config.sections.doors && config.sections.doors.entities) || [];
+    if (doors.includes(entityId)) {
+      const panel = document.getElementById("doors-panel");
+      if (!panel) return false;
+      panel.innerHTML = renderTerminalPanel(sectionTitle("doors"), renderDoors());
+      lastRecentDoorKey = recentDoorIds().join(",");
+      return true;
+    }
+    // Home light tiles update in place so a toggle doesn't rebuild the whole
+    // screen (and the radar map with it).
+    const homeLights = (config.sections.lights && config.sections.lights.entities) || [];
+    if (homeLights.includes(entityId) && el) {
+      el.outerHTML = renderLightCard(entityId);
+      return true;
+    }
+    // Weather panel, presence cards (battery reads sibling sensors), and room
+    // monitors (per-area cells, not per-entity) are not addressable per entity.
+    return false;
+  }
+  if (!el) return false;
+  // Never yank the DOM out from under an active slider drag. Only guard range
+  // inputs — a just-clicked button keeps focus too, and skipping its re-render
+  // would leave the ON/OFF label stale.
+  const ae = document.activeElement;
+  if (ae && ae.tagName === "INPUT" && ae.type === "range" && el.contains(ae)) return true;
+  let html = null;
+  if (currentScreen === "control") {
+    if (domain === "light") html = renderLightCard(entityId);
+    else if (domain === "switch") html = renderSwitchCard(entityId);
+    else if (entityId === (config.entities.mediaPlayer || "")) html = renderMediaCard(entityId);
+  } else if (currentScreen === "security") {
+    if (["sensor", "binary_sensor"].includes(domain)) html = renderMetricCard(entityId);
+    // switch/siren/button/script render as scene-btns without data-entity-id: structural fallback
+  } else if (currentScreen === "status") {
+    // Env metrics embed sparklines; printer cards read sibling sensors;
+    // vacuum cards exist but printer progress must not be missed: keep fallback.
+    return false;
+  }
+  if (html) {
+    el.outerHTML = html;
+    return true;
+  }
+  return false;
+}
+
+async function updateCard(state) {
+  if (lightModalEntity === state.entity_id) renderLightModal();
+  if (printerModalPrefix) {
+    const slug = state.entity_id.split(".")[1];
+    if (slug && slug.startsWith(printerModalPrefix)) renderPrinterModal();
+  }
+  if (!entityBelongsToScreen(state.entity_id, currentScreen)) return;
+  if (updateEntityCardInPlace(state.entity_id)) return;
+  if (currentScreen === "home") renderHomeScreen();
+  else if (currentScreen === "control") renderControlScreen();
+  else if (currentScreen === "security") renderSecurityScreen();
+  else if (currentScreen === "status") await renderStatusScreen();
+}
+
+async function renderAll() {
+  if (currentScreen === "home") renderHomeScreen();
+  else if (currentScreen === "control") renderControlScreen();
+  else if (currentScreen === "security") renderSecurityScreen();
+  else if (currentScreen === "status") await renderStatusScreen();
+  updateClock();
+}
+
+function measureClock() {
+  const el = document.getElementById("clock");
+  if (!el) { clockFontSize = null; return; }
+  // Fit the time on one line: start from the clamp(4rem, 9vw, 6.5rem) size,
+  // then shrink proportionally until it fits the column width.
+  const preferred = Math.min(Math.max(64, window.innerWidth * 0.09), 104);
+  el.style.fontSize = preferred + "px";
+  const avail = el.parentElement.clientWidth - 16;
+  const need = el.scrollWidth;
+  clockFontSize = need > avail && need > 0 ? Math.max(28, Math.floor(preferred * avail / need)) : preferred;
+  el.style.fontSize = clockFontSize + "px";
+}
+
+function updateClock() {
+  const now = new Date();
+  const opts = config.layout.clock24h ? { hour: "2-digit", minute: "2-digit", hour12: false } : { hour: "numeric", minute: "2-digit" };
+  const el = document.getElementById("clock");
+  if (el) {
+    const timeStr = now.toLocaleTimeString([], opts);
+    el.innerHTML = escapeHtml(timeStr).replace(/:/g, '<span class="colon">:</span>');
+    if (clockFontSize != null) el.style.fontSize = clockFontSize + "px";
+  }
+  const d = document.getElementById("date");
+  if (d) d.textContent = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
+}
+
+// ---- Settings ----
+
+export function openSettings() {
+  buildSettings();
+  document.getElementById("settings-overlay").style.display = "flex";
+}
+export function closeSettings() {
+  document.getElementById("settings-overlay").style.display = "none";
+}
+
+const SETTINGS_TABS = ["Layout", "Appearance", "Labels", "Data"];
+let settingsTab = "Layout";
+
+const EDITOR_SCREENS = [["home", "HOME"], ["control", "CONTROL HUB"], ["security", "SECURITY"], ["status", "STATUS MONITOR"]];
+let editorScreen = "home";
+
+export function setEditorScreen(name) {
+  editorScreen = name;
+  buildSettings();
+}
+
+export function switchSettingsTab(name) {
+  settingsTab = name;
+  buildSettings();
+}
+
+function entityOptionTags(domainFilter) {
+  let list = Object.values(states);
+  if (domainFilter) list = list.filter(s => domainFilter.includes(s.entity_id.split(".")[0]));
+  return list.map(s => `<option value="${s.entity_id}">${escapeHtml(friendlyName(s.entity_id))} (${s.entity_id})</option>`).join("");
+}
+
+function buildSettings() {
+  const tabsEl = document.getElementById("settings-tabs");
+  tabsEl.innerHTML = SETTINGS_TABS.map(t =>
+    `<button class="btn" style="${t === settingsTab ? "border-color:var(--accent);color:var(--accent);" : ""}" onclick="switchSettingsTab('${t}')">${t}</button>`
+  ).join("");
+  const body = document.getElementById("settings-body");
+  if (settingsTab === "Layout") {
+    body.innerHTML = renderLayoutTab();
+    initLayoutEditor();
+  } else if (settingsTab === "Appearance") {
+    body.innerHTML = renderAppearanceTab();
+    wireAppearanceTab();
+  } else if (settingsTab === "Labels") {
+    body.innerHTML = renderLabelsTab();
+  } else {
+    body.innerHTML = renderDataTab();
+  }
+}
+
+function renderAppearanceTab() {
+  return `
+    <div class="settings-section" style="margin-bottom:22px;"><h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">Appearance</h3>
+      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">Accent color</label><input id="cfg-accent" type="color" value="${config.theme.accentColor}"></div>
+      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">24-hour clock</label><input id="cfg-24h" type="checkbox" ${config.layout.clock24h ? "checked" : ""}></div>
+    </div>
+    <div class="settings-section" style="margin-bottom:22px;"><h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">Layout</h3>
+      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">Weather entity</label><select id="cfg-weather"><option value="">-- none --</option>${entityOptionTags(["weather"])}</select></div>
+      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:10px;flex-wrap:wrap;"><label style="min-width:120px;font-size:0.9rem;color:var(--text-muted);">Media player</label><select id="cfg-media"><option value="">-- none --</option>${entityOptionTags(["media_player"])}</select></div>
+    </div>
+  `;
+}
+
+function wireAppearanceTab() {
+  document.getElementById("cfg-weather").value = config.entities.weather || "";
+  document.getElementById("cfg-media").value = config.entities.mediaPlayer || "";
+}
+
+function renderLabelsTab() {
+  const labels = config.labels || {};
+  const rows = Object.keys(labels).sort().map(id => `
+    <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-bottom:8px;flex-wrap:wrap;">
+      <span style="flex:1;min-width:200px;font-size:0.85rem;color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${escapeHtml(id)}">${escapeHtml(id)}</span>
+      <input value="${escapeHtml(labels[id])}" onchange="setLabelOverride('${escapeHtml(id)}', this.value)" style="min-width:180px;">
+      <button class="btn" onclick="removeLabelOverride('${escapeHtml(id)}')">×</button>
+    </div>`).join("");
+  return `
+    <div class="settings-section" style="margin-bottom:22px;">
+      <h3 style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--green);margin:0 0 10px;">Label overrides</h3>
+      <p style="color:var(--text-muted);font-size:0.85rem;">Override the display name shown for an entity anywhere on the dashboard. Clear a label's text (or press ×) to remove the override.</p>
+      ${rows || "<p style='color:var(--text-muted);font-size:0.85rem;'>No label overrides yet.</p>"}
+      <div class="settings-row" style="display:flex;gap:12px;align-items:center;margin-top:12px;flex-wrap:wrap;">
+        <select id="cfg-label-entity" style="min-width:220px;"><option value="">-- pick entity --</option>${entityOptionTags(null)}</select>
+        <input id="cfg-label-text" placeholder="Display label" style="min-width:180px;">
+        <button class="btn" onclick="addLabelOverride()">Add</button>
+      </div>
+    </div>
+  `;
+}
+
+export function setLabelOverride(id, value) {
+  config.labels = config.labels || {};
+  if (value) config.labels[id] = value;
+  else delete config.labels[id];
+  renderAll();
+}
+
+export function removeLabelOverride(id) {
+  if (config.labels) delete config.labels[id];
+  renderAll();
+  buildSettings();
+}
+
+export function addLabelOverride() {
+  const sel = document.getElementById("cfg-label-entity");
+  const txt = document.getElementById("cfg-label-text");
+  if (!sel || !sel.value) return;
+  if (txt && txt.value) {
+    config.labels = config.labels || {};
+    config.labels[sel.value] = txt.value;
+  }
+  renderAll();
+  buildSettings();
+}
+
+function renderDataTab() {
+  return `
+    <div class="settings-section" style="margin-bottom:22px;">
+      <p style="color:var(--text-muted);font-size:0.85rem;">Settings are saved to <code>config.json</code> on the server when you press Save &amp; Apply, and shared by every device that opens this dashboard. Export keeps a local backup file.</p>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;">
+        <button class="btn" onclick="exportConfig()">Export JSON</button>
+        <button class="btn" onclick="importConfig()">Import JSON</button>
+      </div>
+      <button class="btn" onclick="logout()" style="background:rgba(248,113,113,0.15);border-color:rgba(248,113,113,0.3);">Clear token &amp; reload</button>
+    </div>
+  `;
+}
+
+let paletteFilter = "";
+let paletteNewOnly = false;
+
+function sectionOfEntity(id) {
+  for (const key of Object.keys(config.sections || {})) {
+    const ents = config.sections[key].entities || [];
+    if (ents.includes(id)) return key;
+  }
+  return null;
+}
+
+function renderPaletteList() {
+  const f = (paletteFilter || "").toLowerCase();
+  const referenced = collectReferencedIds();
+  const ids = Object.values(states)
+    .map(s => s.entity_id)
+    .filter(id => NEW_DEVICE_DOMAINS.includes(id.split(".")[0]))
+    .filter(id => !paletteNewOnly || !referenced.has(id))
+    .filter(id => !f || id.toLowerCase().includes(f) ||
+      friendlyName(id).toLowerCase().includes(f) ||
+      (entityArea(id) || "").toLowerCase().includes(f))
+    .sort((a, b) => friendlyName(a).localeCompare(friendlyName(b)));
+  const groups = {};
+  for (const id of ids) {
+    const area = entityArea(id) || "No area";
+    (groups[area] = groups[area] || []).push(id);
+  }
+  const html = Object.keys(groups).sort().map(area => `
+    <div style="margin-bottom:8px;">
+      <div style="font-size:0.7rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--green);margin:6px 0 2px;">${escapeHtml(area)}</div>
+      ${groups[area].map(id => `
+        <div class="palette-chip${referenced.has(id) ? " on-board" : ""}" data-entity="${escapeHtml(id)}" title="${escapeHtml(id)}">
+          <span class="drag-handle" data-drag-palette title="Drag onto a section">⠿</span>
+          <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(friendlyName(id))}</span>
+          ${referenced.has(id) ? '<span style="color:var(--green);font-size:0.65rem;flex-shrink:0;" title="On dashboard">●</span>' : ""}
+        </div>`).join("")}
+    </div>`).join("");
+  return html || "<p style='color:var(--text-muted);font-size:0.85rem;'>No matching entities.</p>";
+}
+
+function renderLayoutTab() {
+  const missing = computeMissingEntities();
+  const missingBlock = missing.length ? `
+    <div style="border:1px solid rgba(255,51,51,0.4);border-radius:6px;padding:8px;margin-bottom:8px;flex-shrink:0;">
+      <div style="color:var(--danger);font-size:0.72rem;margin-bottom:4px;letter-spacing:0.06em;">MISSING (${missing.length}) — no longer in Home Assistant</div>
+      ${missing.map(id => `<div style="display:flex;align-items:center;justify-content:space-between;gap:6px;font-size:0.78rem;padding:2px 0;">
+        <span style="color:var(--danger);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(id)}</span>
+        <button class="btn" style="padding:1px 8px;" onclick="removeMissingEntity('${escapeHtml(id)}')" title="Remove from config">×</button>
+      </div>`).join("")}
+    </div>` : "";
+  const previewTabs = EDITOR_SCREENS.map(([id, label]) =>
+    `<button class="btn" style="${id === editorScreen ? "border-color:var(--accent);color:var(--accent);" : ""}" onclick="setEditorScreen('${id}')">${label}</button>`
+  ).join("");
+  return `
+    <div style="display:flex;gap:14px;height:100%;min-height:0;">
+      <div id="palette" style="width:290px;flex-shrink:0;display:flex;flex-direction:column;min-height:0;border:1px solid var(--border);border-radius:6px;padding:10px;">
+        <input id="palette-filter" placeholder="Filter by name, id, or area..." value="${escapeHtml(paletteFilter)}" style="margin-bottom:8px;flex-shrink:0;">
+        <label style="font-size:0.78rem;color:var(--text-muted);display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-shrink:0;cursor:pointer;">
+          <input type="checkbox" id="palette-newonly" ${paletteNewOnly ? "checked" : ""}> only entities not on dashboard
+        </label>
+        ${missingBlock}
+        <div id="palette-list" style="overflow-y:auto;flex:1;min-height:0;">${renderPaletteList()}</div>
+        <p style="color:var(--text-muted);font-size:0.72rem;margin:8px 0 0;flex-shrink:0;">Drag an entity onto a panel to add it. Drag a card back here to remove it.</p>
+      </div>
+      <div id="preview" style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;">
+        <div id="preview-tabs" style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0;">${previewTabs}</div>
+        <div id="preview-stage" style="flex:1;min-height:0;overflow:auto;border:1px solid var(--border);border-radius:6px;padding:10px;">
+          <div id="preview-stage-inner"></div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function initLayoutEditor() {
+  const filterEl = document.getElementById("palette-filter");
+  const newOnlyEl = document.getElementById("palette-newonly");
+  const refresh = () => {
+    paletteFilter = filterEl ? filterEl.value : "";
+    paletteNewOnly = newOnlyEl ? newOnlyEl.checked : false;
+    const list = document.getElementById("palette-list");
+    if (list) list.innerHTML = renderPaletteList();
+    initPreviewDrag();
+  };
+  if (filterEl) filterEl.addEventListener("input", refresh);
+  if (newOnlyEl) newOnlyEl.addEventListener("change", refresh);
+  initPreviewDrag();
+  renderEditorPreview();
+}
+
+// Kill duplicate-id interference with the live #clock/#radar-map/#doors-panel
+// and neutralize inline onclick/onchange handlers inside the preview. Live
+// camera streams are swapped for their current still so the preview doesn't
+// open duplicate MJPEG streams.
+function sanitizePreviewHtml(html) {
+  return html
+    .replace(/ id="/g, ' data-pid="')
+    .replace(/ on\w+="[^"]*"/g, "")
+    .replace(/src="\/(?:api\/camera_proxy_stream|ai-dashboard\/cam_stream)\/([^"?]+)[^"]*"/g, (m, eid) => {
+      const st = states[eid];
+      const pic = st && st.attributes && st.attributes.entity_picture;
+      return pic ? `src="${pic}"` : m;
+    });
+}
+
+const PREVIEW_BUILDERS = {
+  home: buildHomePanels,
+  control: buildControlPanels,
+  security: buildSecurityPanels,
+  status: buildStatusPanels
+};
+
+// Build the editorScreen's HTML at real pixel size and display it scaled to
+// fit the stage. Fire-and-forget from initLayoutEditor; re-wires drag handlers
+// once the preview DOM exists.
+async function renderEditorPreview() {
+  const screen = editorScreen;
+  const stage = document.getElementById("preview-stage");
+  const inner = document.getElementById("preview-stage-inner");
+  if (!stage || !inner) return;
+  const build = PREVIEW_BUILDERS[screen] || buildHomePanels;
+  const b = await build();
+  // Bail if a tab switch re-rendered the settings body while we awaited.
+  if (editorScreen !== screen || !inner.isConnected) return;
+  // Hidden screens report clientWidth 0 (display:none); fall back to the
+  // active screen, which shares the same container and therefore width.
+  const live = document.getElementById(screen + "-screen");
+  let w = live ? live.clientWidth : 0;
+  if (!w) {
+    const active = document.querySelector(".screen.active");
+    w = active && active.clientWidth ? active.clientWidth : stage.clientWidth;
+  }
+  // Assemble inline (assembleColumns' signature stays untouched) so each
+  // column div carries data-preview-col for panel drop targeting.
+  const colsHtml = effectivePanels(screen).map((col, i) =>
+    `<div data-preview-col="${i}" style="${b.colStyles[i]}">${col.map(id => b.panels[id] || "").join("")}</div>`
+  ).join("");
+  // Sanitize once and share the exact same HTML with the hidden measure
+  // container so overflow math reflects the current (post-edit) effective
+  // layout, never a stale cache.
+  const sanitized = sanitizePreviewHtml(`<div style="${b.gridStyle}">${colsHtml}</div>`);
+  inner.style.width = w + "px";
+  inner.innerHTML = sanitized;
+  // Scale against the stage's content-box width so the stage padding doesn't
+  // bake in horizontal overflow.
+  const stageStyle = getComputedStyle(stage);
+  const stageContentW = stage.clientWidth - parseFloat(stageStyle.paddingLeft) - parseFloat(stageStyle.paddingRight);
+  const k = Math.min(1, stageContentW / w);
+  inner.style.transform = `scale(${k})`;
+  inner.style.transformOrigin = "top left";
+  // transform doesn't affect layout: shrink the layout box to the scaled
+  // footprint or the stage shows scrollbars/dead space around the preview.
+  inner.style.height = (inner.scrollHeight * k) + "px";
+  decoratePreviewPanels(inner);
+  if (window.updateOverflowBadges) window.updateOverflowBadges(sanitized, w);
+  initPreviewDrag();
+}
+
+// Measured overflow warning for the layout preview. Recomputes on every
+// renderEditorPreview (editor open, tab switch, every edit).
+//
+// IMPORTANT: all offsetHeight reads happen on the persistent hidden
+// #preview-measure container — a 1.0-scale offscreen clone of the preview HTML
+// — never on the scaled preview DOM. transform: scale() does not affect layout,
+// so measuring the scaled DOM would technically give the same numbers, but
+// injecting/clearing badges in the visible preview while reading heights from
+// it would invite layout thrash and feedback loops; the offscreen clone keeps
+// measurement and badge mutation fully separate.
+//
+// Caveat: the measurement reflects CURRENT content only. It cannot predict
+// future states — e.g. printer cards that appear mid-print or the on-call panel
+// that appears when a shift starts — so a layout that fits now may overflow
+// later, and one that overflows now may be fine in practice.
+function updateOverflowBadges(html, width) {
+  const inner = document.getElementById("preview-stage-inner");
+  if (!inner) return;
+  // Clear previous badges/classes at the start of each recompute.
+  inner.querySelectorAll(".overflow-badge").forEach(el => el.remove());
+  inner.querySelectorAll("[data-preview-col].preview-overflow")
+    .forEach(col => col.classList.remove("preview-overflow"));
+
+  // Persistent hidden measure container, created once. visibility:hidden keeps
+  // it laid out (measurable) but invisible; left:-10000px keeps it offscreen.
+  let measure = document.getElementById("preview-measure");
+  if (!measure) {
+    measure = document.createElement("div");
+    measure.id = "preview-measure";
+    measure.setAttribute("aria-hidden", "true");
+    measure.style.cssText = "position:absolute;left:-10000px;top:0;visibility:hidden;";
+    document.body.appendChild(measure);
+  }
+
+  // Width fallback mirrors renderEditorPreview: a hidden screen (display:none)
+  // reports clientWidth 0, so fall back to the active screen, which shares the
+  // same container and therefore width.
+  const live = document.getElementById(editorScreen + "-screen");
+  let w = width || (live ? live.clientWidth : 0);
+  if (!w) {
+    const active = document.querySelector(".screen.active");
+    w = active && active.clientWidth ? active.clientWidth : 0;
+  }
+  // Available height = the live grid's clientHeight (the grid is the flex:1
+  // child of the screen, so this already excludes dock/banner/alert chrome).
+  // Same hidden-screen caveat as width: fall back to the active screen's grid —
+  // same flex container, so same height (unless home's alert banner is showing,
+  // in which case the fallback is only approximate).
+  let grid = live ? live.querySelector("[data-screen-grid]") : null;
+  let avail = grid ? grid.clientHeight : 0;
+  if (!avail) {
+    const activeGrid = document.querySelector(".screen.active [data-screen-grid]");
+    avail = activeGrid ? activeGrid.clientHeight : 0;
+  }
+  if (!w || !avail) return; // nothing reliable to measure against; skip badging
+
+  measure.style.width = w + "px";
+  // `html` is the pristine sanitized render passed by renderEditorPreview.
+  // inner.innerHTML is only a defensive fallback (it includes editor
+  // affordances like × buttons/entity strips, which would skew heights).
+  measure.innerHTML = html || inner.innerHTML;
+
+  const previewCols = inner.querySelectorAll("[data-preview-col]");
+  measure.querySelectorAll("[data-preview-col]").forEach((mcol, i) => {
+    const panels = mcol.querySelectorAll(":scope > [data-panel-id]");
+    if (!panels.length) return;
+    // Sum panel heights + inter-panel gaps. Parse the computed row-gap so the
+    // math stays honest if the column CSS changes (NaN for "normal" -> 14px,
+    // the dashboard's standard gap).
+    let gap = parseFloat(getComputedStyle(mcol).rowGap);
+    if (Number.isNaN(gap)) gap = 14;
+    let sum = gap * (panels.length - 1);
+    panels.forEach(p => { sum += p.offsetHeight; });
+    const over = sum - avail;
+    if (over > 0 && previewCols[i]) {
+      const n = Math.ceil(over / 10) * 10;
+      previewCols[i].classList.add("preview-overflow");
+      const badge = document.createElement("div");
+      badge.className = "overflow-badge";
+      badge.style.cssText = "background:rgba(255,174,0,0.15);border:1px solid var(--amber);color:var(--amber);font-family:var(--font-mono);font-size:0.7rem;padding:3px 8px;margin-bottom:6px;";
+      badge.textContent = `⚠ overflows by ~${n}px`;
+      previewCols[i].insertBefore(badge, previewCols[i].firstChild);
+    }
+  });
+}
+
+function applyPanelDrop(panelId, target) {
+  ensureConfigPanels();
+  const cols = config.panels[editorScreen];
+  if (!cols) return;
+  const targetPanelId = target.getAttribute("data-panel-id");
+  const colEl = target.closest("[data-preview-col]");
+  if (!colEl) return;
+  const dest = cols[parseInt(colEl.getAttribute("data-preview-col"), 10)];
+  if (!dest) return;
+  for (const col of cols) {
+    const i = col.indexOf(panelId);
+    if (i !== -1) col.splice(i, 1);
+  }
+  let index = targetPanelId ? dest.indexOf(targetPanelId) : -1;
+  if (index === -1) index = dest.length;
+  dest.splice(index, 0, panelId);
+  renderAll();
+  buildSettings();
+}
+
+function refreshEditorAfterEdit() {
+  renderAll();
+  buildSettings();
+}
+
+// Entity chip for the aggregated-panel footer strip — same markup as the old
+// board's chips (drag-handle + name + ×), but wired via listeners because the
+// preview HTML is sanitized of inline handlers. The × carries .preview-remove
+// so the stage click-capture guard lets it through.
+function buildEntityChip(section, id) {
+  const chip = document.createElement("span");
+  chip.className = "entity-chip";
+  chip.setAttribute("data-section", section);
+  chip.setAttribute("data-entity", id);
+  chip.title = id;
+  const handle = document.createElement("span");
+  handle.className = "drag-handle";
+  handle.title = "Drag to reorder, move, or drag back to the palette to remove";
+  handle.textContent = "⠿";
+  chip.appendChild(handle);
+  chip.appendChild(document.createTextNode(friendlyName(id) + " "));
+  const btn = document.createElement("button");
+  btn.className = "preview-remove";
+  btn.setAttribute("data-entity", id);
+  btn.textContent = "×";
+  btn.addEventListener("click", ev => {
+    ev.stopPropagation();
+    removeSectionEntity(section, id);
+  });
+  chip.appendChild(btn);
+  return chip;
+}
+
+// Click a section-kind panel's title to edit its icon/title inline (same input
+// pattern as the old board header). Blur without a change restores the title.
+// The key is the panel id itself: builders render sectionTitle(<panelId>), so
+// the presence panel edits config.sections.presence, NOT home.
+function wireTitleEdit(title, key) {
+  if (title.dataset.editWired) return;
+  title.dataset.editWired = "1";
+  title.addEventListener("click", () => {
+    if (title.querySelector("input")) return; // already editing
+    const sec = config.sections[key] || {};
+    const original = title.innerHTML;
+    const iconInput = document.createElement("input");
+    iconInput.value = sec.icon || "";
+    iconInput.style.cssText = "width:42px;text-align:center;padding:4px;";
+    iconInput.title = "Section icon";
+    const titleInput = document.createElement("input");
+    titleInput.value = sec.title || key;
+    titleInput.style.cssText = "flex:1;min-width:80px;padding:4px 8px;";
+    titleInput.title = "Section title";
+    title.textContent = "";
+    title.appendChild(iconInput);
+    title.appendChild(titleInput);
+    titleInput.focus();
+    titleInput.select();
+    let changed = false;
+    iconInput.addEventListener("change", () => { changed = true; setSectionProp(key, "icon", iconInput.value); });
+    titleInput.addEventListener("change", () => { changed = true; setSectionProp(key, "title", titleInput.value); });
+    const onFocusOut = () => {
+      // Defer so focus moving between the two inputs doesn't restore early.
+      setTimeout(() => {
+        if (title.contains(document.activeElement)) return;
+        title.removeEventListener("focusout", onFocusOut);
+        if (changed) buildSettings();
+        else title.innerHTML = original;
+      }, 0);
+    };
+    title.addEventListener("focusout", onFocusOut);
+  });
+}
+
+// Post-render editor affordances on the scaled preview: × remove overlays on
+// section-backed entity cards, registry note chips on fixed/auto/entity panel
+// titles, footer entity strips for aggregated panels (roomMonitors renders
+// per-area data-room cells, not per-entity cards), and inline title/icon
+// editing on section-kind panel titles. Runs on the sanitized DOM, so every
+// handler is attached with addEventListener.
+function decoratePreviewPanels(inner) {
+  const weatherMedia = new Set([
+    config.entities && config.entities.weather,
+    config.entities && config.entities.mediaPlayer
+  ].filter(Boolean));
+  inner.querySelectorAll("[data-panel-id]").forEach(panel => {
+    const panelId = panel.getAttribute("data-panel-id");
+    const entry = PANEL_REGISTRY[panelId];
+    if (!entry) return;
+    // The panel's own title chrome only — skip .panel-title elements hosted by
+    // entity cards inside the panel (camera feed cards render their own name
+    // titles; the cameras panel itself has no title, so it gets no note chip
+    // or title editing — panel dragging still works via the cards' titles).
+    let title = [...panel.querySelectorAll(".panel-title")].find(t => !t.closest("[data-entity-id]"));
+    if (!title && !panel.querySelector(".panel-title")) {
+      // Headerless panel (no .panel-title anywhere — the clock today; cameras
+      // is deliberately excluded: its card-hosted titles are the drag handles
+      // by design). Inject an editor-only handle bar with the panel name so
+      // the existing [data-panel-id] .panel-title drag wiring and note-chip
+      // logic below pick it up. Preview-only chrome — live builder markup is
+      // untouched, so the live screens stay pixel-identical.
+      const handle = document.createElement("div");
+      handle.className = "panel-title preview-injected-handle";
+      handle.style.cssText = "color:var(--text-muted);font-size:0.7rem;font-family:var(--font-mono);letter-spacing:0.08em;text-transform:uppercase;margin-bottom:4px;";
+      handle.textContent = panelId;
+      panel.prepend(handle);
+      title = handle;
+    }
+    if (entry.note && title && !title.querySelector(".preview-note")) {
+      const note = document.createElement("span");
+      note.className = "preview-note";
+      note.style.cssText = "color:var(--text-muted);font-size:0.65rem;margin-left:8px;";
+      note.textContent = "Ⓘ " + entry.note;
+      title.appendChild(note);
+    }
+    if (entry.kind !== "section") return;
+    const section = entry.section;
+    if (title) wireTitleEdit(title, panelId);
+    const cards = panel.querySelectorAll("[data-entity-id]");
+    if (!cards.length) {
+      // Aggregated panel: no per-entity cards to drag or ×, so surface the
+      // section's entities as a footer chip strip instead.
+      const ents = (config.sections[section] && config.sections[section].entities) || [];
+      const panelBody = panel.querySelector(".panel-body") || panel;
+      if (!ents.length) {
+        // Zero-entity section: muted hint so the empty panel reads as
+        // intentional rather than broken (not an error style).
+        if (!panelBody.querySelector("[data-empty-hint]")) {
+          const hint = document.createElement("div");
+          hint.setAttribute("data-empty-hint", section);
+          hint.style.cssText = "color:var(--text-muted);font-size:0.75rem;font-family:var(--font-mono);";
+          hint.textContent = "no entities — drag from palette";
+          panelBody.appendChild(hint);
+        }
+        return;
+      }
+      if (!panelBody.querySelector("[data-entity-strip]")) {
+        const strip = document.createElement("div");
+        strip.setAttribute("data-entity-strip", section);
+        strip.style.marginTop = "8px";
+        for (const id of ents) strip.appendChild(buildEntityChip(section, id));
+        panelBody.appendChild(strip);
+      }
+      return;
+    }
+    cards.forEach(card => {
+      const id = card.getAttribute("data-entity-id");
+      // weather/mediaPlayer are entity-kind panels: not section-editable.
+      if (weatherMedia.has(id)) return;
+      if (card.querySelector(".preview-remove")) return;
+      card.style.position = "relative";
+      const btn = document.createElement("button");
+      btn.className = "preview-remove";
+      btn.setAttribute("data-entity", id);
+      btn.style.cssText = "position:absolute;top:4px;right:4px;z-index:5;background:rgba(0,0,0,0.6);border:1px solid var(--border);color:var(--text-muted);border-radius:4px;padding:0 6px;cursor:pointer;font-family:var(--font-mono);";
+      btn.textContent = "×";
+      btn.title = "Remove from section";
+      btn.addEventListener("click", ev => {
+        ev.stopPropagation();
+        // Remove from this card's own panel section (exact), falling back to
+        // the first section containing the id.
+        const key = section || sectionOfEntity(id);
+        if (key) removeSectionEntity(key, id); // re-renders dashboard + settings
+      });
+      card.appendChild(btn);
+    });
+  });
+}
+
+// Entity/palette drop: drag to the palette removes from the source section, a
+// card/chip target inserts before it in that card's section, a panel target
+// appends to the panel's section. Fixed/auto/entity panels reject the drop and
+// surface their registry note as a transient hint. Palette drags ADD (copy) —
+// an entity may live in multiple sections — while card/chip drags MOVE.
+function applyEntityDrop(d, target) {
+  const id = d.id;
+  const isAdd = d.kind === "palette";
+  const fromKey = isAdd ? null : d.key;
+  if (target.id === "palette") {
+    if (fromKey && config.sections[fromKey]) {
+      config.sections[fromKey].entities = (config.sections[fromKey].entities || []).filter(x => x !== id);
+      refreshEditorAfterEdit();
+    }
+    return;
+  }
+  const panel = target.closest("[data-panel-id]");
+  if (!panel) return;
+  const panelId = panel.getAttribute("data-panel-id");
+  const entry = PANEL_REGISTRY[panelId];
+  if (!entry || entry.kind !== "section") {
+    const titleEl = panel.querySelector(".panel-title");
+    let title = panelId;
+    if (titleEl) {
+      const clone = titleEl.cloneNode(true);
+      clone.querySelectorAll(".preview-note, input").forEach(n => n.remove());
+      title = clone.textContent.trim() || panelId;
+    }
+    setSettingsStatus(`${title}: ${entry && entry.note ? entry.note : "not entity-editable"}`);
+    return;
+  }
+  const beforeId = target.getAttribute("data-entity-id") || target.getAttribute("data-entity");
+  const toKey = target.getAttribute("data-section") || entry.section;
+  if (!config.sections[toKey]) return;
+  if (fromKey && config.sections[fromKey]) {
+    config.sections[fromKey].entities = (config.sections[fromKey].entities || []).filter(x => x !== id);
+  }
+  const to = (config.sections[toKey].entities || []).filter(x => x !== id);
+  let index = beforeId ? to.indexOf(beforeId) : -1;
+  if (index === -1) index = to.length;
+  to.splice(index, 0, id);
+  config.sections[toKey].entities = to;
+  refreshEditorAfterEdit();
+  if (entry.filter === "person") {
+    const domain = id.split(".")[0];
+    if (domain !== "person" && domain !== "device_tracker") {
+      setSettingsStatus("only person/device_tracker entities render in this panel");
+    }
+  }
+}
+
+function initPreviewDrag() {
+  const body = document.getElementById("settings-body");
+  if (!body) return;
+  const stage = document.getElementById("preview-stage");
+  // Belt-and-braces against any missed inline handlers (sanitization already
+  // strips them). .panel-title clicks (inline title editing) and
+  // .preview-remove clicks (× overlays / strip chips) are let through.
+  if (stage && !stage.dataset.clickGuard) {
+    stage.dataset.clickGuard = "1";
+    stage.addEventListener("click", e => {
+      if (!e.target.closest(".panel-title") && !e.target.closest(".preview-remove")) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, true);
+  }
+  body.querySelectorAll(".palette-chip").forEach(chip => {
+    if (chip.dataset.dragWired) return;
+    chip.dataset.dragWired = "1";
+    chip.addEventListener("pointerdown", ev => {
+      if (ev.target.closest("button")) return;
+      startDrag(ev, "palette", chip);
+    });
+  });
+  if (stage) {
+    stage.querySelectorAll("[data-panel-id] .panel-title").forEach(title => {
+      if (title.dataset.dragWired) return;
+      title.dataset.dragWired = "1";
+      title.addEventListener("pointerdown", ev => {
+        // Don't start a panel drag from the inline icon/title inputs (title
+        // edit mode) or buttons.
+        if (ev.target.closest("input") || ev.target.closest("button")) return;
+        const panel = ev.target.closest("[data-panel-id]");
+        if (panel) startDrag(ev, "panel", panel);
+      });
+    });
+    // Entity drag sources: [data-entity-id] cards and footer-strip chips in
+    // section-kind panels. A card's own .panel-title stays a panel-drag handle
+    // (e.g. camera cards drag the cameras panel by their title).
+    stage.querySelectorAll("[data-entity-id], .entity-chip[data-entity]").forEach(el => {
+      if (el.dataset.dragWired) return;
+      const chipSection = el.getAttribute("data-section");
+      const panel = el.closest("[data-panel-id]");
+      const entry = panel && PANEL_REGISTRY[panel.getAttribute("data-panel-id")];
+      if (!chipSection && (!entry || entry.kind !== "section")) return;
+      el.dataset.dragWired = "1";
+      el.addEventListener("pointerdown", ev => {
+        if (ev.target.closest(".preview-remove") || ev.target.closest("input")) return;
+        if (ev.target.closest(".panel-title")) return;
+        startDrag(ev, "entity", el);
+      });
+    });
+  }
+  let drag = null;
+
+  function startDrag(ev, kind, el) {
+    if (!el) return;
+    ev.preventDefault();
+    let id, key = null;
+    if (kind === "panel") {
+      id = el.getAttribute("data-panel-id");
+    } else {
+      id = el.getAttribute("data-entity-id") || el.getAttribute("data-entity");
+      if (kind === "palette") {
+        key = sectionOfEntity(id);
+      } else {
+        // Source section of an entity card/chip: explicit data-section on
+        // strip chips, else the backing section of its panel.
+        key = el.getAttribute("data-section");
+        if (!key) {
+          const panel = el.closest("[data-panel-id]");
+          key = panel ? panelSection(panel.getAttribute("data-panel-id")) : null;
+        }
+      }
+    }
+    drag = {
+      kind,
+      el,
+      key,
+      id,
+      pointerId: ev.pointerId,
+      startX: ev.clientX,
+      startY: ev.clientY,
+      moved: false,
+      ghost: null
+    };
+    document.addEventListener("pointermove", onMove);
+    document.addEventListener("pointerup", onUp, { once: true });
+    document.addEventListener("pointercancel", onCancel, { once: true });
+  }
+
+  function onMove(ev) {
+    if (!drag || ev.pointerId !== drag.pointerId) return;
+    if (!drag.moved && Math.hypot(ev.clientX - drag.startX, ev.clientY - drag.startY) < 6) return;
+    if (!drag.moved) {
+      drag.moved = true;
+      drag.el.classList.add("dragging");
+      body.classList.add("editor-dragging");
+      const ghost = drag.el.cloneNode(true);
+      ghost.id = "drag-ghost";
+      ghost.style.width = drag.el.offsetWidth + "px";
+      document.body.appendChild(ghost);
+      drag.ghost = ghost;
+    }
+    if (drag.ghost) {
+      drag.ghost.style.left = (ev.clientX + 12) + "px";
+      drag.ghost.style.top = (ev.clientY + 12) + "px";
+    }
+    // Auto-scroll the palette or preview stage when dragging near their edges.
+    [document.getElementById("palette-list"), document.getElementById("preview-stage")].forEach(sc => {
+      if (!sc) return;
+      const r = sc.getBoundingClientRect();
+      if (ev.clientX < r.left || ev.clientX > r.right || ev.clientY < r.top || ev.clientY > r.bottom) return;
+      if (ev.clientY < r.top + 40) sc.scrollTop -= 12;
+      else if (ev.clientY > r.bottom - 40) sc.scrollTop += 12;
+    });
+    clearIndicators();
+    const target = findDropTarget(ev);
+    if (target) target.classList.add("drop-before");
+  }
+
+  function cleanupDrag(d) {
+    d.el.classList.remove("dragging");
+    if (d.ghost) d.ghost.remove();
+    body.classList.remove("editor-dragging");
+    clearIndicators();
+  }
+
+  function onCancel() {
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    cleanupDrag(d);
+  }
+
+  function onUp(ev) {
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointercancel", onCancel);
+    if (!drag) return;
+    const target = drag.moved ? findDropTarget(ev) : null;
+    const d = drag;
+    drag = null;
+    cleanupDrag(d);
+    if (d.moved && target) {
+      if (d.kind === "panel") applyPanelDrop(d.id, target);
+      else applyEntityDrop(d, target);
+    }
+  }
+
+  function findDropTarget(ev) {
+    const el = document.elementFromPoint(ev.clientX, ev.clientY);
+    if (!el || !stage) return null;
+    if (drag.kind === "entity" || drag.kind === "palette") {
+      const palette = el.closest("#palette");
+      if (palette) return palette;
+      const card = el.closest("[data-entity-id], .entity-chip[data-entity]");
+      if (card && stage.contains(card) && card !== drag.el) return card;
+      const panel = el.closest("[data-panel-id]");
+      if (panel && stage.contains(panel)) return panel;
+      return null;
+    }
+    const panel = el.closest("[data-panel-id]");
+    if (panel && stage.contains(panel) && panel !== drag.el) return panel;
+    const colEl = el.closest("[data-preview-col]");
+    if (colEl && stage.contains(colEl)) return colEl;
+    return null;
+  }
+
+  function clearIndicators() {
+    document.querySelectorAll(".drop-before").forEach(x => x.classList.remove("drop-before"));
+  }
+}
+
+function setSectionProp(key, prop, value) {
+  if (!config.sections[key]) return;
+  config.sections[key][prop] = value;
+  renderAll();
+}
+
+function removeSectionEntity(key, id) {
+  const sec = config.sections[key];
+  if (!sec) return;
+  sec.entities = (sec.entities || []).filter(x => x !== id);
+  renderAll();
+  buildSettings();
+}
+
+const NEW_DEVICE_DOMAINS = ["light", "switch", "scene", "script", "fan", "sensor", "binary_sensor", "camera", "media_player", "vacuum", "lock", "cover", "siren", "update"];
+
+function collectReferencedIds() {
+  const ids = new Set();
+  if (config.entities) {
+    if (config.entities.weather) ids.add(config.entities.weather);
+    if (config.entities.mediaPlayer) ids.add(config.entities.mediaPlayer);
+  }
+  for (const key of Object.keys(config.sections || {})) {
+    const sec = config.sections[key];
+    for (const id of (sec.entities || [])) ids.add(id);
+  }
+  for (const item of (config.dock && config.dock.items) || []) {
+    if (item.entityId) ids.add(item.entityId);
+  }
+  return ids;
+}
+
+function computeMissingEntities() {
+  const referenced = collectReferencedIds();
+  const missing = [];
+  for (const id of referenced) {
+    if (!states[id] && !entityById[id]) missing.push(id);
+  }
+  return missing.sort();
+}
+
+export function removeMissingEntity(id) {
+  for (const key of Object.keys(config.sections || {})) {
+    const sec = config.sections[key];
+    if (Array.isArray(sec.entities)) sec.entities = sec.entities.filter(x => x !== id);
+  }
+  if (config.entities) {
+    if (config.entities.weather === id) config.entities.weather = "";
+    if (config.entities.mediaPlayer === id) config.entities.mediaPlayer = "";
+  }
+  if (config.dock && Array.isArray(config.dock.items)) {
+    config.dock.items = config.dock.items.filter(i => i.entityId !== id);
+  }
+  renderAll();
+  buildSettings();
+}
+
+export async function saveSettings() {
+  const accentEl = document.getElementById("cfg-accent");
+  if (accentEl) config.theme.accentColor = accentEl.value;
+  const clockEl = document.getElementById("cfg-24h");
+  if (clockEl) config.layout.clock24h = clockEl.checked;
+  const weatherEl = document.getElementById("cfg-weather");
+  if (weatherEl) config.entities.weather = weatherEl.value || "";
+  const mediaEl = document.getElementById("cfg-media");
+  if (mediaEl) config.entities.mediaPlayer = mediaEl.value || "";
+  applyTheme();
+  await renderAll();
+  const ok = await saveConfig();
+  if (ok) {
+    setSettingsStatus("");
+    closeSettings();
+  }
+}
+
+export function exportConfig() {
+  const blob = new Blob([JSON.stringify(config, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "dashboard-config.json"; a.click();
+  URL.revokeObjectURL(url);
+}
+
+export function importConfig() {
+  const input = document.createElement("input");
+  input.type = "file"; input.accept = "application/json";
+  input.onchange = async () => {
+    const file = input.files[0]; if (!file) return;
+    try {
+      const txt = await file.text();
+      const data = JSON.parse(txt);
+      config = deepMerge(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), data);
+      migrateConfig(config);
+      applyTheme();
+      renderAll();
+      buildSettings();
+    } catch (e) { alert("Invalid JSON: " + e.message); }
+  };
+  input.click();
+}
+
+export function logout() {
+  localStorage.removeItem("ha_token");
+  location.reload();
+}
+
+// ---- Connection ----
+
+// Force an immediate reconnect with fresh backoff. If the socket looks open we
+// close it and let onclose schedule the reconnect; if it is already closed we
+// connect now (clearing any pending backoff timer first).
+function forceReconnect() {
+  reconnectDelay = 1000;
+  if (!ws || ws.readyState === WebSocket.CLOSED) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+    connect();
+    return;
+  }
+  try { ws.close(); } catch (e) {}
+}
+
+// Send a message over the live socket. If the socket is not open (half-open
+// connections look fine until a write), surface the disconnect and kick off a
+// reconnect immediately instead of silently discarding the command.
+function sendWs(obj) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    setStatus("disconnected");
+    forceReconnect();
+    return false;
+  }
+  ws.send(JSON.stringify(obj));
+  return true;
+}
+
+// App-level ping watchdog. The proxy answers {type:"ping"} with {type:"pong"}
+// (HA's own WS API does the same natively). If no pong arrives between pings
+// the socket is presumed half-open and closed to trigger reconnect. The
+// watchdog only arms after the first pong is ever seen, so an old proxy that
+// doesn't answer pings degrades gracefully instead of flapping.
+function startPingWatchdog() {
+  clearInterval(pingTimer);
+  awaitingPong = false;
+  pingTimer = setInterval(() => {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    if (awaitingPong && pongSeen) {
+      try { ws.close(); } catch (e) {}
+      return;
+    }
+    awaitingPong = true;
+    ws.send(JSON.stringify({ id: Date.now(), type: "ping" }));
+  }, 25000);
+}
+
+function stopPingWatchdog() {
+  clearInterval(pingTimer);
+  pingTimer = null;
+  awaitingPong = false;
+}
+
+// A suspended wall-panel tablet (iOS freezes timers/sockets) wakes with a dead
+// connection. Reconnect immediately on wake rather than waiting for a tap to
+// discover it.
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { hiddenAt = Date.now(); return; }
+  const wasHiddenMs = hiddenAt ? Date.now() - hiddenAt : 0;
+  hiddenAt = null;
+  if (wasHiddenMs > 60000 || !ws || ws.readyState !== WebSocket.OPEN) forceReconnect();
+});
+window.addEventListener("pageshow", ev => { if (ev.persisted) forceReconnect(); });
+
+function connectProxy() {
+  setStatus("connecting");
+  const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ai-dashboard/ws";
+  ws = new WebSocket(url);
+  ws.onopen = () => {
+    setStatus("connected");
+    startPingWatchdog();
+    // The proxy pushes the full state list ({id: 1, type: "result"}) on connect
+    // and forwards every state_changed event unprompted, so the client sends
+    // neither get_states nor subscribe_events here.
+  };
+  ws.onmessage = async (ev) => {
+    let msg;
+    try {
+      msg = JSON.parse(ev.data);
+    } catch (e) {
+      console.warn("dropping malformed WS frame", e);
+      return;
+    }
+    if (msg.type === "pong") { awaitingPong = false; pongSeen = true; return; }
+    if (msg.type === "result" && msg.id === 1 && msg.success) {
+      states = {};
+      for (const s of msg.result) states[s.entity_id] = s;
+      await fetchRegistry();
+      await refreshForecast();
+      await primeLastEventCache();
+      renderAll();
+    }
+    if (msg.type === "event" && msg.event && msg.event.event_type === "state_changed") {
+      const s = msg.event.data.new_state;
+      if (s) { trackLastEvent(states[s.entity_id], s); states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
+    }
+  };
+  ws.onclose = () => {
+    stopPingWatchdog();
+    setStatus("disconnected");
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connectProxy, Math.min(reconnectDelay, 30000));
+    reconnectDelay *= 2;
+  };
+  ws.onerror = () => { setStatus("disconnected"); ws.close(); };
+}
+
+function connect() {
+  if (window.HA_INTEGRATION_PROXY) return connectProxy();
+  setStatus("connecting");
+  const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/websocket";
+  ws = new WebSocket(url);
+  ws.onopen = () => ws.send(JSON.stringify({ type: "auth", access_token: token }));
+  ws.onmessage = async (ev) => {
+    let msg;
+    try {
+      msg = JSON.parse(ev.data);
+    } catch (e) {
+      console.warn("dropping malformed WS frame", e);
+      return;
+    }
+    if (msg.type === "pong") { awaitingPong = false; pongSeen = true; return; }
+    if (msg.type === "auth_ok") {
+      setStatus("connected");
+      startPingWatchdog();
+      ws.send(JSON.stringify({ id: 1, type: "get_states" }));
+      ws.send(JSON.stringify({ id: 2, type: "subscribe_events", event_type: "state_changed" }));
+      await fetchRegistry();
+    }
+    if (msg.type === "result" && msg.id === 1 && msg.success) {
+      states = {};
+      for (const s of msg.result) states[s.entity_id] = s;
+      await refreshForecast();
+      renderAll();
+    }
+    if (msg.type === "event" && msg.event && msg.event.event_type === "state_changed") {
+      const s = msg.event.data.new_state;
+      if (s) { trackLastEvent(states[s.entity_id], s); states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
+    }
+  };
+  ws.onclose = () => {
+    stopPingWatchdog();
+    setStatus("disconnected");
+    clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connect, Math.min(reconnectDelay, 30000));
+    reconnectDelay *= 2;
+  };
+  ws.onerror = () => { setStatus("disconnected"); ws.close(); };
+}
+
+// ---- Init ----
+
+async function init() {
+  config = await loadConfig();
+  applyTheme();
+  await fetchHAConfig();
+  document.getElementById("dock").innerHTML = renderDock();
+  showScreen("home");
+  setInterval(refreshForecast, 15 * 60 * 1000);
+  if (window.HA_INTEGRATION_PROXY) {
+    token = "";
+    localStorage.removeItem("ha_token");
+    connect();
+  } else {
+    token = localStorage.getItem("ha_token");
+    if (!token) {
+      token = prompt("Enter Home Assistant long-lived access token:");
+      if (token) localStorage.setItem("ha_token", token);
+    }
+    if (token) connect();
+  }
+  setInterval(updateClock, 1000);
+  window.addEventListener("resize", measureClock);
+  setInterval(refreshDoorRecency, 30000);
+  setInterval(() => {
+    const cams = (config.sections && config.sections.cameras) || {};
+    const snapMap = cams.snapshot || {};
+    for (const cameraId of Object.keys(snapMap)) {
+      const lastEvent = snapshotLastActivityMs(snapMap[cameraId]);
+      const idleLongEnough = !lastEvent || (Date.now() - lastEvent) > SNAPSHOT_IDLE_EVENT_WINDOW_MS;
+      const stale = (Date.now() - (snapshotLastRefresh[cameraId] || 0)) >= SNAPSHOT_IDLE_POLL_MS;
+      if (idleLongEnough && stale) refreshCameraSnapshot(cameraId);
+    }
+  }, SNAPSHOT_CHECK_MS);
+  // Restart live camera streams periodically: a stalled MJPEG <img> shows the
+  // last frame forever without firing onerror, and browsers expose no stall
+  // event. Scoped to the active screen; the ts= cache-buster forces a fresh
+  // connection. Snapshot cameras are untouched (they have their own refresh).
+  setInterval(() => {
+    const screenEl = document.getElementById(currentScreen + "-screen");
+    if (!screenEl) return;
+    screenEl.querySelectorAll("img.camera-feed:not([data-snapshot-camera])").forEach(img => {
+      if (!/(camera_proxy_stream|cam_stream)\//.test(img.src)) return;
+      const base = img.src.replace(/([?&])ts=\d+/, "").replace(/[?&]$/, "");
+      img.src = `${base}${base.includes("?") ? "&" : "?"}ts=${Date.now()}`;
+    });
+  }, 10 * 60 * 1000);
+}
+
+document.addEventListener("DOMContentLoaded", init);
