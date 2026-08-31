@@ -4,16 +4,21 @@ This repository is a **Home Assistant configuration directory**. It contains the
 
 The intended reader of this file is an AI coding agent that has no prior context about the project.
 
+**Deeper guides** (loaded when you work in those areas):
+
+- `www/ai-dashboard/AGENTS.md` — the custom AI dashboard and its `ai_dashboard_proxy` integration.
+- `docs/ring-cameras.md` — Ring camera architecture (official integration vs ring-mqtt add-on) and its hard constraints.
+
 ---
 
 ## Project Overview
 
 - **Type**: Home Assistant configuration + custom integrations.
-- **Home Assistant Version**: `2026.8.1` (recorded in `.HA_VERSION`; update this if the version changes).
+- **Home Assistant Version**: recorded in `.HA_VERSION`.
 - **Primary Language**: English in comments and documentation.
 - **Configuration Language**: YAML, with Python used for custom integrations.
-- **No Top-Level Package Manager**: There is no `pyproject.toml`, `package.json`, `requirements.txt`, `Dockerfile`, `docker-compose.yml`, or `Makefile` at the repository root. Dependency management is handled by Home Assistant and HACS at runtime. A GitHub Actions validation workflow lives in `.github/workflows/validate.yml`.
-- **Git Repository**: `//HOMEASSISTANT/config/` is a git repository. Git commands are appropriate when the user approves them. The working branch is usually `master`.
+- **No Top-Level Package Manager**: No `pyproject.toml`, `package.json`, `requirements.txt`, `Dockerfile`, or `Makefile` at the repository root. Dependency management is handled by Home Assistant and HACS at runtime. A GitHub Actions validation workflow lives in `.github/workflows/validate.yml`.
+- **Git Repository**: `//HOMEASSISTANT/config/` is a git repository (remote: GitHub). Git commands are appropriate when the user approves them. The working branch is usually `master`.
 - **Agent Workflow**: This project uses the Superpowers skill system. Design docs live in `docs/superpowers/specs/` and implementation plans in `docs/superpowers/plans/`. Scratch workspace for plans is in `.superpowers/sdd/` (git-ignored).
 
 ---
@@ -23,11 +28,10 @@ The intended reader of this file is an AI coding agent that has no prior context
 - **Runtime**: Home Assistant (Python-based home automation platform).
 - **Core Configuration**: YAML files parsed by Home Assistant on startup.
 - **Custom Integrations**: Python packages under `custom_components/`.
-- **Frontend/Theming**: Home Assistant Lovelace themes (`themes/`), community cards (`www/community/`), and frontend extensions (`custom_components/uix/`).
-- **Databases**:
-  - `home-assistant_v2.db*` — Home Assistant state history and recorder data.
-  - `zigbee.db*` — Zigbee coordinator database.
+- **Frontend/Theming**: Lovelace themes (`themes/`), community cards (`www/community/`), and frontend extensions (`custom_components/uix/`).
+- **Databases**: `home-assistant_v2.db*` (recorder/history), `zigbee.db*` (Zigbee coordinator).
 - **Secrets**: `secrets.yaml` stores sensitive placeholders. It must never be committed or shared.
+- **Backups**: Weekly full backups via `shell_command.create_weekly_backup` (automation `weekly_backup`), pruned past 14 days locally; off-site copies are handled by Nabu Casa cloud backup.
 
 ---
 
@@ -39,41 +43,23 @@ The intended reader of this file is an AI coding agent that has no prior context
 ├── automations.yaml            # Automations (included from configuration.yaml)
 ├── scripts.yaml                # Scripts (loaded by configuration.yaml)
 ├── scenes.yaml                 # Scenes (loaded by configuration.yaml)
-├── secrets.yaml                # Secrets placeholder file
+├── secrets.yaml                # Secrets placeholder file (never commit)
 ├── .HA_VERSION                 # Installed Home Assistant version
-├── home-assistant_v2.db*       # Recorder SQLite database
-├── zigbee.db*                  # Zigbee SQLite database
-├── .storage/                   # Home Assistant runtime registries and auth
-├── .superpowers/               # Superpowers skill scratch workspace (git-ignored)
-├── .tools/                     # Local tooling (e.g. portable Node.js, git-ignored)
-├── blueprints/                 # Reusable automation and script blueprints
-│   ├── automation/homeassistant/
-│   └── script/homeassistant/
+├── .storage/                   # Home Assistant runtime registries and auth (do not hand-edit)
+├── .tools/                     # Local tooling (portable Node.js, git-ignored)
+├── blueprints/                 # Stock HA automation/script blueprints (rarely touched)
 ├── .github/workflows/          # CI validation (validate.yml)
-├── custom_components/          # Custom integrations
-│   ├── ai_dashboard_proxy/     # Serves /ai-dashboard/ with server-side HA auth
-│   ├── alexa_media/            # Alexa Media Player (HACS)
-│   ├── bambu_lab/              # Bambu Lab 3D printer integration
-│   ├── extended_openai_conversation/  # OpenAI conversation integration (HACS)
-│   ├── hacs/                   # Home Assistant Community Store
-│   ├── openhasp/               # openHASP wall plate integration (HACS)
-│   ├── pagerduty/              # PagerDuty integration
-│   └── uix/                    # UI extension for Lovelace
-├── themes/                     # Lovelace themes
-│   └── google_dark_theme/
-├── www/                        # Static web assets served by Home Assistant
-│   ├── ai-dashboard/           # Custom retro-terminal wall dashboard
+├── custom_components/          # Custom integrations (most are HACS-managed — see below)
+├── themes/google_dark_theme/   # Lovelace theme
+├── www/
+│   ├── ai-dashboard/           # Custom retro-terminal wall dashboard (see its AGENTS.md)
 │   ├── community/              # HACS-downloaded community cards
 │   └── media/                  # User media files
-├── docs/superpowers/           # Design specs and implementation plans
-│   ├── specs/
-│   └── plans/
+├── docs/                       # Notes (ring-cameras.md, device notes) + superpowers specs/plans
 ├── openhasp/                   # openHASP plate definition (wall_panel.yaml)
 ├── scripts/                    # Maintenance and validation scripts (backups, HA YAML validation)
 ├── ipad-wall-panel.yaml        # YAML-managed Lovelace wall panel dashboard
-├── dashboard-backup-*.json     # Backups of UI-managed dashboards
-├── image/                      # Cached images
-└── tts/                        # Cached text-to-speech audio
+└── dashboard-backup-*.json     # Backups of UI-managed dashboards
 ```
 
 ---
@@ -86,25 +72,14 @@ The intended reader of this file is an AI coding agent that has no prior context
 - Merges themes from `themes/` using `!include_dir_merge_named themes`.
 - Configures the `recorder` to purge data after 30 days and excludes noisy diagnostic entities.
 - Defines a `command_line` sensor for disk usage (`HA disk usage`).
-- Includes:
-  - `automations.yaml`
-  - `scripts.yaml`
-  - `scenes.yaml`
+- Defines two `ffmpeg` cameras (`camera.backyard_rtsp_live`, `camera.front_door_rtsp_live`) backed by the ring-mqtt RTSP feeds — see `docs/ring-cameras.md`.
+- Includes `automations.yaml`, `scripts.yaml`, `scenes.yaml`.
 
 ### Automations, Scripts, and Scenes
 
-- `automations.yaml`: Contains user automations (e.g., PagerDuty high-urgency Echo alerts, Ring motion/ding clip archiving, low-battery notifications).
-- `scripts.yaml`: Contains user scripts for lighting/media presets and HA actions (e.g., `all_lights_off`, `goodnight`, `movie_mode`).
-- `scenes.yaml`: Contains user scenes for lighting presets (e.g., `movie_mode`, `focus_mode`, `relax_mode`).
-
-
-### Blueprints
-
-Stored under `blueprints/`. These are Home Assistant-provided reusable templates:
-
-- `automation/homeassistant/motion_light.yaml`
-- `automation/homeassistant/notify_leaving_zone.yaml`
-- `script/homeassistant/confirmable_notification.yaml`
+- `automations.yaml`: User automations (e.g., PagerDuty high-urgency Echo alerts, `ring_snapshot_archive_*` Ring motion/ding clip archiving, low-battery notifications, weekly backup + pruning, disk space alert).
+- `scripts.yaml`: Lighting/media presets and HA actions (e.g., `all_lights_off`, `goodnight`, `movie_mode`).
+- `scenes.yaml`: Lighting presets (e.g., `movie_mode`, `focus_mode`, `relax_mode`).
 
 ### Themes
 
@@ -114,55 +89,27 @@ Stored under `blueprints/`. These are Home Assistant-provided reusable templates
 
 ## Dashboards
 
-### Preferred Dashboard Stack
-
-- **Layout mode**: `type: sections` with `max_columns: 3`.
-- **Theme**: `Google Dark Theme` on all views.
-- **Common cards**:
-  - `custom:mushroom-light-card` for lights (brightness + color temp controls).
-  - `custom:mushroom-switch-card` for switches.
-  - `custom:mushroom-vacuum-card` for vacuums.
-  - `custom:ha-bambulab-print_status-card`, `custom:ha-bambulab-print_control-card`, `custom:ha-bambulab-ams-card`, `custom:ha-bambulab-spool-card` for Bambu Lab printers.
-  - `custom:weather-radar-card` for weather radar.
-  - `tile` for sensors, scenes, scripts, media players, and updates.
-  - `picture-entity` with `camera_view: live` for cameras.
-  - `weather-forecast` for weather.
-  - `gauge` for system metrics.
-
-### Current Dashboards
-
-- **`www/ai-dashboard/`**: Custom retro-terminal wall dashboard served at `/ai-dashboard/`. Built as a standalone HTML/JS/CSS app proxied through `custom_components/ai_dashboard_proxy/`. Designed for landscape wall-mounted iPads / tablets. Four screens are switched via a bottom dock (which also renders the quick-action buttons configured in `config.dock.items`, e.g. All off / Goodnight): **HOME** (clock, weather + room monitors, radar + presence + doors — door "opened" and presence "last seen" times are seeded from recorder history via `POST /ai-dashboard/api/history` and tracked from live WS transitions, so HA restarts don't reset them), **CONTROL HUB** (scenes, scripts, lights, media), **SECURITY** (camera feeds — front door last-activity snapshot, backyard true live MJPEG that auto-starts/stops with the screen, plus a HISTORY chip per camera opening the motion/ding event archive modal (10s mp4 clips recorded from the ring-mqtt RTSP feed by the `ring_snapshot_archive_*` automations, plus legacy jpg stills) — and alarm-related sensors), and **STATUS MONITOR** (per-area environment sensors with 24-hour sparklines for temperature/humidity, plus host/system metrics). The radar is a RainViewer overlay on a keyless Esri dark-gray basemap, with the Esri World_Transportation (bold highways/interstates) and World_Boundaries_and_Places_Alternate (state lines + city labels, light-on-dark variant) reference layers above the radar frames; camera feeds and the radar map render above the CRT scanline/vignette overlays for clarity (the overlay divs live inside `#app` — outside it, `#app`'s own stacking context would keep any content z-index from winning).
+- **`www/ai-dashboard/`**: Custom retro-terminal wall dashboard served at `/ai-dashboard/` — the primary wall-tablet UI. **See `www/ai-dashboard/AGENTS.md` for architecture, the Settings editor, layout model, proxy endpoints, and its dev workflow.**
 - **`ipad-wall-panel.yaml`**: YAML-managed Lovelace dashboard for the wall-mounted iPad in the Living Room. Registered in `configuration.yaml` under `lovelace.dashboards.ipad-wall-panel`.
 - **Original UI dashboard**: Backed up as `dashboard-backup-*.json` from `.storage/lovelace.dashboard_dashboard`.
 
-### Dashboard Development Workflow
+### Lovelace Conventions (for `ipad-wall-panel.yaml` and any Lovelace work)
 
-1. Back up the current UI-managed dashboard from `.storage/lovelace.dashboard_dashboard` if migrating.
-2. Edit the YAML dashboard file directly.
-3. Validate YAML syntax. A portable Node.js install lives in `.tools/node/`; use it with the local `yaml` package if installed, or use Python's stdlib parser as a fallback:
-   ```bash
-   # Using local Node.js (Windows/Git Bash)
-   .tools/node/node.exe -e "const YAML = require('yaml'); YAML.parse(require('fs').readFileSync('ipad-wall-panel.yaml', 'utf8')); console.log('valid')"
+- **Layout mode**: `type: sections` with `max_columns: 3`; large touch targets for wall-mounted iPad use.
+- **Theme**: `Google Dark Theme` on all views.
+- **Common cards**:
+  - `custom:mushroom-light-card` for lights (brightness + color temp controls).
+  - `custom:mushroom-switch-card` for switches; `custom:mushroom-vacuum-card` for vacuums.
+  - `custom:ha-bambulab-print_status-card`, `custom:ha-bambulab-print_control-card`, `custom:ha-bambulab-ams-card`, `custom:ha-bambulab-spool-card` for Bambu Lab printers.
+  - `custom:weather-radar-card` for weather radar.
+  - `tile` for sensors, scenes, scripts, media players, and updates.
+  - `picture-entity` with `camera_view: live` for cameras; `weather-forecast` for weather; `gauge` for system metrics.
 
-   # Fallback with Python
-   py -c "import yaml; yaml.safe_load(open('ipad-wall-panel.yaml', encoding='utf-8')); print('valid')"
-   ```
-4. Reload Lovelace dashboards from **Developer Tools > YAML > Lovelace Dashboards > Reload**, or restart Home Assistant.
+### Lovelace YAML Workflow
 
-### AI Dashboard Development Workflow
-
-0. **Prefer the built-in Settings editor for content changes.** Click `[ SETTINGS ]` in the bottom dock on the dashboard: the **Layout** tab is a visual preview editor — an entity palette (filterable, grouped by area, with a "not on dashboard" toggle and a missing-entity cleanup block) on the left, and a scaled live preview of the selected screen (screen tabs across the top) on the right. Drag panels by their headers to reorder them within or between columns, drag entities from the palette onto a panel to add them (an entity can live in multiple sections at once — palette drags add, card drags move), drag cards between panels to move them, and click a card's × (or drag it back to the palette) to remove it. Section titles/icons are editable by clicking a panel's title. An amber badge warns when a column's panels overflow the screen height. The layout model is `config.panels` (screen → columns → ordered panel ids, with defensive defaults in `DEFAULT_PANELS`); it replaced the old `sectionOrder` board. Panels can be rearranged within or between columns of a screen; moving a panel to a DIFFERENT screen is not supported (each screen's builder only builds its own panels) and hand-editing `config.panels` that way yields an empty slot on the target screen while the defensive merge re-appends the panel on its default screen. The **Appearance** tab holds accent color, clock format, and weather/media entity picks. The **Labels** tab manages per-entity display-name overrides (`config.labels`). Save & Apply persists to `config.json` on the server via `POST /ai-dashboard/api/config` (a timestamped `config.json.bak.*` backup is created on every save, pruned to the newest 10), so changes are shared by all devices. Only edit `config.json` by hand for structural changes the editor doesn't cover. The Layout tab's measured overflow badge reflects current content only — it cannot predict future states such as printer cards appearing mid-print or the on-call panel appearing when a shift starts.
-1. Edit `www/ai-dashboard/index.html` and/or `www/ai-dashboard/config.json` directly.
-2. Validate HTML syntax with the local Node.js install or Python's `html.parser`:
-   ```bash
-   # Using local Node.js
-   .tools/node/node.exe -e "const HTMLParser = require('node-html-parser'); HTMLParser.parse(require('fs').readFileSync('www/ai-dashboard/index.html', 'utf8')); console.log('HTML parse OK')"
-
-   # Fallback with Python
-   py -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
-   ```
-3. Hard-refresh the dashboard in the browser (`Ctrl+Shift+R` / `Cmd+Shift+R`) to pick up the latest files. The proxy serves them directly from `www/ai-dashboard/`.
-4. If you changed anything under `custom_components/ai_dashboard_proxy/` (Python), a **Home Assistant restart** is required — a browser refresh is not enough.
+1. Edit the YAML dashboard file directly.
+2. Validate YAML syntax (see Common Operations below).
+3. Reload Lovelace dashboards from **Developer Tools > YAML > Lovelace Dashboards > Reload**, or restart Home Assistant.
 
 ---
 
@@ -173,7 +120,7 @@ Common device families in this instance (entity IDs follow these prefixes):
 - **Lights / Ceiling fans**: `light.ceiling_fan`, `light.living_room_ceiling_fan`, `light.third_reality_inc_3rcb01057z*`, `light.*_chamber_light`
 - **Bedroom bulbs**: Sylvania Smart+ WiFi A19 — Alexa-only, not integrable with HA (Tuya white-label lock). Slated for replacement; see `docs/sylvania-smartplus-wifi-notes.md`.
 - **Bambu Lab 3D printers**: `sensor.p1s_*`, `binary_sensor.p1s_*`, `fan.p1s_*`, `light.p1s_*_chamber_light`, `camera.p1s_*_camera`, etc.
-- **Cameras**: `camera.front_door_live_view`, `camera.downstairs_live_view`, `camera.backyard_rtsp_live` (ffmpeg camera in `configuration.yaml` — transcoded MJPEG of the ring-mqtt RTSP feed, used by the AI dashboard Security screen), `camera.backyard_live_stream` (generic camera on the same RTSP feed — HLS for the HA UI), `camera.p1s_*_camera`
+- **Cameras**: `camera.front_door_live_view`, `camera.downstairs_live_view` (official Ring — last cloud recording only), `camera.backyard_rtsp_live` / `camera.front_door_rtsp_live` (ffmpeg on ring-mqtt RTSP), `camera.backyard_live_stream` (generic/HLS for the HA UI), `camera.p1s_*_camera`. Details: `docs/ring-cameras.md`.
 - **Environmental sensors**: `sensor.hobeian_zg_204zx_*`, `binary_sensor.hobeian_zg_204zx*`
 - **Motion / security**: `switch.front_door_motion_detection`, `switch.downstairs_motion_detection`, `event.front_door_*`, `event.downstairs_motion`, `siren.downstairs_siren*`
 - **Door / window sensors**: `binary_sensor.living_room_front_door`, `binary_sensor.backdoor`
@@ -185,141 +132,43 @@ Common device families in this instance (entity IDs follow these prefixes):
 - **Network**: `sensor.exos_router_*`, `binary_sensor.exos_router_wan_status`
 - **Host / add-on diagnostics**: `sensor.home_assistant_core_*`, `sensor.home_assistant_host_*`, `sensor.home_assistant_supervisor_*`, `sensor.*_cpu_percent`, `sensor.*_memory_percent`, `sensor.ha_disk_usage`
 
-For the full current entity list, parse `//HOMEASSISTANT/config/.storage/core.entity_registry`.
-
-### Ring cameras: official integration vs ring-mqtt (add-on)
-
-The official Ring integration has **no true live view** — its `camera.*_live_view` entities replay the last cloud recording, and its `event.*_motion` entities are unreliable. The **ring-mqtt add-on** (`03cabcc9_ring_mqtt`, repo `https://github.com/tsightler/ring-mqtt-ha-addon`, auth via its web UI on ingress port 55123, bundles go2rtc) bridges Ring's on-demand WebRTC sessions to local RTSP at `rtsp://03cabcc9-ring-mqtt:8554/<camera_id>_live` and publishes its own `*_snapshot` cameras, motion binary sensors, and per-camera switches over MQTT.
-
-Key constraints (Ring-side, not configurable): streams are **on-demand only** — `switch.<cam>_live_stream` must be on for the RTSP path to exist; Ring kills any stream after ~10 minutes and suppresses motion/ding events while streaming. The AI dashboard Security screen turns `switch.downstairs_live_stream` on when opened and off when closed (`livestream` map in the cameras section config), so never leave these switches on permanently. Every live view also creates a recording in the Ring app when the account has Ring Protect.
-
-`camera.record` **fails (HTTP 500) on the official `camera.*_live_view` entities** — their cloud recording URLs aren't streamable sources. To record clips, use the RTSP path instead: turn on `switch.<cam>_live_stream`, wait ~8s for go2rtc, then `camera.record` on an RTSP-backed entity (`camera.backyard_live_stream`, or `camera.front_door_rtsp_live` — a generic camera in `configuration.yaml`, camera id `343ea435ca6d`). This is what the `ring_snapshot_archive_*` automations do.
+For the full current entity list, parse `.storage/core.entity_registry`.
 
 ---
 
 ## Custom Integrations (`custom_components/`)
 
-Each integration is a Home Assistant standard package with a `manifest.json`, `__init__.py`, and platform modules.
+Each integration is a standard HA package with a `manifest.json`, `__init__.py`, and platform modules — consult each `manifest.json` for the authoritative version, dependencies, and requirements rather than trusting docs.
 
-### `ai_dashboard_proxy`
+**Warning**: HACS-managed integrations (`alexa_media`, `bambu_lab`, `extended_openai_conversation`, `hacs`, `openhasp`, `uix`) have their directories **replaced on update** — never store your own files (including AGENTS.md or notes) inside them.
 
-- **Purpose**: Serves the custom `www/ai-dashboard/` app at `/ai-dashboard/` and handles Home Assistant authentication server-side so the dashboard can call HA APIs without exposing a long-lived token in the browser.
-- **Version**: `1.0.0`.
-- **Key Modules**:
-  - `__init__.py` — integration setup.
-  - `http.py` — HTTP/WebSocket views: serves dashboard assets with registry-derived area names injected, proxies HA state events and service calls over `/ai-dashboard/ws`, and exposes helper endpoints `POST /ai-dashboard/api/forecast` (weather forecast), `POST /ai-dashboard/api/history` (recorder state history for sparklines, via `homeassistant.components.recorder.history.get_significant_states` run in the recorder executor), and `POST /ai-dashboard/api/config` (persists the dashboard config to `www/ai-dashboard/config.json` with a timestamped backup and atomic write), plus `GET /ai-dashboard/cam_stream/{entity_id}` (authenticated MJPEG camera stream passthrough — `/api/camera_proxy_stream` 403s for remote browser sessions) and `GET /ai-dashboard/api/snapshots?camera=<key>` (lists motion/ding archives under `www/ai-dashboard/snapshots/<key>/` — 10s mp4 clips recorded from the ring-mqtt RTSP feed plus legacy jpg stills — pruning past 14 days / 100 files; files are written by the `ring_snapshot_archive_*` automations and served as static dashboard assets). Service calls over the WS are restricted to an allowlist of domains (`ALLOWED_SERVICE_DOMAINS` in `http.py`: light, switch, scene, script, media_player, vacuum, siren, lock, cover, fan, climate, input_boolean) — a dashboard feature calling any other domain is rejected with `domain_not_allowed` until the domain is added there. The WS also answers `{type:"ping"}` with `{type:"pong"}` — the dashboard client runs an app-level ping watchdog plus a visibilitychange/pageshow force-reconnect to recover half-open sockets after a wall tablet wakes from sleep. Leaflet is vendored under `www/ai-dashboard/vendor/leaflet/` (no CDN dependency for the radar); Google Fonts still loads from the CDN.
-- **Restart Required**: Any change to this component's Python requires a Home Assistant restart to take effect.
-
-### `bambu_lab`
-
-- **Purpose**: Integrates Bambu Lab 3D printers.
-- **Version**: `2.2.22`.
-- **Dependencies**: `device_automation`, `ffmpeg`, `frontend`, `http`, `lovelace`, `mqtt`, `websocket_api`.
-- **External Requirement**: `beautifulsoup4`.
-- **Platforms**: binary_sensor, button, camera, fan, image, light, number, select, sensor, switch, update.
-- **Key Modules**:
-  - `__init__.py` — integration setup, services, and a print-history HTTP API view.
-  - `coordinator.py` — data update coordinator.
-  - `config_flow.py` — UI configuration flow.
-  - `definitions.py` — entity descriptions.
-  - `pybambu/` — lower-level printer communication library embedded inside the integration.
-    - `models.py`, `bambu_client.py`, `bambu_cloud.py`, `commands.py`, `utils.py`, `const.py`
-    - `tests/` — unit tests with JSON mock payloads.
-- **Services**: Defined in `services.yaml`. Includes `send_command`, `print_project_file`, `skip_objects`, `move_axis`, `extrude_retract`, `load_filament`, `set_filament`, `get_filament_data`, `start_filament_drying`, etc.
-
-### `extended_openai_conversation`
-
-- **Purpose**: Extended OpenAI Conversation integration (HACS) for chat/voice-based control of the HA instance.
-- **Version**: `2.0.2`.
-- **Integration Type**: `service`.
-- **External Requirement**: `openai~=2.21.0`.
-
-### `hacs`
-
-- **Purpose**: Home Assistant Community Store (HACS).
-- **Version**: `2.0.5`.
-- **Dependencies**: `http`, `websocket_api`, `frontend`, `persistent_notification`, `lovelace`, `repairs`.
-- **External Requirement**: `aiogithubapi>=22.10.1`.
-- **Key Modules**:
-  - `base.py`, `__init__.py`, `coordinator.py`, `data_client.py`
-  - `repositories/` — logic for integrations, plugins, themes, appdaemon, python_script, and template repositories.
-  - `utils/` — helpers for GitHub, JSON, validation, backups, paths, queues, etc.
-  - `validate/` — repository validation rules.
-  - `websocket/` — WebSocket API endpoints.
-  - `hacs_frontend/` — bundled frontend assets.
-
-### `openhasp`
-
-- **Purpose**: openHASP integration (HACS) for the physical wall plate; plate layout is defined in `openhasp/wall_panel.yaml` and pushed over MQTT.
-- **Version**: `0.7.2`.
-- **Dependencies**: `mqtt`, `http`. Subscribes to `hasp/discovery/#`.
-- **External Requirement**: `jsonschema>=3.2.0`.
-
-### `pagerduty`
-
-- **Purpose**: PagerDuty integration for incidents and on-call data.
-- **Version**: `v1.21.0`.
-- **External Requirement**: `pagerduty==7.0.0`.
-- **Platforms**: sensor, calendar, notify.
-- **Key Modules**:
-  - `__init__.py` — setup and config entry handling.
-  - `sensor.py`, `calendar.py`, `notify.py` — platform implementations.
-  - `coordinator.py` — data polling coordinator.
-  - `config_flow.py` — UI configuration flow.
-- **Services**: `send_notification` defined in `services.yaml`.
-
-### `alexa_media`
-
-- **Purpose**: Alexa Media Player integration (HACS-installed). Enables announcements and TTS on Amazon Echo/Fire TV devices.
-- **Version**: `5.15.7`.
-- **Platforms**: media_player, sensor, switch, alarm_control_panel, binary_sensor, light.
-- **Key usage for agents**: Echo announcements use `notify.alexa_media_<device_name>` with `data: {type: announce}`. Fire TV devices do not reliably support `type: announce`; use Echo devices for spoken announcements.
-
-### `uix`
-
-- **Purpose**: UI eXtension for Home Assistant (custom Lovelace/frontend extension).
-- **Version**: `8.1.0`.
-- **Integration Type**: `service`.
-- **Key Modules**:
-  - `__init__.py` — frontend script registration and cleanup.
-  - `frontend.py` — serves `uix.js` and registers extra module URLs.
-  - `connection.py` — WebSocket command handlers.
-  - `config_flow.py` — configuration flow.
-  - `checks.py`, `diagnostics.py`, `helpers.py`, `const.py` — supporting modules.
-  - `uix.js` / `uix.js.gz` — bundled frontend code.
+- **`ai_dashboard_proxy`** (self-written): Serves `/ai-dashboard/` and handles HA auth server-side for the dashboard. Documented in `www/ai-dashboard/AGENTS.md`. **Any Python change requires a Home Assistant restart.**
+- **`alexa_media`** (HACS): Announcements/TTS on Echo/Fire TV. Key usage: Echo announcements use `notify.alexa_media_<device_name>` with `data: {type: announce}`. The `media_player.everywhere` group and Fire TV devices are unreliable for announcements; prefer individual Echo devices.
+- **`bambu_lab`** (HACS): Bambu Lab 3D printers. Contains the embedded `pybambu/` library with the repo's only tests (see Testing).
+- **`extended_openai_conversation`** (HACS): OpenAI-backed conversation agent for chat/voice control.
+- **`hacs`** (HACS): Home Assistant Community Store itself.
+- **`openhasp`** (HACS): Physical wall plate; plate layout is defined in `openhasp/wall_panel.yaml` (config lives outside the integration dir) and pushed over MQTT.
+- **`pagerduty`**: Incidents and on-call data (sensor, calendar, notify); drives the high-urgency Echo alert automations.
+- **`uix`** (HACS): UI eXtension for Lovelace/frontend.
 
 ---
 
 ## Build and Runtime
 
-- **No Build Step**: Home Assistant loads YAML and Python directly.
-- **Runtime**: Start Home Assistant in the usual way for the installation type (OS, Container, Supervised, or Core). This directory (`/config`) is the configuration path.
+- **No Build Step**: Home Assistant loads YAML and Python directly; this directory (`/config`) is the configuration path.
 - **Validation**: Home Assistant validates YAML and integration manifests on startup. Check the Home Assistant logs for errors after any configuration change.
-- **Dependencies**: Runtime Python packages are installed by Home Assistant based on `manifest.json` `requirements` and by HACS for downloaded integrations/cards.
-- **`deps/`**: Empty at time of writing. Home Assistant may place runtime-installed Python wheels here depending on the install method.
+- **Dependencies**: Runtime Python packages are installed by Home Assistant from each integration's `manifest.json` `requirements`, and by HACS for downloaded integrations/cards.
 
 ---
 
 ## Testing
 
-There is no top-level test harness. Only the `bambu_lab` integration contains tests.
+There is no top-level test harness. Only the `bambu_lab` integration contains tests:
 
-### Bambu Lab Tests
-
-- **Location**: `custom_components/bambu_lab/pybambu/tests/`
-- **Framework**: Python `unittest`.
-- **Mock Data**: JSON files such as `P1P.json`, `H2D.json`, `MOCK-*.json`, and `test_ams_ams2_amsht.json`.
-- **Test Files**:
-  - `test_models.py` — model parsing and state updates.
-  - `test_error_lookup.py` — error-code lookup behavior.
-  - `test_utils.py` — utility functions and mock MQTT client.
-- **Test Requirements**: `custom_components/bambu_lab/pybambu/tests/requirements.txt`
-- **How to Run**:
-  1. Create and activate a Python virtual environment inside `custom_components/bambu_lab/pybambu/` at `venv/`.
-  2. Install test dependencies: `pip install -r tests/requirements.txt`
-  3. Run `custom_components/bambu_lab/pybambu/run_tests.sh`
-
-The runner script preloads the stdlib `select` module before importing Home Assistant platform modules to avoid shadowing by `custom_components/bambu_lab/select.py`.
+- **Location**: `custom_components/bambu_lab/pybambu/tests/` (Python `unittest`, JSON mock payloads).
+- **How to Run**: Create a venv inside `custom_components/bambu_lab/pybambu/venv/`, `pip install -r tests/requirements.txt`, then run `custom_components/bambu_lab/pybambu/run_tests.sh`.
+- The runner script preloads the stdlib `select` module before importing HA platform modules to avoid shadowing by `custom_components/bambu_lab/select.py`.
+- Run these tests when a change touches `pybambu/`.
 
 ---
 
@@ -335,11 +184,11 @@ The runner script preloads the stdlib `select` module before importing Home Assi
 
 ## Security Considerations
 
-- **`secrets.yaml`**: Contains credentials placeholders. Never expose it in logs, copy it outside this environment, or commit it to version control.
-- **`.storage/`**: Contains Home Assistant authentication, registry, and state files (e.g., `auth`, `core.config_entries`, `core.entity_registry`). These are runtime-sensitive and should not be edited manually unless you know exactly what you are doing.
+- **`secrets.yaml`**: Never expose it in logs, copy it outside this environment, or commit it to version control.
+- **`.storage/`**: Contains authentication, registry, and state files. Runtime-sensitive — do not edit manually.
 - **Database Files**: `home-assistant_v2.db*` and `zigbee.db*` contain runtime data. Avoid deleting or modifying them while Home Assistant is running.
 - **Custom Integrations**: They execute with the same privileges as Home Assistant. Review any changes carefully, especially network calls, shell commands, or file-system access.
-
+- **AI dashboard auth model**: any LAN client can use the dashboard (by design, for wall tablets) — treat the LAN as the trust boundary and keep the service-call allowlist in `custom_components/ai_dashboard_proxy/http.py` (`ALLOWED_SERVICE_DOMAINS`) minimal.
 
 ---
 
@@ -354,7 +203,7 @@ The runner script preloads the stdlib `select` module before importing Home Assi
   py -c "import yaml; yaml.safe_load(open('configuration.yaml', encoding='utf-8')); print('configuration.yaml valid')"
   ```
 - **Check Logs**: Use Home Assistant's logs to debug integration errors or configuration problems.
-- **Update Integrations**: Custom integrations under `custom_components/` are typically updated by replacing their directory contents (often via HACS or manual download). Preserve `manifest.json` and platform structure.
+- **Update Integrations**: HACS-managed integrations are updated via HACS, which replaces their directories wholesale — see the warning under Custom Integrations.
 
 ---
 
@@ -387,11 +236,7 @@ There is no automated deployment to the live Home Assistant instance; deploy man
 
 - This is a personal/single-instance Home Assistant configuration. Changes affect a live home automation system.
 - Always prefer minimal, targeted edits.
-- Verify any YAML changes with Home Assistant's configuration validation before restarting. Use the local Node.js in `.tools/node/` or the Python fallback for syntax checks.
-- When editing the AI dashboard (`www/ai-dashboard/`), validate HTML/JSON syntax and hard-refresh the browser to pick up changes.
-- When editing Python custom integrations, run the existing `bambu_lab` tests if the change touches `pybambu/`.
+- Verify YAML changes with Home Assistant's configuration validation before restarting. Use the local Node.js in `.tools/node/` or the Python fallback for syntax checks.
 - If you add a new custom integration, include a valid `manifest.json` and follow the Home Assistant integration platform pattern used by the existing components.
-- Dashboards can be UI-managed (stored in `.storage/lovelace.*`) or YAML-managed (registered in `configuration.yaml`). The current wall panel is YAML-managed; the AI dashboard is file-based under `www/ai-dashboard/`.
-- For Alexa announcements, use per-device `notify.alexa_media_<entity>` services with `data: {type: announce}`. The `media_player.everywhere` group and Fire TV devices are unreliable for announcements; prefer individual Echo devices.
-- When the user asks for a Lovelace dashboard change, default to the established pattern: `type: sections`, `max_columns: 3`, `theme: Google Dark Theme`, Mushroom cards for lights/switches/vacuums, and large touch targets for wall-mounted iPad use.
+- Dashboards can be UI-managed (stored in `.storage/lovelace.*`) or YAML-managed (registered in `configuration.yaml`). The Lovelace wall panel is YAML-managed; the AI dashboard is file-based under `www/ai-dashboard/`.
 - For new features or significant changes, use the Superpowers skill workflow: brainstorm → design spec → implementation plan → subagent-driven execution. Keep specs in `docs/superpowers/specs/` and plans in `docs/superpowers/plans/`.
