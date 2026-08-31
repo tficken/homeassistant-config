@@ -1,8 +1,11 @@
 // HA REST helpers (via the dashboard proxy or a user token) and the WS
 // service-call actions used by inline handlers. sendWs comes from
 // connection.js; imported here as a runtime-only circular function reference.
+// refreshForecast's renderHomeScreen import from screens/home.js is the same
+// kind of runtime-only cycle (api.js <- config.js <- screens <- api.js).
 import { state } from './state.js';
 import { sendWs } from './connection.js';
+import { renderHomeScreen } from './screens/home.js';
 
 export async function apiFetch(path) {
   const headers = state.token ? { "Authorization": `Bearer ${state.token}` } : {};
@@ -103,4 +106,28 @@ export async function fetchHAConfig() {
   }
   state.haConfig = await apiFetch("/api/config");
   return state.haConfig;
+}
+
+export async function refreshForecast() {
+  const weatherId = state.config.entities.weather || "weather.forecast_home";
+  const st = state.states[weatherId];
+  // Fallback 1: entity attribute
+  if (st && st.attributes && Array.isArray(st.attributes.forecast)) {
+    state.forecastCache.daily = st.attributes.forecast.slice(0, 5);
+    state.forecastCache.fetchedAt = Date.now();
+    if (state.currentScreen === "home") renderHomeScreen();
+    return;
+  }
+  // Primary: server-side forecast endpoint (uses the dashboard proxy's HA auth)
+  const res = await apiCall("POST", "/ai-dashboard/api/forecast", {
+    entity_id: weatherId,
+    type: "daily"
+  });
+  if (res && res[weatherId] && Array.isArray(res[weatherId].forecast)) {
+    state.forecastCache.daily = res[weatherId].forecast.slice(0, 5);
+    state.forecastCache.fetchedAt = Date.now();
+    if (state.currentScreen === "home") renderHomeScreen();
+    return;
+  }
+  state.forecastCache.daily = [];
 }

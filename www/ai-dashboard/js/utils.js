@@ -1,10 +1,10 @@
 // Pure formatting/entity helpers + door/presence last-event tracking.
-// Leaf module: only reads shared runtime state and calls back into main.js
-// (getPresenceEntities/renderDoors) and components/panels.js
+// Leaf module: only reads shared runtime state and calls back into
+// screens/home.js (getPresenceEntities/renderDoors) and components/panels.js
 // (renderTerminalPanel) — circular function references only, no top-level
 // reads of imported bindings.
 import { state } from './state.js';
-import { getPresenceEntities, renderDoors } from './main.js';
+import { getPresenceEntities, renderDoors } from './screens/home.js';
 import { renderTerminalPanel } from './components/panels.js';
 
 const DOMAIN_ICONS = {

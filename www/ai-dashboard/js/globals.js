@@ -2,11 +2,11 @@
 // call bare global names. ES modules create no globals, so attach the entry points here.
 // When a function is later extracted to its own module, update its import below.
 import {
-  showScreen,
   openSettings, closeSettings, saveSettings, exportConfig, importConfig, logout,
   switchSettingsTab, setEditorScreen,
   addLabelOverride, removeLabelOverride, setLabelOverride, removeMissingEntity,
 } from './main.js';
+import { showScreen } from './screens/index.js';
 import { streamFeedFallback } from './cameras.js';
 import { toggleEntity, mediaCmd, setBrightness, setColorTemp } from './api.js';
 import {

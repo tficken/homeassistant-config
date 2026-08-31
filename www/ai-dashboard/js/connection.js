@@ -2,13 +2,13 @@
 // ping watchdog, and the proxy/direct socket message handlers. The
 // visibilitychange/pageshow hooks (registered at module top level below)
 // reconnect a suspended wall tablet immediately on wake.
-// renderAll/updateCard/refreshForecast are runtime-only circular imports from
-// main.js, and scheduleSnapshotRefresh from cameras.js — function references
-// only, no top-level reads.
+// renderAll/updateCard are runtime-only circular imports from
+// screens/index.js, refreshForecast from api.js, and scheduleSnapshotRefresh
+// from cameras.js — function references only, no top-level reads.
 import { state } from './state.js';
 import { trackLastEvent, primeLastEventCache } from './utils.js';
-import { fetchRegistry } from './api.js';
-import { renderAll, updateCard, refreshForecast } from './main.js';
+import { fetchRegistry, refreshForecast } from './api.js';
+import { renderAll, updateCard } from './screens/index.js';
 import { scheduleSnapshotRefresh } from './cameras.js';
 
 export function setStatus(cls) {
