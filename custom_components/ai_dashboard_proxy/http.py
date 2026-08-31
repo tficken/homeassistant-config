@@ -20,7 +20,10 @@ from homeassistant.components.recorder import history as recorder_history
 from homeassistant.const import EVENT_STATE_CHANGED
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.area_registry import EVENT_AREA_REGISTRY_UPDATED
+from homeassistant.helpers.area_registry import async_get as async_get_area_registry
+from homeassistant.helpers.device_registry import async_get as async_get_device_registry
 from homeassistant.helpers.entity_registry import EVENT_ENTITY_REGISTRY_UPDATED
+from homeassistant.helpers.entity_registry import async_get as async_get_entity_registry
 from homeassistant.helpers.json import json_dumps
 from homeassistant.util import dt as dt_util
 
@@ -56,52 +59,31 @@ def _is_authorized(request: web.Request, secret: str | None) -> bool:
 
 
 async def async_load_entity_areas(hass: HomeAssistant) -> dict[str, str]:
-    """Build a map of entity_id -> area name from HA registries."""
+    """Build a map of entity_id -> area name from HA's in-memory registries.
 
-    def _load() -> dict[str, str]:
-        try:
-            base = hass.config.config_dir
-            with open(
-                os.path.join(base, ".storage", "core.area_registry"),
-                encoding="utf-8",
-            ) as f:
-                area_data = json.load(f)
-            with open(
-                os.path.join(base, ".storage", "core.device_registry"),
-                encoding="utf-8",
-            ) as f:
-                device_data = json.load(f)
-            with open(
-                os.path.join(base, ".storage", "core.entity_registry"),
-                encoding="utf-8",
-            ) as f:
-                entity_data = json.load(f)
-        except Exception:
-            return {}
-
-        area_names = {
-            a["id"]: a["name"]
-            for a in area_data.get("data", {}).get("areas", [])
-        }
-        device_areas = {
-            d["id"]: d["area_id"]
-            for d in device_data.get("data", {}).get("devices", [])
-            if d.get("area_id")
-        }
+    Uses the registry helper APIs (not .storage JSON), so HA registry schema
+    changes can't silently break area names. Everything is in-memory, so no
+    executor job is needed.
+    """
+    try:
+        area_registry = async_get_area_registry(hass)
+        device_registry = async_get_device_registry(hass)
+        entity_registry = async_get_entity_registry(hass)
 
         entity_areas: dict[str, str] = {}
-        for entry in entity_data.get("data", {}).get("entities", []):
-            entity_id = entry.get("entity_id")
-            if not entity_id:
-                continue
-            area_id = entry.get("area_id")
+        for entry in entity_registry.entities.values():
+            area_id = entry.area_id
+            if not area_id and entry.device_id:
+                device = device_registry.async_get(entry.device_id)
+                area_id = device.area_id if device else None
             if not area_id:
-                area_id = device_areas.get(entry.get("device_id"))
-            if area_id:
-                entity_areas[entity_id] = area_names.get(area_id, area_id)
+                continue
+            area = area_registry.async_get_area(area_id)
+            entity_areas[entry.entity_id] = area.name if area else area_id
         return entity_areas
-
-    return await hass.async_add_executor_job(_load)
+    except Exception:
+        _LOGGER.exception("Failed to build entity-area map")
+        return {}
 
 
 async def dashboard_handler(request: web.Request) -> web.StreamResponse:

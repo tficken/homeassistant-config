@@ -61,7 +61,7 @@ The Layout tab's measured overflow badge reflects current content only — it ca
 2. The request carries HA's authenticated-session flag.
 3. The request presents the configured secret as `Authorization: Bearer <secret>` or a `?secret=` query param (the query-param form will end up in browser history and proxy logs — prefer the header where possible).
 
-Area names are resolved by reading `.storage/core.area_registry` / `core.device_registry` / `core.entity_registry` JSON directly (in an executor job), not via HA's registry helper APIs — if area names ever silently stop appearing after an HA upgrade, suspect a registry schema change there first.
+Area names come from HA's in-memory registry helper APIs (area/device/entity registries via `async_get`), refreshed on registry-update events — no `.storage` JSON parsing, so HA registry schema changes can't silently break them.
 
 ---
 
