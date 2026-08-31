@@ -1,6 +1,6 @@
 input, select {
   background: rgba(255,255,255,0.07); border: 1px solid var(--border); border-radius: 4px;
-  padding: 8px 10px; color: var(--text); font-size: 0.9rem;
+  padding: var(--space-2) 10px; color: var(--text); font-size: 0.9rem;
 }
 select, select option { background: #0d140d; color: var(--text); }
 input[type="range"] { accent-color: var(--green); }
@@ -31,7 +31,7 @@ input[type="range"] { accent-color: var(--green); }
   font-size: 0.65rem;
   padding: 2px 6px;
   border-radius: 4px;
-  margin-left: 8px;
+  margin-left: var(--space-2);
 }
 .radar-timestamp {
   position: absolute;
@@ -41,8 +41,8 @@ input[type="range"] { accent-color: var(--green); }
   background: rgba(0,0,0,0.6);
   color: var(--green);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  padding: 3px 8px;
+  font-size: var(--text-sm);
+  padding: 3px var(--space-2);
   border: 1px solid var(--border);
   border-radius: 4px;
   pointer-events: none;

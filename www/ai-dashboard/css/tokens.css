@@ -12,4 +12,28 @@
   --font-mono: 'Share Tech Mono', monospace;
   --panel-bg: rgba(8, 18, 8, 0.92);
   --border: rgba(20, 254, 23, 0.45);
+  --accent: #2dd4bf; /* default; applyTheme() overrides from config.theme.accentColor */
+
+  /* spacing scale (4px base) */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* type scale */
+  --text-sm: 0.7rem;
+  --text-base: 0.85rem;
+  --text-lg: 1.1rem;
+  --text-xl: 1.5rem;
+
+  /* CRT parameters (current rendered values become the defaults) */
+  --glow-strength: 0.45;        /* panel-title text-shadow alpha */
+  --scanline-opacity: 0.12;     /* current scanline band alpha */
+  --flicker-amount: 0.015;      /* crtFlicker opacity dip: 1 - this */
+
+  /* motion */
+  --transition-fast: 120ms ease-out;
+  --transition-screen: 180ms ease-in-out;
 }
