@@ -3,22 +3,24 @@
 // When a function is later extracted to its own module, update its import below.
 import {
   showScreen,
-  openLightModal, closeLightModal, lightPressStart, lightPressEnd, lightPressCancel, lightWheelPick,
-  openPrinterModal, closePrinterModal, pressPrinterButton,
-  closeSnapshotHistory, stepSnapshotHistory,
   streamFeedFallback,
   openSettings, closeSettings, saveSettings, exportConfig, importConfig, logout,
   switchSettingsTab, setEditorScreen,
   addLabelOverride, removeLabelOverride, setLabelOverride, removeMissingEntity,
 } from './main.js';
 import { toggleEntity, mediaCmd, setBrightness, setColorTemp } from './api.js';
+import {
+  openLightModal, closeLightModal, lightPressStart, lightPressMove, lightPressEnd, lightPressCancel, lightWheelPick,
+} from './components/light-modal.js';
+import { openPrinterModal, closePrinterModal, pressPrinterButton } from './components/printer-modal.js';
+import { openSnapshotHistory, closeSnapshotHistory, stepSnapshotHistory } from './components/snapshot-viewer.js';
 
 Object.assign(window, {
   toggleEntity, mediaCmd, setBrightness, setColorTemp,
   showScreen,
-  openLightModal, closeLightModal, lightPressStart, lightPressEnd, lightPressCancel, lightWheelPick,
+  openLightModal, closeLightModal, lightPressStart, lightPressMove, lightPressEnd, lightPressCancel, lightWheelPick,
   openPrinterModal, closePrinterModal, pressPrinterButton,
-  closeSnapshotHistory, stepSnapshotHistory,
+  openSnapshotHistory, closeSnapshotHistory, stepSnapshotHistory,
   streamFeedFallback,
   openSettings, closeSettings, saveSettings, exportConfig, importConfig, logout,
   switchSettingsTab, setEditorScreen,
