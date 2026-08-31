@@ -2,7 +2,6 @@
 // call bare global names. ES modules create no globals, so attach the entry points here.
 // When a function is later extracted to its own module, update its import below.
 import {
-  toggleEntity, mediaCmd, setBrightness, setColorTemp,
   showScreen,
   openLightModal, closeLightModal, lightPressStart, lightPressEnd, lightPressCancel, lightWheelPick,
   openPrinterModal, closePrinterModal, pressPrinterButton,
@@ -12,6 +11,7 @@ import {
   switchSettingsTab, setEditorScreen,
   addLabelOverride, removeLabelOverride, setLabelOverride, removeMissingEntity,
 } from './main.js';
+import { toggleEntity, mediaCmd, setBrightness, setColorTemp } from './api.js';
 
 Object.assign(window, {
   toggleEntity, mediaCmd, setBrightness, setColorTemp,

@@ -4,132 +4,9 @@ import { friendlyName, presenceLabel, sectionTitle, entityArea, iconFor, isActiv
   renderOfflineBadge, isActionable, formatState, weatherIcon, escapeHtml, formatTemp, relativeTime,
   doorEntityIds, lastEventTime, primeLastEventCache, trackLastEvent, recentDoorIds,
   DOOR_RECENT_WINDOW_MS, refreshDoorRecency } from './utils.js';
-
-// Layout model: screen -> array of columns -> ordered panel ids.
-// Known limitation: panels can move within/between columns of their own screen
-// only — each screen's builder builds only its own panels, so moving a panel
-// to a different screen (hand-edited state.config.panels) renders an empty slot there
-// while effectivePanels re-appends it on its default screen.
-const DEFAULT_PANELS = {
-  home:    [["clock", "presence", "lights", "oncall"], ["weather", "roomMonitors"], ["radar", "doors"]],
-  control: [["scenes"], ["quickControls", "media"], ["scripts"]],
-  security: [["cameras", "security"]],
-  status:  [["environment"], ["system"]]
-};
-
-// Panel id -> how the panel is backed. kinds:
-//   section — entities live in state.config.sections[section] (presence: title/icon from
-//             sections.presence but entities from sections.home filtered to
-//             person.*/device_tracker.* — see getPresenceEntities())
-//   fixed   — built-in panel, not entity-editable (clock, radar)
-//   entity  — single entity from state.config.entities[entityKey] (set in Appearance tab)
-//   auto    — self-populating (oncall detects calendar.* entities)
-const PANEL_REGISTRY = {
-  clock:        { kind: "fixed", note: "built in" },
-  radar:        { kind: "fixed", note: "built in" },
-  oncall:       { kind: "auto", note: "auto-detects calendar.* entities" },
-  weather:      { kind: "entity", entityKey: "weather", note: "entity set in Appearance tab" },
-  media:        { kind: "entity", entityKey: "mediaPlayer", note: "entity set in Appearance tab" },
-  presence:     { kind: "section", section: "home", filter: "person" },
-  lights:       { kind: "section", section: "lights" },
-  roomMonitors: { kind: "section", section: "roomMonitors" },
-  doors:        { kind: "section", section: "doors" },
-  scenes:       { kind: "section", section: "scenes" },
-  quickControls:{ kind: "section", section: "quickControls" },
-  scripts:      { kind: "section", section: "scripts" },
-  cameras:      { kind: "section", section: "cameras" },
-  security:     { kind: "section", section: "security" },
-  environment:  { kind: "section", section: "environment" },
-  system:       { kind: "section", section: "system" }
-};
-
-// Resolve the effective layout for a screen: state.config.panels if valid, else the
-// defaults; unknown panel ids dropped, missing default panels re-appended at
-// their default column/index. Pure — never mutates state.config.
-function effectivePanels(screen) {
-  const defaults = DEFAULT_PANELS[screen] || [];
-  const raw = state.config.panels && state.config.panels[screen];
-  const cols = (Array.isArray(raw) && raw.length && raw.every(Array.isArray))
-    ? raw.map(col => col.filter(id => PANEL_REGISTRY[id]))
-    : defaults.map(col => col.slice());
-  const present = new Set(cols.flat());
-  defaults.forEach((col, ci) => {
-    col.forEach((id, pi) => {
-      if (!present.has(id)) {
-        const target = cols[ci] || (cols[ci] = []);
-        target.splice(Math.min(pi, target.length), 0, id);
-        present.add(id);
-      }
-    });
-  });
-  return cols;
-}
-
-// Copy the resolved layout into state.config.panels so a later save persists the full
-// model (the editor calls this before its first mutation).
-function ensureConfigPanels() {
-  state.config.panels = state.config.panels || {};
-  for (const screen of Object.keys(DEFAULT_PANELS)) {
-    state.config.panels[screen] = effectivePanels(screen).map(col => col.slice());
-  }
-}
-
-// Backing state.config.sections key for a section-kind panel, else null. The
-// presence panel's entities live in sections.home (filtered to
-// person.*/device_tracker.* by getPresenceEntities()), so presence -> "home".
-function panelSection(panelId) {
-  const entry = PANEL_REGISTRY[panelId];
-  return entry && entry.kind === "section" ? entry.section : null;
-}
-
-const DEFAULT_CONFIG = {
-  theme: { backgroundImage: "", accentColor: "#2dd4bf" },
-  panels: DEFAULT_PANELS,
-  layout: { clock24h: false },
-  entities: {
-    weather: "weather.forecast_home",
-    mediaPlayer: "media_player.living_room_fire_tv_living_room"
-  },
-  sections: {
-    home: { title: "Home", icon: "🏠", entities: ["person.woteg", "person.bobbie", "weather.forecast_home"] },
-    scenes: { title: "Scenes", icon: "🎨", entities: ["scene.all_lights_off", "scene.relax_mode", "scene.movie_mode", "scene.focus_mode", "scene.living_room_focus_mode", "scene.living_room_relax_mode", "scene.living_room_all_lights_off"] },
-    scripts: { title: "Scripts", icon: "▶️", entities: ["script.goodnight", "script.focus_mode", "script.movie_mode", "script.relax_mode", "script.pause_all_media", "script.living_room_lights_on", "script.living_room_lights_off", "script.travis_office_lights_on", "script.travis_office_lights_off", "script.goodnight_door_check", "script.goodnight_dim_lights", "script.goodnight_enable_security"] },
-    quickControls: { title: "Quick Controls", icon: "🎛️", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan", "light.p1s_01p00a412300832_chamber_light", "light.travis_office_p1s_uno_chamber_light"] },
-    lights: { title: "Lights", icon: "💡", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan"] },
-    cameras: { title: "Cameras", icon: "📷", entities: ["camera.front_door_live_view", "camera.backyard_rtsp_live"], snapshot: { "camera.front_door_live_view": { preferEntity: "camera.front_door_last_recording", activityEntities: ["event.front_door_motion", "event.front_door_ding", "sensor.front_door_last_activity"] } }, livestream: { "camera.backyard_rtsp_live": "switch.downstairs_live_stream" }, history: { "camera.front_door_live_view": "front_door", "camera.backyard_rtsp_live": "backyard" } },
-    security: { title: "Security", icon: "🛡️", entities: ["switch.front_door_motion_detection", "switch.downstairs_motion_detection", "sensor.front_door_battery", "sensor.downstairs_battery", "siren.downstairs_siren", "siren.downstairs_siren_2", "sensor.front_door_last_activity", "sensor.downstairs_last_activity"] },
-    doors: { title: "Doors", icon: "🚪", entities: ["binary_sensor.living_room_front_door", "binary_sensor.backdoor"] },
-    roomMonitors: { title: "Room Monitors", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2"] },
-    environment: { title: "Environment", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_illuminance", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2", "sensor.hobeian_zg_204zx_illuminance_2"] },
-    presence: { title: "Presence", icon: "👤", entities: ["binary_sensor.hobeian_zg_204zx", "binary_sensor.hobeian_zg_204zx_2"] },
-    system: { title: "System", icon: "⚙️", entities: ["sensor.home_assistant_core_cpu_percent", "sensor.home_assistant_core_memory_percent", "sensor.ha_disk_usage", "vacuum.geordi_la_forge", "vacuum.pooper_litter_box", "update.home_assistant_core_update", "update.home_assistant_operating_system_update", "update.home_assistant_supervisor_update"] }
-  },
-  dock: { items: [{ icon: "⚙️", action: "settings", label: "Settings" }] }
-};
-
-async function apiFetch(path) {
-  const headers = state.token ? { "Authorization": `Bearer ${state.token}` } : {};
-  try {
-    const r = await fetch(path, { headers });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch (e) {
-    console.error("apiFetch failed", path, e);
-    return null;
-  }
-}
-
-async function apiCall(method, path, body) {
-  const headers = state.token ? { "Authorization": `Bearer ${state.token}`, "Content-Type": "application/json" } : { "Content-Type": "application/json" };
-  try {
-    const r = await fetch(path, { method, headers, body: body ? JSON.stringify(body) : undefined });
-    if (!r.ok) return null;
-    return await r.json();
-  } catch (e) {
-    console.error("apiCall failed", method, path, e);
-    return null;
-  }
-}
+import { PANEL_REGISTRY, DEFAULT_CONFIG, effectivePanels, ensureConfigPanels, panelSection,
+  deepMerge, loadConfig, migrateConfig, saveConfig, applyTheme } from './config.js';
+import { apiCall, fetchHistory, fetchRegistry, fetchHAConfig, toggleEntity } from './api.js';
 
 async function refreshForecast() {
   const weatherId = state.config.entities.weather || "weather.forecast_home";
@@ -155,76 +32,11 @@ async function refreshForecast() {
   state.forecastCache.daily = [];
 }
 
-async function fetchHistory(entityIds, hours = 24) {
-  const now = Date.now();
-  const stale = entityIds.filter(id =>
-    !state.historyCache[id] || (now - state.historyCache[id].fetchedAt) > 30 * 60 * 1000
-  );
-  if (!stale.length) return;
-  const res = await apiCall("POST", "/ai-dashboard/api/history", {
-    entity_ids: stale,
-    hours: hours
-  });
-  if (!res) return;
-  for (const id of stale) {
-    if (Array.isArray(res[id])) state.historyCache[id] = { fetchedAt: now, data: res[id] };
-  }
-}
 
-function deepMerge(target, ...sources) {
-  for (const src of sources) {
-    if (!src) continue;
-    for (const key of Object.keys(src)) {
-      if (src[key] && typeof src[key] === "object" && !Array.isArray(src[key])) {
-        target[key] = target[key] || {};
-        deepMerge(target[key], src[key]);
-      } else {
-        target[key] = src[key];
-      }
-    }
-  }
-  return target;
-}
 
-async function loadConfig() {
-  let fileConfig = {};
-  try {
-    const r = await fetch("config.json", { cache: "no-store" });
-    if (r.ok) fileConfig = await r.json();
-  } catch (e) {}
-  const cfg = deepMerge(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), fileConfig);
-  migrateConfig(cfg);
-  return cfg;
-}
-
-function migrateConfig(cfg) {
-  if (cfg.entities && Array.isArray(cfg.entities.quickControls)) {
-    const legacy = cfg.entities.quickControls;
-    if (legacy.length &&
-        (!cfg.sections.quickControls || !Array.isArray(cfg.sections.quickControls.entities) || !cfg.sections.quickControls.entities.length)) {
-      cfg.sections.quickControls = cfg.sections.quickControls || { title: "Quick Controls", icon: "🎛️", entities: [] };
-      cfg.sections.quickControls.entities = legacy;
-    }
-    delete cfg.entities.quickControls;
-  }
-  delete cfg.sectionOrder; // superseded by state.config.panels
-}
-
-async function saveConfig() {
-  const res = await apiCall("POST", "/ai-dashboard/api/config", state.config);
-  if (res && res.success === true) return true;
-  setSettingsStatus("SAVE FAILED — changes are live but not persisted. Use Data > Export JSON as a backup.");
-  return false;
-}
-
-function setSettingsStatus(msg) {
+export function setSettingsStatus(msg) {
   const el = document.getElementById("settings-status");
   if (el) el.textContent = msg || "";
-}
-
-function applyTheme() {
-  const accent = state.config.theme.accentColor || DEFAULT_CONFIG.theme.accentColor;
-  document.documentElement.style.setProperty("--accent", accent);
 }
 
 const SNAPSHOT_EVENT_REFRESH_DELAY_MS = 20000;
@@ -301,67 +113,6 @@ function setStatus(cls) {
   const banner = document.getElementById("conn-banner");
   if (banner) banner.style.display = cls === "connected" ? "none" : "block";
   if (cls === "connected") state.reconnectDelay = 1000;
-}
-
-export function toggleEntity(entityId) {
-  const domain = entityId.split(".")[0];
-  let service = "toggle";
-  if (["scene","script","button"].includes(domain)) service = "turn_on";
-  else if (domain === "media_player") service = "media_play_pause";
-  else if (domain === "lock") {
-    const st = state.states[entityId] && state.states[entityId].state;
-    service = st === "locked" ? "unlock" : "lock";
-  }
-  sendWs({ id: Date.now(), type: "call_service", domain, service, service_data: { entity_id: entityId } });
-}
-
-export function mediaCmd(eid, service) {
-  sendWs({ id: Date.now(), type: "call_service", domain: "media_player", service, service_data: { entity_id: eid } });
-}
-
-export function setBrightness(entityId, pct) {
-  const value = Math.round((parseInt(pct, 10) / 100) * 255);
-  sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, brightness: value } });
-}
-
-export function setColorTemp(entityId, kelvin) {
-  sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, color_temp_kelvin: parseInt(kelvin, 10) } });
-}
-
-function setLightColor(entityId, rgb) {
-  sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, rgb_color: rgb } });
-}
-
-async function fetchRegistry() {
-  if (window.HA_INTEGRATION_PROXY) {
-    // Proxied dashboard has no HA token; the registry endpoints would 401.
-    // window.HA_AREAS (injected by the proxy) already covers area lookups.
-    state.areas = [];
-    state.entities = [];
-    state.areaMap = {};
-    state.entityById = {};
-    return;
-  }
-  const [aRes, eRes] = await Promise.all([
-    apiFetch("/api/config/area_registry/list"),
-    apiFetch("/api/config/entity_registry/list")
-  ]);
-  state.areas = aRes || [];
-  state.entities = eRes || [];
-  state.areaMap = {};
-  for (const a of state.areas) state.areaMap[a.area_id] = a.name;
-  state.entityById = {};
-  for (const e of state.entities) state.entityById[e.entity_id] = e;
-}
-
-async function fetchHAConfig() {
-  if (state.haConfig) return state.haConfig;
-  if (window.HA_CONFIG) {
-    state.haConfig = window.HA_CONFIG;
-    return state.haConfig;
-  }
-  state.haConfig = await apiFetch("/api/config");
-  return state.haConfig;
 }
 
 // ---- Component renderers ----
@@ -2583,7 +2334,8 @@ function forceReconnect() {
 // Send a message over the live socket. If the socket is not open (half-open
 // connections look fine until a write), surface the disconnect and kick off a
 // reconnect immediately instead of silently discarding the command.
-function sendWs(obj) {
+// Exported for api.js's service actions until the connection module lands.
+export function sendWs(obj) {
   if (!state.ws || state.ws.readyState !== WebSocket.OPEN) {
     setStatus("disconnected");
     forceReconnect();
