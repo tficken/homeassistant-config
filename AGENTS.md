@@ -31,7 +31,7 @@ The intended reader of this file is an AI coding agent that has no prior context
 - **Frontend/Theming**: Lovelace themes (`themes/`), community cards (`www/community/`), and frontend extensions (`custom_components/uix/`).
 - **Databases**: `home-assistant_v2.db*` (recorder/history), `zigbee.db*` (Zigbee coordinator).
 - **Secrets**: `secrets.yaml` stores sensitive placeholders. It must never be committed or shared.
-- **Backups**: Weekly full backups via `shell_command.create_weekly_backup` (automation `weekly_backup`), pruned past 14 days locally; off-site copies are handled by Nabu Casa cloud backup.
+- **Backups**: Weekly full backups via `shell_command.create_weekly_backup` (automation `weekly_backup`), pruned past 14 days locally; off-site copies are handled by Nabu Casa cloud backup. `sensor.ha_last_backup_age` (command_line, from `scripts/last_backup_age.py`) tracks the newest backup's age and the `stale_backup_alert` automation notifies when it exceeds 8 days — this catches the backup never running, which `create_weekly_backup.py`'s own failure notification cannot.
 
 ---
 
@@ -58,7 +58,6 @@ The intended reader of this file is an AI coding agent that has no prior context
 ├── docs/                       # Notes (ring-cameras.md, device notes) + superpowers specs/plans
 ├── openhasp/                   # openHASP plate definition (wall_panel.yaml)
 ├── scripts/                    # Maintenance and validation scripts (backups, HA YAML validation)
-├── ipad-wall-panel.yaml        # YAML-managed Lovelace wall panel dashboard
 └── dashboard-backup-*.json     # Backups of UI-managed dashboards
 ```
 
@@ -77,7 +76,7 @@ The intended reader of this file is an AI coding agent that has no prior context
 
 ### Automations, Scripts, and Scenes
 
-- `automations.yaml`: User automations (e.g., PagerDuty high-urgency Echo alerts, `ring_snapshot_archive_*` Ring motion/ding clip archiving, low-battery notifications, weekly backup + pruning, disk space alert).
+- `automations.yaml`: User automations (e.g., PagerDuty high-urgency Echo alerts, `ring_snapshot_archive_*` Ring motion/ding clip archiving, `ring_live_stream_failsafe`, low-battery notifications, weekly backup + pruning + `stale_backup_alert`, disk space alert).
 - `scripts.yaml`: Lighting/media presets and HA actions (e.g., `all_lights_off`, `goodnight`, `movie_mode`).
 - `scenes.yaml`: Lighting presets (e.g., `movie_mode`, `focus_mode`, `relax_mode`).
 
@@ -90,10 +89,10 @@ The intended reader of this file is an AI coding agent that has no prior context
 ## Dashboards
 
 - **`www/ai-dashboard/`**: Custom retro-terminal wall dashboard served at `/ai-dashboard/` — the primary wall-tablet UI. **See `www/ai-dashboard/AGENTS.md` for architecture, the Settings editor, layout model, proxy endpoints, and its dev workflow.**
-- **`ipad-wall-panel.yaml`**: YAML-managed Lovelace dashboard for the wall-mounted iPad in the Living Room. Registered in `configuration.yaml` under `lovelace.dashboards.ipad-wall-panel`.
 - **Original UI dashboard**: Backed up as `dashboard-backup-*.json` from `.storage/lovelace.dashboard_dashboard`.
+- **Retired**: the YAML-managed `ipad-wall-panel.yaml` Lovelace dashboard was removed in favor of the AI dashboard (recoverable from git history if ever needed).
 
-### Lovelace Conventions (for `ipad-wall-panel.yaml` and any Lovelace work)
+### Lovelace Conventions (for any Lovelace work)
 
 - **Layout mode**: `type: sections` with `max_columns: 3`; large touch targets for wall-mounted iPad use.
 - **Theme**: `Google Dark Theme` on all views.
@@ -130,7 +129,7 @@ Common device families in this instance (entity IDs follow these prefixes):
 - **People / presence**: `person.woteg` (Travis), `person.bobbie` (Bobbie). The iPhone device tracker is the same user as Travis and is not displayed separately in the AI dashboard.
 - **Weather**: `weather.forecast_home`
 - **Network**: `sensor.exos_router_*`, `binary_sensor.exos_router_wan_status`
-- **Host / add-on diagnostics**: `sensor.home_assistant_core_*`, `sensor.home_assistant_host_*`, `sensor.home_assistant_supervisor_*`, `sensor.*_cpu_percent`, `sensor.*_memory_percent`, `sensor.ha_disk_usage`
+- **Host / add-on diagnostics**: `sensor.home_assistant_core_*`, `sensor.home_assistant_host_*`, `sensor.home_assistant_supervisor_*`, `sensor.*_cpu_percent`, `sensor.*_memory_percent`, `sensor.ha_disk_usage`, `sensor.ha_last_backup_age`
 
 For the full current entity list, parse `.storage/core.entity_registry`.
 
@@ -212,7 +211,7 @@ There is no top-level test harness. Only the `bambu_lab` integration contains te
 GitHub Actions validation runs on every push/PR via `.github/workflows/validate.yml`:
 
 - **YAML lint** — `yamllint -c .yamllint.yaml .` (GitHub workflow files only; HA custom tags break standard parsers).
-- **HA YAML syntax** — `python scripts/validate_ha_yaml.py` registers `!include`, `!secret`, etc. as no-ops and parses `configuration.yaml`, `automations.yaml`, `scripts.yaml`, `scenes.yaml`, and `ipad-wall-panel.yaml`.
+- **HA YAML syntax** — `python scripts/validate_ha_yaml.py` registers `!include`, `!secret`, etc. as no-ops and parses `configuration.yaml`, `automations.yaml`, `scripts.yaml`, and `scenes.yaml`.
 - **JSON** — `python -m json.tool www/ai-dashboard/config.json`.
 - **HTML** — Python `html.parser` sanity check on `www/ai-dashboard/index.html`.
 - **Python** — `flake8 custom_components/ai_dashboard_proxy` and `python -m compileall custom_components/ai_dashboard_proxy`.
@@ -238,5 +237,5 @@ There is no automated deployment to the live Home Assistant instance; deploy man
 - Always prefer minimal, targeted edits.
 - Verify YAML changes with Home Assistant's configuration validation before restarting. Use the local Node.js in `.tools/node/` or the Python fallback for syntax checks.
 - If you add a new custom integration, include a valid `manifest.json` and follow the Home Assistant integration platform pattern used by the existing components.
-- Dashboards can be UI-managed (stored in `.storage/lovelace.*`) or YAML-managed (registered in `configuration.yaml`). The Lovelace wall panel is YAML-managed; the AI dashboard is file-based under `www/ai-dashboard/`.
+- Dashboards can be UI-managed (stored in `.storage/lovelace.*`) or YAML-managed (registered in `configuration.yaml`). No YAML-managed Lovelace dashboards are currently registered; the AI dashboard is file-based under `www/ai-dashboard/`.
 - For new features or significant changes, use the Superpowers skill workflow: brainstorm → design spec → implementation plan → subagent-driven execution. Keep specs in `docs/superpowers/specs/` and plans in `docs/superpowers/plans/`.

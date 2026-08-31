@@ -24,7 +24,6 @@ YAML_FILES = [
     "automations.yaml",
     "scripts.yaml",
     "scenes.yaml",
-    "ipad-wall-panel.yaml",
 ]
 
 errors = []
