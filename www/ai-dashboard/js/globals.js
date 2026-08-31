@@ -3,11 +3,11 @@
 // When a function is later extracted to its own module, update its import below.
 import {
   showScreen,
-  streamFeedFallback,
   openSettings, closeSettings, saveSettings, exportConfig, importConfig, logout,
   switchSettingsTab, setEditorScreen,
   addLabelOverride, removeLabelOverride, setLabelOverride, removeMissingEntity,
 } from './main.js';
+import { streamFeedFallback } from './cameras.js';
 import { toggleEntity, mediaCmd, setBrightness, setColorTemp } from './api.js';
 import {
   openLightModal, closeLightModal, lightPressStart, lightPressMove, lightPressEnd, lightPressCancel, lightWheelPick,
