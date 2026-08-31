@@ -1,9 +1,8 @@
 // HA REST helpers (via the dashboard proxy or a user token) and the WS
-// service-call actions used by inline handlers. sendWs stays in main.js until
-// the connection module is extracted; imported here as a runtime-only
-// circular function reference.
+// service-call actions used by inline handlers. sendWs comes from
+// connection.js; imported here as a runtime-only circular function reference.
 import { state } from './state.js';
-import { sendWs } from './main.js';
+import { sendWs } from './connection.js';
 
 export async function apiFetch(path) {
   const headers = state.token ? { "Authorization": `Bearer ${state.token}` } : {};
