@@ -51,7 +51,7 @@
   },
   "entities": {
     "weather": "weather.forecast_home",
-    "mediaPlayer": "media_player.living_room_fire_tv_living_room"
+    "mediaPlayer": "media_player.everywhere"
   },
   "sections": {
     "home": {
@@ -95,13 +95,11 @@
       ]
     },
     "quickControls": {
-      "title": "Quick Controls",
+      "title": "LIGHTS",
       "icon": "🎛️",
       "entities": [
         "light.ceiling_fan",
-        "light.living_room_ceiling_fan",
-        "light.travis_office_p1s_uno_chamber_light",
-        "light.p1s_01p00a412300832_chamber_light"
+        "light.living_room_ceiling_fan"
       ]
     },
     "cameras": {
