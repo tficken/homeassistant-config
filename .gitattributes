@@ -1,0 +1,17 @@
+# Normalize line endings: LF in the repo, platform-native in the working tree.
+* text=auto
+
+# Never treat these as text.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.mp3 binary
+*.mp4 binary
+*.gz binary
+*.db binary
+*.db-shm binary
+*.db-wal binary
+*.pyc binary
+*.woff2 binary
