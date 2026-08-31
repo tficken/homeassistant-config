@@ -4,7 +4,7 @@
 
 The two halves of the system:
 
-- **Frontend**: `index.html` (markup + all JS/CSS inline), `config.json` (persisted user config), `vendor/leaflet/` (vendored radar map library — no CDN dependency; Google Fonts still loads from CDN), `snapshots/` (camera event archive, git-ignored).
+- **Frontend**: `index.html` (markup + all JS inline; CSS extracted to `css/` — `tokens.css`, `base.css`, `components.css`, `screens.css`, `editor.css`, linked in that order), `config.json` (persisted user config), `vendor/leaflet/` (vendored radar map library — no CDN dependency; Google Fonts still loads from CDN), `snapshots/` (camera event archive, git-ignored).
 - **Backend**: `custom_components/ai_dashboard_proxy/` (self-written, not HACS-managed). **Any change to its Python requires a Home Assistant restart** — a browser refresh is not enough.
 
 ---

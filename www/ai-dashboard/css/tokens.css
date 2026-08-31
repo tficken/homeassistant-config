@@ -1,0 +1,15 @@
+:root {
+  color-scheme: dark;
+  --bg: #030503;
+  --bg-glow: #0a140a;
+  --green: #14fe17;
+  --green-dim: #1a4a1a;
+  --green-hover: #2d7a2d;
+  --text: #e8ffe8;
+  --text-muted: #5a7a5a;
+  --amber: #ffae00;
+  --danger: #ff3333;
+  --font-mono: 'Share Tech Mono', monospace;
+  --panel-bg: rgba(8, 18, 8, 0.92);
+  --border: rgba(20, 254, 23, 0.45);
+}

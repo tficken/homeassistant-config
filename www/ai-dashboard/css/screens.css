@@ -1,0 +1,49 @@
+input, select {
+  background: rgba(255,255,255,0.07); border: 1px solid var(--border); border-radius: 4px;
+  padding: 8px 10px; color: var(--text); font-size: 0.9rem;
+}
+select, select option { background: #0d140d; color: var(--text); }
+input[type="range"] { accent-color: var(--green); }
+.leaflet-container { background: #000; }
+.radar-basemap { filter: brightness(0.45) contrast(1.15); }
+/* Recolor the Esri reference tiles: hue-rotate shifts the orange roads to
+   shades of green (shields/casing are near-white and keep their value),
+   and the label layer is brightened to pure-white city names. */
+.radar-roads { filter: hue-rotate(100deg) saturate(1.3); }
+.radar-labels { filter: brightness(1.5) contrast(1.2); }
+#radar-map { width: 100%; height: 100%; position: relative; }
+@keyframes clockPulse {
+  0%, 100% { text-shadow: 0 0 24px rgba(20,254,23,0.45); opacity: 1; }
+  50% { text-shadow: 0 0 48px rgba(20,254,23,0.85); opacity: 0.82; }
+}
+#clock { animation: clockPulse 2.2s infinite ease-in-out; }
+#clock .colon { animation: colonPulse 1.2s infinite ease-in-out; }
+@keyframes colonPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.offline-badge {
+  display: inline-block;
+  background: rgba(255, 51, 51, 0.18);
+  border: 1px solid var(--danger);
+  color: var(--danger);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+.radar-timestamp {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 500;
+  background: rgba(0,0,0,0.6);
+  color: var(--green);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  pointer-events: none;
+}
