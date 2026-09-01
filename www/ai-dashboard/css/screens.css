@@ -41,7 +41,7 @@ input[type="range"] { accent-color: var(--green); }
   background: rgba(0,0,0,0.6);
   color: var(--green);
   font-family: var(--font-mono);
-  font-size: var(--text-sm);
+  font-size: 0.75rem;
   padding: 3px var(--space-2);
   border: 1px solid var(--border);
   border-radius: 4px;
