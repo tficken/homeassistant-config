@@ -62,25 +62,25 @@ export function renderSnapshotHistory() {
   const mediaUrl = file ? `/ai-dashboard/snapshots/${encodeURIComponent(snapshotHistory.key)}/${encodeURIComponent(file)}` : "";
   // mp4 = 10s clip from the ring-mqtt RTSP feed; jpg = legacy event still
   const media = file && file.endsWith(".mp4")
-    ? `<video src="${mediaUrl}" style="max-width:88vw;max-height:70vh;display:block;border:1px solid var(--green);" controls autoplay muted loop playsinline></video>`
-    : `<img src="${mediaUrl}" style="max-width:88vw;max-height:70vh;object-fit:contain;display:block;border:1px solid var(--green);" alt="">`;
+    ? `<video src="${mediaUrl}" class="snapshot-modal-media" controls autoplay muted loop playsinline></video>`
+    : `<img src="${mediaUrl}" class="snapshot-modal-media snapshot-modal-still" alt="">`;
   const body = snapshotHistory.loading
-    ? `<div style="color:var(--text-muted);font-family:var(--font-mono);padding:60px 0;">LOADING…</div>`
+    ? `<div class="snapshot-modal-empty">LOADING…</div>`
     : !n
-      ? `<div style="color:var(--text-muted);font-family:var(--font-mono);padding:60px 0;">NO CLIPS YET — saved on the next motion/ding event</div>`
+      ? `<div class="snapshot-modal-empty">NO CLIPS YET — saved on the next motion/ding event</div>`
       : `${media}
-         <div style="font-family:var(--font-mono);color:var(--green);margin-top:8px;font-size:0.9rem;">${escapeHtml(snapshotTsLabel(file))} <span style="color:var(--text-muted);">· ${snapshotHistory.idx + 1} / ${n}</span></div>`;
+         <div class="snapshot-modal-ts">${escapeHtml(snapshotTsLabel(file))} <span class="snapshot-modal-count">· ${snapshotHistory.idx + 1} / ${n}</span></div>`;
   const nav = n > 1
-    ? `<div style="display:flex;gap:12px;margin-top:10px;font-family:var(--font-mono);">
-         <button class="bottom-btn" style="padding:8px 18px;cursor:pointer;" onclick="stepSnapshotHistory(-1)">◀ OLDER</button>
-         <button class="bottom-btn" style="padding:8px 18px;cursor:pointer;" onclick="stepSnapshotHistory(1)">NEWER ▶</button>
+    ? `<div class="snapshot-modal-nav">
+         <button class="bottom-btn" onclick="stepSnapshotHistory(-1)">◀ OLDER</button>
+         <button class="bottom-btn" onclick="stepSnapshotHistory(1)">NEWER ▶</button>
        </div>`
     : "";
-  const html = `<div style="position:fixed;inset:0;background:rgba(0,0,0,0.88);z-index:1200;display:flex;align-items:center;justify-content:center;" onclick="closeSnapshotHistory()">
-    <div style="display:flex;flex-direction:column;align-items:center;max-width:92vw;" onclick="event.stopPropagation()">
-      <div style="font-family:var(--font-mono);color:var(--green);letter-spacing:0.1em;margin-bottom:8px;align-self:stretch;display:flex;justify-content:space-between;">
+  const html = `<div class="modal-backdrop snapshot-modal-backdrop" onclick="closeSnapshotHistory()">
+    <div class="snapshot-modal-panel" onclick="event.stopPropagation()">
+      <div class="snapshot-modal-header">
         <span>⌂ ${escapeHtml(name)} — EVENT HISTORY</span>
-        <span style="cursor:pointer;color:var(--text-muted);" onclick="closeSnapshotHistory()">[ CLOSE ✕ ]</span>
+        <span class="modal-close" onclick="closeSnapshotHistory()">[ CLOSE ✕ ]</span>
       </div>
       ${body}
       ${nav}

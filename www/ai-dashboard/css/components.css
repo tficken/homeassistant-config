@@ -118,3 +118,133 @@
 }
 .btn:hover { background: rgba(255,255,255,0.14); }
 .btn-primary { background: rgba(20, 254, 23, 0.14); border-color: rgba(20, 254, 23, 0.45); color: var(--green); }
+
+/* ---- Modals: shared chrome + per-modal layout (extracted from inline styles) ---- */
+@keyframes modalPop {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.modal-backdrop {
+  position: fixed; inset: 0; z-index: 1100;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex; align-items: center; justify-content: center;
+}
+.modal-panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 2px;
+  box-shadow: 0 0 24px rgba(20, 254, 23, 0.18);
+  animation: modalPop var(--transition-fast);
+  max-width: 90vw; max-height: 85vh;
+  display: flex; flex-direction: column;
+}
+.modal-header {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  text-transform: uppercase; letter-spacing: 0.12em;
+  color: var(--green);
+  text-shadow: 0 0 8px rgba(20, 254, 23, var(--glow-strength));
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.modal-body { padding: var(--space-3); overflow-y: auto; }
+.modal-actions { padding: var(--space-2) var(--space-3); display: flex; gap: var(--space-2); justify-content: flex-end; }
+/* text-shadow:none: the header's glow inherits, but the close glyph must stay dim */
+.modal-close { cursor: pointer; color: var(--text-muted); text-shadow: none; }
+.modal-close:hover { color: var(--green); }
+
+/* Light modal */
+.light-modal-backdrop { background: rgba(0, 0, 0, 0.8); backdrop-filter: blur(3px); }
+.light-modal-panel { width: min(560px, 92vw); }
+.light-modal-body { display: flex; flex-direction: column; gap: 18px; padding: 16px 18px 20px; }
+.light-modal-status-row { display: flex; align-items: center; justify-content: space-between; }
+.light-modal-status { font-family: var(--font-mono); letter-spacing: 0.1em; color: var(--text-muted); }
+.light-modal-status.active { color: var(--green); text-shadow: 0 0 8px rgba(20, 254, 23, 0.5); }
+.light-modal-power {
+  width: 56px; height: 56px; border-radius: 50%;
+  border: 1px solid var(--border); background: transparent; color: var(--text-muted);
+  cursor: pointer; display: inline-flex; align-items: center; justify-content: center;
+  transition: box-shadow .15s, color .15s;
+}
+.light-modal-power.active {
+  border-color: var(--green); background: rgba(20, 254, 23, 0.08); color: var(--green);
+  box-shadow: 0 0 16px rgba(20, 254, 23, 0.35);
+}
+.light-modal-label { font-size: 0.72rem; color: var(--text-muted); letter-spacing: 0.12em; margin-bottom: 6px; }
+.light-modal-wheel-label { font-size: 0.72rem; color: var(--text-muted); letter-spacing: 0.12em; margin-bottom: 8px; text-align: center; }
+.light-modal-temp-row { display: flex; align-items: center; gap: 10px; }
+.light-modal-temp-icon { font-size: 1.1rem; }
+.light-modal-temp-icon.warm { color: var(--amber); }
+.light-modal-temp-icon.cool { color: #7ab8ff; }
+.light-modal-temp-slider { flex: 1; min-height: 36px; accent-color: var(--amber); }
+.light-modal-brightness { width: 100%; min-height: 44px; accent-color: var(--green); }
+.light-modal-wheel {
+  position: relative; width: 192px; height: 192px; margin: 0 auto;
+  border-radius: 50%; cursor: crosshair; border: 1px solid var(--border);
+  box-shadow: 0 0 24px rgba(255, 255, 255, 0.07), inset 0 0 12px rgba(0, 0, 0, 0.4);
+  background: radial-gradient(circle, #fff 0%, rgba(255, 255, 255, 0) 62%),
+    conic-gradient(#f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00);
+}
+.light-modal-marker {
+  position: absolute; width: 16px; height: 16px; margin: -8px 0 0 -8px;
+  border-radius: 50%; border: 2px solid #fff;
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.8); pointer-events: none;
+}
+
+/* Printer modal */
+.printer-modal-backdrop { background: rgba(0, 0, 0, 0.85); backdrop-filter: blur(3px); }
+.printer-modal-panel { width: min(720px, 94vw); max-height: 92vh; }
+.printer-modal-body { display: grid; grid-template-columns: 1fr; gap: 18px; }
+.printer-modal-body.with-cam { grid-template-columns: 1.1fr 1fr; }
+.printer-modal-cam { width: 100%; border: 1px solid var(--border); display: block; background: #000; }
+.printer-modal-side { display: flex; flex-direction: column; gap: 14px; }
+.printer-modal-status { font-family: var(--font-mono); color: var(--text-muted); letter-spacing: 0.08em; }
+.printer-modal-status.active { color: var(--green); }
+.printer-modal-stat {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-family: var(--font-mono); padding: 5px 0; border-bottom: 1px solid var(--border);
+}
+.printer-modal-stat-label { color: var(--text-muted); font-size: 0.78rem; letter-spacing: 0.08em; }
+.printer-modal-stat-value { color: var(--green); }
+.printer-modal-unit { color: var(--text-muted); font-size: 0.75rem; }
+.printer-modal-label { font-size: 0.72rem; color: var(--text-muted); letter-spacing: 0.12em; margin-bottom: 8px; }
+.printer-modal-trays { display: flex; gap: 10px; flex-wrap: wrap; }
+.printer-modal-tray { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.printer-modal-tray-dot { width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--border); }
+.printer-modal-tray-label {
+  font-size: 0.65rem; color: var(--text-muted); font-family: var(--font-mono);
+  max-width: 64px; text-align: center; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap;
+}
+.printer-modal-controls { display: flex; gap: 10px; flex-wrap: wrap; }
+.printer-modal-controls .scene-btn { cursor: pointer; }
+.printer-modal-progress-head {
+  display: flex; justify-content: space-between; font-family: var(--font-mono);
+  font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px;
+}
+.printer-modal-progress-label { letter-spacing: 0.08em; }
+.printer-modal-progress-value { color: var(--green); }
+.printer-modal-progress-track { width: 100%; height: 10px; background: var(--green-dim); border-radius: 5px; }
+.printer-modal-progress-bar {
+  height: 100%; background: var(--green); border-radius: 5px;
+  box-shadow: 0 0 10px rgba(20, 254, 23, 0.4); transition: width .3s;
+}
+
+/* Snapshot history modal (no box chrome — floating media viewer) */
+.snapshot-modal-backdrop { background: rgba(0, 0, 0, 0.88); }
+.snapshot-modal-panel {
+  display: flex; flex-direction: column; align-items: center; max-width: 92vw;
+  animation: modalPop var(--transition-fast);
+}
+.snapshot-modal-header {
+  font-family: var(--font-mono); color: var(--green); letter-spacing: 0.1em;
+  margin-bottom: 8px; align-self: stretch; display: flex; justify-content: space-between;
+}
+.snapshot-modal-media { max-width: 88vw; max-height: 70vh; display: block; border: 1px solid var(--green); }
+.snapshot-modal-still { object-fit: contain; }
+.snapshot-modal-empty { color: var(--text-muted); font-family: var(--font-mono); padding: 60px 0; }
+.snapshot-modal-ts { font-family: var(--font-mono); color: var(--green); margin-top: 8px; font-size: 0.9rem; }
+.snapshot-modal-count { color: var(--text-muted); }
+.snapshot-modal-nav { display: flex; gap: 12px; margin-top: 10px; font-family: var(--font-mono); }
+.snapshot-modal-nav .bottom-btn { padding: 8px 18px; cursor: pointer; }
