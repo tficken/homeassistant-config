@@ -47,3 +47,11 @@ input[type="range"] { accent-color: var(--green); }
   border-radius: 4px;
   pointer-events: none;
 }
+
+/* Camera feeds fade in on first frame. .camera-feed is the <img> itself
+   (renderCameraFeed in js/cameras.js), not a wrapper; the JS adds
+   .feed-loaded on first load (or a 1500ms fallback for MJPEG streams).
+   Snapshot refreshes swap src on an already-loaded img, so they don't
+   re-trigger the fade. */
+img.camera-feed { opacity: 0; transition: opacity 400ms ease-in; }
+img.camera-feed.feed-loaded { opacity: 1; }

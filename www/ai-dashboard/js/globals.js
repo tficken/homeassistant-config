@@ -8,7 +8,7 @@ import {
 import { addLabelOverride, removeLabelOverride, setLabelOverride } from './settings/labels.js';
 import { removeMissingEntity } from './settings/layout.js';
 import { showScreen } from './screens/index.js';
-import { streamFeedFallback } from './cameras.js';
+import { streamFeedFallback, cameraFeedLoaded } from './cameras.js';
 import { toggleEntity, mediaCmd, setBrightness, setColorTemp } from './api.js';
 import {
   openLightModal, closeLightModal, lightPressStart, lightPressMove, lightPressEnd, lightPressCancel, lightWheelPick,
@@ -22,7 +22,7 @@ Object.assign(window, {
   openLightModal, closeLightModal, lightPressStart, lightPressMove, lightPressEnd, lightPressCancel, lightWheelPick,
   openPrinterModal, closePrinterModal, pressPrinterButton,
   openSnapshotHistory, closeSnapshotHistory, stepSnapshotHistory,
-  streamFeedFallback,
+  streamFeedFallback, cameraFeedLoaded,
   openSettings, closeSettings, saveSettings, exportConfig, importConfig, logout,
   switchSettingsTab, setEditorScreen,
   addLabelOverride, removeLabelOverride, setLabelOverride, removeMissingEntity,

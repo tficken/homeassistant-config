@@ -105,7 +105,11 @@
   box-shadow: inset 0 0 10px rgba(20, 254, 23, 0.25);
 }
 .screen { display: none; flex-direction: column; gap: 14px; flex: 1; min-height: 0; }
-.screen.active { display: flex; }
+.screen.active { display: flex; animation: screenIn var(--transition-screen); }
+@keyframes screenIn {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
 .settings-close {
   background: rgba(255,255,255,0.08); border: 1px solid var(--border);
   color: var(--text); border-radius: 4px; padding: 6px var(--space-3); cursor: pointer;
@@ -118,6 +122,34 @@
 }
 .btn:hover { background: rgba(255,255,255,0.14); }
 .btn-primary { background: rgba(20, 254, 23, 0.14); border-color: rgba(20, 254, 23, 0.45); color: var(--green); }
+
+/* Press feedback: tactile scale + glow on tap. Light/switch cards have no
+   dedicated class (js/components/cards.js renders .terminal-panel roots with
+   the handlers on the inner .panel-body), so the card selectors match those
+   handler attributes. The transition lines EXTEND each element's existing
+   transition — a later rule replaces it wholesale, so background/color are
+   repeated here to keep the hover transitions smooth. */
+.bottom-btn, .scene-btn {
+  transition: background var(--transition-fast), border-color var(--transition-fast), box-shadow var(--transition-fast), color var(--transition-fast), transform var(--transition-fast);
+}
+.btn, .entity-chip,
+.terminal-panel[data-entity-id] > .panel-body[onclick],
+.terminal-panel[data-entity-id] > .panel-body[onpointerdown] {
+  transition: transform var(--transition-fast), box-shadow var(--transition-fast), border-color var(--transition-fast);
+}
+.bottom-btn:active, .scene-btn:active, .btn:active,
+.terminal-panel[data-entity-id] > .panel-body[onclick]:active,
+.terminal-panel[data-entity-id] > .panel-body[onpointerdown]:active {
+  transform: scale(0.97);
+  box-shadow: 0 0 20px rgba(20, 254, 23, 0.28);
+}
+
+/* Value-change flash: updateEntityCardInPlace (js/screens/index.js) adds
+   .value-flash to the value element after re-rendering a card. */
+@keyframes valueFlash {
+  0% { color: #ffffff; text-shadow: 0 0 12px var(--green); }
+}
+.value-flash { animation: valueFlash 600ms ease-out; }
 
 /* ---- Modals: shared chrome + per-modal layout (extracted from inline styles) ---- */
 @keyframes modalPop {
@@ -254,12 +286,16 @@
 .entity-unavailable { opacity: 0.45; filter: saturate(0.3); }
 .entity-unavailable .metric-value, .entity-unavailable .card-state { text-decoration: line-through; }
 
-/* Honor prefers-reduced-motion: stop the CRT flicker, LED pulse, and modal pop,
-   and collapse transitions. Lives here (after components.css rules) so these
-   overrides win over the animation declarations above at equal specificity. */
+/* Honor prefers-reduced-motion: stop the CRT flicker, LED pulse, modal pop,
+   screen crossfade, and value flash, and collapse transitions (which also
+   neutralizes the camera-feed fade-in). Lives here (after components.css
+   rules) so these overrides win over the animation declarations above at
+   equal specificity. */
 @media (prefers-reduced-motion: reduce) {
   #app { animation: none; }
   .status-led.on { animation: none; }
   .modal-panel { animation: none; }
+  .screen.active { animation: none; }
+  .value-flash { animation: none; }
   *, *::before, *::after { transition-duration: 0.01ms !important; }
 }

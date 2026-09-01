@@ -122,6 +122,7 @@ export function updateEntityCardInPlace(entityId) {
     const homeLights = (state.config.sections.lights && state.config.sections.lights.entities) || [];
     if (homeLights.includes(entityId) && el) {
       el.outerHTML = renderLightCard(entityId);
+      flashCardValue(screenEl, entityId, domain);
       return true;
     }
     // Weather panel, presence cards (battery reads sibling sensors), and room
@@ -149,9 +150,39 @@ export function updateEntityCardInPlace(entityId) {
   }
   if (html) {
     el.outerHTML = html;
+    flashCardValue(screenEl, entityId, domain);
     return true;
   }
   return false;
+}
+
+// Flash the just-changed value text after a card (re)render so state changes
+// read at a glance on a wall tablet. Cards have no shared value class, so the
+// target is structural: metric/env cards put the value in the root's first
+// child div; light/switch cards put the ON/OFF state in the panel-body's last
+// div; the media card's changing text is its title (panel-body's first div).
+// This never touches the card root, so Task 13's .entity-unavailable dimming
+// is unaffected. No-op when the entity has no card on the screen (structural
+// fallbacks like security scene-btns).
+export function flashCardValue(screenEl, entityId, domain) {
+  if (!screenEl) return;
+  const card = screenEl.querySelector(`[data-entity-id="${CSS.escape(entityId)}"]`);
+  if (!card) return;
+  const body = card.querySelector(":scope > .panel-body");
+  let target;
+  if (["sensor", "binary_sensor"].includes(domain)) {
+    target = card.firstElementChild;
+    // Status-screen printer/vacuum cards wrap content in .panel-body; the
+    // value is its first child (metric/env cards have no wrapper).
+    if (target && target.classList.contains("panel-body")) target = target.firstElementChild;
+  }
+  else if (body && domain === "media_player") target = body.firstElementChild;
+  else if (body) target = body.lastElementChild;
+  if (!target) return;
+  // Reflow read restarts the animation when updates land faster than 600ms.
+  target.classList.remove("value-flash");
+  void target.offsetWidth;
+  target.classList.add("value-flash");
 }
 
 export async function updateCard(st) {
@@ -166,6 +197,13 @@ export async function updateCard(st) {
   else if (state.currentScreen === "control") renderControlScreen();
   else if (state.currentScreen === "security") renderSecurityScreen();
   else if (state.currentScreen === "status") await renderStatusScreen();
+  // Full re-render fallback (incl. every STATUS MONITOR sensor update): flash
+  // the entity's new value so the change is visible from across the room.
+  flashCardValue(
+    document.getElementById(state.currentScreen + "-screen"),
+    st.entity_id,
+    st.entity_id.split(".")[0]
+  );
 }
 
 export async function renderAll() {

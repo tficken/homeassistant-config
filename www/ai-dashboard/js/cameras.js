@@ -130,6 +130,7 @@ export function renderCameraFeed(entityId) {
   const pendingOverlay = liveSwitch && !src
     ? `<div class="livestream-pending" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#000;color:var(--text-muted);font-family:var(--font-mono);font-size:0.85rem;letter-spacing:0.1em;">STARTING LIVE STREAM…</div>`
     : "";
+  if (src) armFeedFallbackSoon(entityId);
   const historyKey = cameraHistoryKey(entityId);
   const historyChip = historyKey
     ? ` <span class="history-chip" style="cursor:pointer;color:var(--accent,#2dd4bf);font-size:0.7rem;border:1px solid currentColor;padding:1px 6px;margin-left:6px;" onclick="event.stopPropagation();openSnapshotHistory('${historyKey}','${entityId}')">HISTORY</span>`
@@ -137,10 +138,37 @@ export function renderCameraFeed(entityId) {
   return `<div class="terminal-panel" style="margin-bottom:10px;" data-entity-id="${entityId}">
     <div class="panel-title">${escapeHtml(name)}${titleSuffix}${historyChip}</div>
     <div class="panel-body" style="padding:0;${liveSwitch ? "position:relative;" : ""}">
-      <img class="camera-feed" ${snap ? `data-snapshot-camera="${entityId}"` : ""}${liveAttrs}${src ? ` src="${src}"` : ""}${onerr} style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
+      <img class="camera-feed" ${snap ? `data-snapshot-camera="${entityId}"` : ""}${liveAttrs}${src ? ` src="${src}"` : ""} onload="cameraFeedLoaded(this)"${onerr} style="width:100%;aspect-ratio:16/9;object-fit:cover;display:block;background:#000;" alt="${escapeHtml(name)}">
       ${pendingOverlay}
     </div>
   </div>`;
+}
+
+// Feed fade-in (css/screens.css keeps img.camera-feed transparent until
+// .feed-loaded lands). Stills fire load once; MJPEG streams can fire load per
+// frame or never fire a single clean one, so the first load wins and a 1500ms
+// fallback timer — armed when the stream src is attached — guarantees the
+// fade. Idempotent: repeated MJPEG load events just re-add the class.
+export function cameraFeedLoaded(img) {
+  if (img._feedFallbackTimer) {
+    clearTimeout(img._feedFallbackTimer);
+    img._feedFallbackTimer = null;
+  }
+  img.classList.add("feed-loaded");
+}
+
+function armFeedFallback(img) {
+  if (img._feedFallbackTimer) clearTimeout(img._feedFallbackTimer);
+  img._feedFallbackTimer = setTimeout(() => cameraFeedLoaded(img), 1500);
+}
+
+// renderCameraFeed returns HTML for an innerHTML swap, so the img isn't in the
+// DOM yet — defer past the insertion, then arm the fallback on the live node.
+function armFeedFallbackSoon(entityId) {
+  setTimeout(() => {
+    const img = document.querySelector(`[data-entity-id="${CSS.escape(entityId)}"] img.camera-feed`);
+    if (img && img.src) armFeedFallback(img);
+  }, 0);
 }
 
 // On-demand Ring live streams (ring-mqtt): the RTSP feed only exists while the
@@ -159,6 +187,7 @@ export function startLivestreamCameras() {
       const img = document.querySelector(`img.camera-feed[data-livestream-camera="${cameraId}"]`);
       if (!img) return;
       img.src = `/ai-dashboard/cam_stream/${cameraId}?ts=${Date.now()}`;
+      armFeedFallback(img); // MJPEG may never fire a clean load; guarantee the fade-in
       const overlay = img.parentElement && img.parentElement.querySelector(".livestream-pending");
       if (overlay) overlay.remove();
     }, LIVESTREAM_STARTUP_DELAY_MS);
