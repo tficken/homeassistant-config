@@ -20,7 +20,7 @@ body { position: relative; font-family: Inter, -apple-system, BlinkMacSystemFont
   display: flex; flex-direction: column;
   padding: var(--space-4);
   gap: var(--space-4);
-  animation: crtFlicker 0.12s infinite;
+  animation: crtFlicker 0.4s infinite;
 }
 .scanlines {
   position: fixed;

@@ -16,7 +16,7 @@ export function renderLightCard(entityId) {
   // the controls modal (see lightPress*).
   const lit = active && !offline;
   const bulb = `<svg viewBox="0 0 24 24" width="36" height="36" fill="${lit ? "currentColor" : "none"}" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" style="color:${lit ? "var(--green)" : "var(--text-muted)"};${lit ? "filter:drop-shadow(0 0 10px rgba(20,254,23,0.55));" : ""}"><path d="M9 18h6"/><path d="M10 21h4"/><path d="M12 3a6 6 0 0 0-3.6 10.8c.9.7 1.6 1.6 1.6 2.7h4c0-1.1.7-2 1.6-2.7A6 6 0 0 0 12 3z"/></svg>`;
-  return `<div class="terminal-panel" data-entity-id="${entityId}" style="${lit ? "border-color:rgba(20,254,23,0.45);background:linear-gradient(180deg,rgba(20,254,23,0.07),rgba(20,254,23,0.02));box-shadow:0 0 16px rgba(20,254,23,0.15), inset 0 0 24px rgba(20,254,23,0.04);" : ""}">
+  return `<div class="terminal-panel${offline ? " entity-unavailable" : ""}" data-entity-id="${entityId}" style="${lit ? "border-color:rgba(20,254,23,0.45);background:linear-gradient(180deg,rgba(20,254,23,0.07),rgba(20,254,23,0.02));box-shadow:0 0 16px rgba(20,254,23,0.15), inset 0 0 24px rgba(20,254,23,0.04);" : ""}">
     <div class="panel-body" style="display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;cursor:pointer;user-select:none;-webkit-user-select:none;touch-action:manipulation;padding:14px 10px;"
       onpointerdown="lightPressStart(event,'${entityId}')" onpointermove="lightPressMove(event)" onpointerup="lightPressEnd(event,'${entityId}')" onpointercancel="lightPressCancel()" oncontextmenu="event.preventDefault()">
       ${bulb}
@@ -30,7 +30,7 @@ export function renderSwitchCard(entityId) {
   const st = state.states[entityId];
   const offline = isUnavailable(st);
   const active = st ? isActive(st.state) : false;
-  return `<div class="terminal-panel" data-entity-id="${entityId}">
+  return `<div class="terminal-panel${offline ? " entity-unavailable" : ""}" data-entity-id="${entityId}">
     <div class="panel-body" style="display:flex;align-items:center;justify-content:space-between;gap:12px;cursor:pointer;" onclick="toggleEntity('${entityId}')">
       <div>${renderStatusLed(offline ? "unavailable" : (active ? "on" : "off"))} <span style="font-family:var(--font-mono);">${escapeHtml(friendlyName(entityId))}</span></div>
       <div style="color:var(--text-muted);font-family:var(--font-mono);">${offline ? "OFFLINE" : (active ? "ON" : "OFF")}</div>
@@ -44,9 +44,10 @@ export function renderMetricCard(entityId) {
   const deviceClass = st.attributes && st.attributes.device_class;
   const isTimestamp = deviceClass === "timestamp";
   const unit = st.attributes && st.attributes.unit_of_measurement ? st.attributes.unit_of_measurement : "";
-  const offline = isUnavailable(st) ? renderOfflineBadge() : "";
+  const unavailable = isUnavailable(st);
+  const offline = unavailable ? renderOfflineBadge() : "";
   const value = isTimestamp ? escapeHtml(relativeTime(st.state) || st.state) : escapeHtml(st.state);
-  return `<div class="terminal-panel" style="text-align:center;padding:8px;display:flex;flex-direction:column;justify-content:center;" data-entity-id="${entityId}">
+  return `<div class="terminal-panel${unavailable ? " entity-unavailable" : ""}" style="text-align:center;padding:8px;display:flex;flex-direction:column;justify-content:center;" data-entity-id="${entityId}">
     <div style="font-family:var(--font-mono);font-size:1.4rem;color:var(--green);">${offline || value}<span style="font-size:0.8rem;color:var(--text-muted);">${offline || isTimestamp ? "" : escapeHtml(unit)}</span></div>
     <div style="font-size:0.75rem;color:var(--text-muted);">${escapeHtml(friendlyName(entityId))}</div>
     ${renderSparkline(entityId)}
@@ -76,11 +77,12 @@ export function renderEnvMetric(entityId) {
   const deviceClass = st.attributes && st.attributes.device_class;
   const labelMap = { temperature: "TEMP", humidity: "HUM", illuminance: "LIGHT" };
   const label = labelMap[deviceClass] || (deviceClass ? deviceClass.toUpperCase() : entityId.split("_").pop().toUpperCase());
-  const offline = isUnavailable(st) ? renderOfflineBadge() : "";
+  const unavailable = isUnavailable(st);
+  const offline = unavailable ? renderOfflineBadge() : "";
   const sparkline = (deviceClass === "temperature" || deviceClass === "humidity")
     ? renderSparkline(entityId)
     : "";
-  return `<div class="terminal-panel" style="text-align:center;padding:10px 4px;display:flex;flex-direction:column;justify-content:center;" data-entity-id="${entityId}">
+  return `<div class="terminal-panel${unavailable ? " entity-unavailable" : ""}" style="text-align:center;padding:10px 4px;display:flex;flex-direction:column;justify-content:center;" data-entity-id="${entityId}">
     <div style="font-family:var(--font-mono);font-size:1.5rem;color:var(--green);">${offline || escapeHtml(st.state)}<span style="font-size:0.75rem;color:var(--text-muted);">${offline ? "" : escapeHtml(unit)}</span></div>
     <div class="metric-label" style="font-size:0.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.05em;">${escapeHtml(label)}</div>
     ${sparkline}

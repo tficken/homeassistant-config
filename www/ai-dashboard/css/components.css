@@ -248,3 +248,18 @@
 .snapshot-modal-count { color: var(--text-muted); }
 .snapshot-modal-nav { display: flex; gap: 12px; margin-top: 10px; font-family: var(--font-mono); }
 .snapshot-modal-nav .bottom-btn { padding: 8px 18px; cursor: pointer; }
+
+/* Unavailable entities: one consistent treatment across all card types.
+   Added by card renderers in js/components/cards.js when isUnavailable() is true. */
+.entity-unavailable { opacity: 0.45; filter: saturate(0.3); }
+.entity-unavailable .metric-value, .entity-unavailable .card-state { text-decoration: line-through; }
+
+/* Honor prefers-reduced-motion: stop the CRT flicker, LED pulse, and modal pop,
+   and collapse transitions. Lives here (after components.css rules) so these
+   overrides win over the animation declarations above at equal specificity. */
+@media (prefers-reduced-motion: reduce) {
+  #app { animation: none; }
+  .status-led.on { animation: none; }
+  .modal-panel { animation: none; }
+  *, *::before, *::after { transition-duration: 0.01ms !important; }
+}

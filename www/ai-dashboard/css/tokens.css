@@ -30,8 +30,8 @@
 
   /* CRT parameters (current rendered values become the defaults) */
   --glow-strength: 0.45;        /* panel-title text-shadow alpha */
-  --scanline-opacity: 0.12;     /* current scanline band alpha */
-  --flicker-amount: 0.015;      /* crtFlicker opacity dip: 1 - this */
+  --scanline-opacity: 0.10;     /* scanline band alpha */
+  --flicker-amount: 0.008;      /* crtFlicker opacity dip: 1 - this */
 
   /* motion */
   --transition-fast: 120ms ease-out;
