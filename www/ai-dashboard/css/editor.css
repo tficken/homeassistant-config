@@ -8,6 +8,12 @@
 .drag-handle { cursor: grab; color: var(--text-muted); padding: 0 6px; user-select: none; touch-action: none; font-family: var(--font-mono); }
 .entity-chip.dragging { opacity: 0.4; }
 .entity-chip.drop-before { box-shadow: 0 -2px 0 var(--accent); }
+
+/* The editor-only entity strip is appended as a direct panel-body child, where
+   .terminal-panel.fill > .panel-body > * { flex: 1 } would stretch it to half
+   the panel height — squeezing the content grid until its cells overflow and
+   paint over the chips. Keep it compact; the content keeps the flex space. */
+.terminal-panel.fill > .panel-body > [data-entity-strip] { flex: 0 0 auto; }
 .palette-chip {
   display: flex; align-items: center; gap: var(--space-1);
   background: rgba(255,255,255,0.07); border: 1px solid var(--border);
