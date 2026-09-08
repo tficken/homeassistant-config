@@ -57,6 +57,9 @@ async function init() {
       img.src = `${base}${base.includes("?") ? "&" : "?"}ts=${Date.now()}`;
     });
   }, 10 * 60 * 1000);
+  // Signals the load-error trap in index.html that boot completed — runtime
+  // errors after this point must not be mislabeled as module-load failures.
+  window.__dashBooted = true;
 }
 
 document.addEventListener("DOMContentLoaded", init);

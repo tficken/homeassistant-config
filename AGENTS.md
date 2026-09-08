@@ -212,6 +212,7 @@ GitHub Actions validation runs on every push/PR via `.github/workflows/validate.
 - **YAML lint** — `yamllint -c .yamllint.yaml .` (GitHub workflow files only; HA custom tags break standard parsers).
 - **HA YAML syntax** — `python scripts/validate_ha_yaml.py` registers `!include`, `!secret`, etc. as no-ops and parses `configuration.yaml`, `automations.yaml`, and `scripts.yaml`.
 - **JSON** — `python -m json.tool www/ai-dashboard/config.json`.
+- **Dashboard JS syntax** — `node --input-type=module --check` over every `www/ai-dashboard/js/**/*.js` module.
 - **HTML** — Python `html.parser` sanity check on `www/ai-dashboard/index.html`.
 - **Python** — `flake8 custom_components/ai_dashboard_proxy` and `python -m compileall custom_components/ai_dashboard_proxy`.
 
@@ -221,6 +222,7 @@ pip install yamllint pyyaml flake8
 yamllint -c .yamllint.yaml .
 python scripts/validate_ha_yaml.py
 python -m json.tool www/ai-dashboard/config.json > /dev/null
+for f in $(find www/ai-dashboard/js -name '*.js'); do .tools/node/node.exe --input-type=module --check < "$f" || exit 1; done
 python -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
 flake8 custom_components/ai_dashboard_proxy --max-line-length=120 --extend-ignore=E501,W503
 python -m compileall custom_components/ai_dashboard_proxy -q

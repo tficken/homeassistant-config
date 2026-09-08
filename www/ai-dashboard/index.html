@@ -49,8 +49,12 @@
 </div>
 
 <script>
-  // Surface module-load failures on the wall tablet instead of a black screen.
+  // Surface module-load/boot failures on the wall tablet instead of a black
+  // screen. Once init() completes (window.__dashBooted set by js/main.js),
+  // later runtime errors are ignored here so they don't mislabel the banner
+  // as a load error or fight setStatus()'s management of it.
   window.addEventListener('error', (e) => {
+    if (window.__dashBooted) return;
     const banner = document.getElementById('conn-banner');
     if (banner) {
       banner.textContent = 'DASHBOARD LOAD ERROR: ' + (e.message || 'module failed to load');

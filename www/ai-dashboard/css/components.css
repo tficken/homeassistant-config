@@ -181,7 +181,6 @@
   display: flex; justify-content: space-between; align-items: center;
 }
 .modal-body { padding: var(--space-3); overflow-y: auto; }
-.modal-actions { padding: var(--space-2) var(--space-3); display: flex; gap: var(--space-2); justify-content: flex-end; }
 /* text-shadow:none: the header's glow inherits, but the close glyph must stay dim */
 .modal-close { cursor: pointer; color: var(--text-muted); text-shadow: none; }
 .modal-close:hover { color: var(--green); }
@@ -284,18 +283,18 @@
 /* Unavailable entities: one consistent treatment across all card types.
    Added by card renderers in js/components/cards.js when isUnavailable() is true. */
 .entity-unavailable { opacity: 0.45; filter: saturate(0.3); }
-.entity-unavailable .metric-value, .entity-unavailable .card-state { text-decoration: line-through; }
 
 /* Honor prefers-reduced-motion: stop the CRT flicker, LED pulse, modal pop,
-   screen crossfade, and value flash, and collapse transitions (which also
-   neutralizes the camera-feed fade-in). Lives here (after components.css
-   rules) so these overrides win over the animation declarations above at
-   equal specificity. */
+   screen crossfade, clock/colon pulse, and value flash, and collapse
+   transitions (which also neutralizes the camera-feed fade-in). Lives here
+   (after components.css rules) so these overrides win over the animation
+   declarations above at equal specificity. */
 @media (prefers-reduced-motion: reduce) {
   #app { animation: none; }
   .status-led.on { animation: none; }
   .modal-panel { animation: none; }
   .screen.active { animation: none; }
+  #clock, #clock .colon { animation: none; }
   .value-flash { animation: none; }
   *, *::before, *::after { transition-duration: 0.01ms !important; }
 }

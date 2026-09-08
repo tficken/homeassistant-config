@@ -2,7 +2,6 @@
 // start/stop, feed card rendering, and stream fallback. Timer state lives in
 // state.js (snapshotRefreshTimers, snapshotLastRefresh, livestreamStartTimers).
 import { state } from './state.js';
-import { openSnapshotHistory } from './components/snapshot-viewer.js';
 import { friendlyName, isUnavailable, renderOfflineBadge, escapeHtml, relativeTime } from './utils.js';
 import { sendWs } from './connection.js';
 

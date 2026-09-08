@@ -215,7 +215,6 @@ export function buildHomePanels() {
   const dateStr = now.toLocaleDateString([], { weekday: "long", month: "short", day: "numeric" }).toUpperCase();
 
   const presencePanel = renderTerminalPanel(sectionTitle("presence"), `<div style="display:flex;flex-direction:column;gap:10px;height:100%;justify-content:space-evenly;">${presence}</div>`, "fill");
-  const doorsPanel = `<div id="doors-panel">${renderTerminalPanel(sectionTitle("doors"), renderDoors())}</div>`;
 
   const calStates = Object.keys(state.states).filter(id => id.startsWith("calendar.")).map(id => state.states[id]).filter(Boolean);
   const cal = calStates.find(s => s.state === "on") || calStates.find(s => s.attributes && s.attributes.message);

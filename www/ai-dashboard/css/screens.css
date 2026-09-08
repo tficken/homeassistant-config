@@ -16,6 +16,8 @@ input[type="range"] { accent-color: var(--green); }
   0%, 100% { text-shadow: 0 0 24px rgba(20,254,23,0.45); opacity: 1; }
   50% { text-shadow: 0 0 48px rgba(20,254,23,0.85); opacity: 0.82; }
 }
+/* rem values assume the default 16px root font-size: 4rem=64px / 6.5rem=104px,
+   matching the JS fallback in measureClock (js/screens/index.js). */
 #clock { font-size: clamp(4rem, 9vw, 6.5rem); line-height: 1; animation: clockPulse 2.2s infinite ease-in-out; }
 #clock .colon { animation: colonPulse 1.2s infinite ease-in-out; }
 @keyframes colonPulse {

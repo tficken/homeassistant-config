@@ -7,14 +7,6 @@ import { state } from './state.js';
 import { getPresenceEntities, renderDoors } from './screens/home.js';
 import { renderTerminalPanel } from './components/panels.js';
 
-const DOMAIN_ICONS = {
-  light: { on: "💡", off: "🌑" }, switch: { on: "⚡", off: "🔌" }, fan: { on: "🌀", off: "🍃" },
-  binary_sensor: { on: "🔔", off: "🔕" }, climate: "🌡️", media_player: "📺", vacuum: "🤖",
-  sensor: "📊", weather: "🌤️", scene: "🎬", script: "▶️", button: "🔘", number: "🔢",
-  select: "☰", cover: "🪟", lock: "🔒", input_boolean: { on: "✅", off: "⬜" },
-  person: "👤", device_tracker: "📍", camera: "📷", siren: "🚨", update: "🔄", alarm_control_panel: "🛡️"
-};
-
 export function friendlyName(entityId) {
   if (state.config.labels && state.config.labels[entityId]) return state.config.labels[entityId];
   const s = state.states[entityId];

@@ -72,10 +72,6 @@ export function setColorTemp(entityId, kelvin) {
   sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, color_temp_kelvin: parseInt(kelvin, 10) } });
 }
 
-export function setLightColor(entityId, rgb) {
-  sendWs({ id: Date.now(), type: "call_service", domain: "light", service: "turn_on", service_data: { entity_id: entityId, rgb_color: rgb } });
-}
-
 export async function fetchRegistry() {
   if (window.HA_INTEGRATION_PROXY) {
     // Proxied dashboard has no HA token; the registry endpoints would 401.
