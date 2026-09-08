@@ -217,6 +217,13 @@ export async function renderAll() {
 export function measureClock() {
   const el = document.getElementById("clock");
   if (!el) { state.clockFontSize = null; return; }
+  // Modern browsers: the CSS clamp() rule on #clock sizes the clock, so skip
+  // JS measurement and clear any inline font-size left over from the fallback.
+  if (window.CSS && CSS.supports("font-size", "clamp(1rem, 2vw, 3rem)")) {
+    el.style.fontSize = "";
+    state.clockFontSize = null;
+    return;
+  }
   // Fit the time on one line: start from the clamp(4rem, 9vw, 6.5rem) size,
   // then shrink proportionally until it fits the column width.
   const preferred = Math.min(Math.max(64, window.innerWidth * 0.09), 104);

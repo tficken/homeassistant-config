@@ -16,7 +16,7 @@ input[type="range"] { accent-color: var(--green); }
   0%, 100% { text-shadow: 0 0 24px rgba(20,254,23,0.45); opacity: 1; }
   50% { text-shadow: 0 0 48px rgba(20,254,23,0.85); opacity: 0.82; }
 }
-#clock { animation: clockPulse 2.2s infinite ease-in-out; }
+#clock { font-size: clamp(4rem, 9vw, 6.5rem); line-height: 1; animation: clockPulse 2.2s infinite ease-in-out; }
 #clock .colon { animation: colonPulse 1.2s infinite ease-in-out; }
 @keyframes colonPulse {
   0%, 100% { opacity: 1; }
