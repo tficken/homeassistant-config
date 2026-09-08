@@ -5,7 +5,7 @@
 // wireTitleEdit) and editor.js (editorScreen, setSettingsStatus, buildSettings)
 // — function references at runtime only.
 import { state } from '../state.js';
-import { friendlyName } from '../utils.js';
+import { friendlyName, entityArea } from '../utils.js';
 import { PANEL_REGISTRY, ensureConfigPanels, panelSection } from '../config.js';
 import { renderAll } from '../screens/index.js';
 import { editorScreen, setSettingsStatus, buildSettings } from './editor.js';
@@ -31,38 +31,9 @@ export function applyPanelDrop(panelId, target) {
   buildSettings();
 }
 
-// Entity chip for the aggregated-panel footer strip — same markup as the old
-// board's chips (drag-handle + name + ×), but wired via listeners because the
-// preview HTML is sanitized of inline handlers. The × carries .preview-remove
-// so the stage click-capture guard lets it through.
-export function buildEntityChip(section, id) {
-  const chip = document.createElement("span");
-  chip.className = "entity-chip";
-  chip.setAttribute("data-section", section);
-  chip.setAttribute("data-entity", id);
-  chip.title = id;
-  const handle = document.createElement("span");
-  handle.className = "drag-handle";
-  handle.title = "Drag to reorder, move, or drag back to the palette to remove";
-  handle.textContent = "⠿";
-  chip.appendChild(handle);
-  chip.appendChild(document.createTextNode(friendlyName(id) + " "));
-  const btn = document.createElement("button");
-  btn.className = "preview-remove";
-  btn.setAttribute("data-entity", id);
-  btn.textContent = "×";
-  btn.addEventListener("click", ev => {
-    ev.stopPropagation();
-    removeSectionEntity(section, id);
-  });
-  chip.appendChild(btn);
-  return chip;
-}
-
 // Post-render editor affordances on the scaled preview: × remove overlays on
-// section-backed entity cards, registry note chips on fixed/auto/entity panel
-// titles, footer entity strips for aggregated panels (roomMonitors renders
-// per-area data-room cells, not per-entity cards), and inline title/icon
+// section-backed entity cards AND on aggregated per-room cells (roomMonitors),
+// registry note chips on fixed/auto/entity panel titles, and inline title/icon
 // editing on section-kind panel titles. Runs on the sanitized DOM, so every
 // handler is attached with addEventListener.
 export function decoratePreviewPanels(inner) {
@@ -105,8 +76,9 @@ export function decoratePreviewPanels(inner) {
     if (title) wireTitleEdit(title, panelId);
     const cards = panel.querySelectorAll("[data-entity-id]");
     if (!cards.length) {
-      // Aggregated panel: no per-entity cards to drag or ×, so surface the
-      // section's entities as a footer chip strip instead.
+      // Aggregated panel: no per-entity cards to drag or ×. roomMonitors gets
+      // per-room × overlays below; other aggregated sections manage entities
+      // from the palette/labels instead.
       const ents = (state.config.sections[section] && state.config.sections[section].entities) || [];
       const panelBody = panel.querySelector(".panel-body") || panel;
       if (!ents.length) {
@@ -121,13 +93,29 @@ export function decoratePreviewPanels(inner) {
         }
         return;
       }
-      if (!panelBody.querySelector("[data-entity-strip]")) {
-        const strip = document.createElement("div");
-        strip.setAttribute("data-entity-strip", section);
-        strip.style.marginTop = "8px";
-        for (const id of ents) strip.appendChild(buildEntityChip(section, id));
-        panelBody.appendChild(strip);
-      }
+      // Aggregated room cells (roomMonitors): a per-room × like the per-card
+      // one below, removing every entity grouped into that room (the same
+      // area-or-name grouping renderRoomMonitors uses) in a single re-render.
+      panel.querySelectorAll("[data-room]").forEach(cell => {
+        if (cell.querySelector(".preview-remove")) return;
+        const area = cell.getAttribute("data-room");
+        const roomEnts = ents.filter(id => (entityArea(id) || friendlyName(id)) === area);
+        if (!roomEnts.length) return;
+        cell.style.position = "relative";
+        const btn = document.createElement("button");
+        btn.className = "preview-remove";
+        btn.style.cssText = "position:absolute;top:4px;right:4px;z-index:5;background:rgba(0,0,0,0.6);border:1px solid var(--border);color:var(--text-muted);border-radius:4px;padding:0 6px;cursor:pointer;font-family:var(--font-mono);";
+        btn.textContent = "×";
+        btn.title = `Remove ${area} (${roomEnts.length} entities)`;
+        btn.addEventListener("click", ev => {
+          ev.stopPropagation();
+          const sec = state.config.sections[section];
+          if (!sec) return;
+          sec.entities = (sec.entities || []).filter(x => !roomEnts.includes(x));
+          refreshEditorAfterEdit();
+        });
+        cell.appendChild(btn);
+      });
       return;
     }
     cards.forEach(card => {
