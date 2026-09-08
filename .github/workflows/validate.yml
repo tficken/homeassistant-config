@@ -27,10 +27,19 @@ jobs:
         with:
           python-version: "3.11"
       - run: pip install pyyaml
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Validate Home Assistant YAML files
         run: python scripts/validate_ha_yaml.py
       - name: Validate AI dashboard config JSON
         run: python -m json.tool www/ai-dashboard/config.json > /dev/null
+      - name: Dashboard JS syntax
+        run: |
+          for f in $(find www/ai-dashboard/js -name '*.js'); do
+            node --input-type=module --check < "$f" || exit 1
+          done
+          echo "Dashboard JS modules OK"
       - name: Validate AI dashboard HTML
         run: python -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
 

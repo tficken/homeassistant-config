@@ -105,6 +105,14 @@
         "light.living_room_ceiling_fan"
       ]
     },
+    "lights": {
+      "title": "Lights",
+      "icon": "💡",
+      "entities": [
+        "light.ceiling_fan",
+        "light.living_room_ceiling_fan"
+      ]
+    },
     "cameras": {
       "title": "Cameras",
       "icon": "📷",
@@ -160,7 +168,9 @@
         "sensor.hobeian_zg_204zx_temperature_2",
         "sensor.hobeian_zg_204zx_humidity_2",
         "sensor.hobeian_zg_204zx_temperature_3",
-        "sensor.hobeian_zg_204zx_humidity_3"
+        "sensor.hobeian_zg_204zx_humidity_3",
+        "sensor.hobeian_zg_204zx_temperature_4",
+        "sensor.hobeian_zg_204zx_humidity_4"
       ]
     },
     "environment": {

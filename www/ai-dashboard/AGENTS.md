@@ -4,7 +4,7 @@
 
 The two halves of the system:
 
-- **Frontend**: `index.html` (markup + all JS inline; CSS extracted to `css/` — `tokens.css`, `base.css`, `components.css`, `screens.css`, `editor.css`, linked in that order), `config.json` (persisted user config), `vendor/leaflet/` (vendored radar map library — no CDN dependency; Google Fonts still loads from CDN), `snapshots/` (camera event archive, git-ignored).
+- **Frontend**: `index.html` (thin shell — markup plus a module-load error trap that surfaces a visible error if any `js/` module fails to load; no inline app JS) + `css/` (`tokens.css`, `base.css`, `components.css`, `screens.css`, `editor.css`, linked in that order) + `js/` ES modules: `state.js` (store), `config.js`, `api.js`, `connection.js`, `utils.js`, `components/` (panels, cards, light-modal, printer-modal, snapshot-viewer), `screens/` (home, control, security, status, index), `settings/`, `cameras.js`, `radar.js`, `globals.js` (window shim for inline handlers — any new inline handler entry point must be added there), `main.js` (init + intervals). Plus `config.json` (persisted user config), `vendor/leaflet/` (vendored radar map library — no CDN dependency; Google Fonts still loads from CDN), `snapshots/` (camera event archive, git-ignored).
 - **Backend**: `custom_components/ai_dashboard_proxy/` (self-written, not HACS-managed). **Any change to its Python requires a Home Assistant restart** — a browser refresh is not enough.
 
 ---
@@ -73,8 +73,8 @@ Area names come from HA's in-memory registry helper APIs (area/device/entity reg
 
 ## Development Workflow
 
-1. Edit `www/ai-dashboard/index.html` and/or `www/ai-dashboard/config.json` directly (for content changes, prefer the Settings editor above).
-2. Validate HTML/JSON syntax:
+1. Edit the files under `www/ai-dashboard/` directly — markup in `index.html`, styles in `css/`, behavior in the `js/` ES modules (see the Frontend bullet above) — and/or `config.json` (for content changes, prefer the Settings editor above).
+2. Validate HTML/JSON/JS syntax:
    ```bash
    # HTML — using local Node.js
    .tools/node/node.exe -e "const HTMLParser = require('node-html-parser'); HTMLParser.parse(require('fs').readFileSync('www/ai-dashboard/index.html', 'utf8')); console.log('HTML parse OK')"
@@ -82,6 +82,11 @@ Area names come from HA's in-memory registry helper APIs (area/device/entity reg
    py -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
    # JSON
    python -m json.tool www/ai-dashboard/config.json > /dev/null
+   # JS modules (CI runs this loop over all of www/ai-dashboard/js)
+   for f in $(find www/ai-dashboard/js -name '*.js'); do
+     node --input-type=module --check < "$f" || exit 1
+   done
+   echo "Dashboard JS modules OK"
    ```
 3. Hard-refresh the dashboard in the browser (`Ctrl+Shift+R` / `Cmd+Shift+R`) — the proxy serves files directly from `www/ai-dashboard/`.
 4. If you changed anything under `custom_components/ai_dashboard_proxy/` (Python), **restart Home Assistant**.
