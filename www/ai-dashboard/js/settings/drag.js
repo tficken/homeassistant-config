@@ -6,7 +6,7 @@
 // — function references at runtime only.
 import { state } from '../state.js';
 import { friendlyName, entityArea } from '../utils.js';
-import { PANEL_REGISTRY, ensureConfigPanels, panelSection } from '../config.js';
+import { PANEL_REGISTRY, ensureConfigPanels, panelSection, effectivePanels, effectiveSizes, effectiveColWidths } from '../config.js';
 import { renderAll } from '../screens/index.js';
 import { editorScreen, setSettingsStatus, buildSettings } from './editor.js';
 import { sectionOfEntity, removeSectionEntity, refreshEditorAfterEdit, wireTitleEdit } from './layout.js';
@@ -31,6 +31,117 @@ export function applyPanelDrop(panelId, target) {
   buildSettings();
 }
 
+// Merge a patch into the panel's sizes entry for the editor screen, creating
+// the buckets on demand and dropping empty entries so the saved config stays
+// clean. In-memory only — persisted by Save & Apply.
+function setSizeEntry(panelId, patch) {
+  state.config.sizes = state.config.sizes || {};
+  const bucket = state.config.sizes[editorScreen] = state.config.sizes[editorScreen] || {};
+  bucket[panelId] = Object.assign({}, bucket[panelId], patch);
+  const entry = bucket[panelId];
+  if (!entry.full) delete entry.full;
+  if (typeof entry.h !== "number" && !entry.full) delete bucket[panelId];
+  if (!Object.keys(bucket).length) delete state.config.sizes[editorScreen];
+}
+
+// ⇔ toggle: hoist the panel into its own full-width row (or back into its
+// column). A no-op flag on a single-column screen is prevented by the caller
+// (the ⇔ button is only injected on multi-column screens).
+export function toggleFull(panelId) {
+  const cur = effectiveSizes(editorScreen)[panelId] || {};
+  setSizeEntry(panelId, { full: !cur.full });
+  refreshEditorAfterEdit();
+}
+
+// Current preview scale factor (pointer deltas are viewport px; unscaled
+// layout px = delta / k). Written by renderEditorPreview after every render.
+function previewScale() {
+  const stage = document.getElementById("preview-stage");
+  const k = stage && parseFloat(stage.dataset.scale);
+  return k > 0 ? k : 1;
+}
+
+// Bottom-edge height drag. The panel's flex weight tracks the pointer live;
+// the final weight is committed to state.config on pointerup. Weight unit
+// calibration comes from the panel's weighted flex siblings (px per unit);
+// an all-auto column falls back to 100 px/unit. An auto-height panel converts
+// to weighted on first drag, starting at its current rendered height.
+function startHeightResize(ev, target, panelId) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  const k = previewScale();
+  const parent = target.parentElement;
+  if (!parent) return;
+  // Exclude editor chrome injected into columns (overflow badges).
+  const siblings = [...parent.children].filter(el => !el.classList.contains("overflow-badge"));
+  let sumGrow = 0, sumH = 0;
+  for (const el of siblings) {
+    const g = parseFloat(getComputedStyle(el).flexGrow) || 0;
+    if (g > 0) { sumGrow += g; sumH += el.offsetHeight; }
+  }
+  const pxPerUnit = sumGrow > 0 ? sumH / sumGrow : 100;
+  const grow0 = parseFloat(getComputedStyle(target).flexGrow) || 0;
+  const w0 = grow0 > 0 ? grow0 : target.offsetHeight / pxPerUnit;
+  const startY = ev.clientY;
+  const pointerId = ev.pointerId;
+  let w = w0;
+  const onMove = e => {
+    if (e.pointerId !== pointerId) return;
+    w = Math.max(0.25, w0 + (e.clientY - startY) / (k * pxPerUnit));
+    target.style.flex = `${w} 1 0`;
+    target.style.minHeight = "0";
+  };
+  const onUp = e => {
+    if (e.pointerId !== pointerId) return;
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointercancel", onUp);
+    setSizeEntry(panelId, { h: Math.round(w * 100) / 100 });
+    refreshEditorAfterEdit();
+  };
+  document.addEventListener("pointermove", onMove);
+  document.addEventListener("pointerup", onUp);
+  document.addEventListener("pointercancel", onUp);
+}
+
+// Column-divider width drag. Adjusts the two neighboring fr values (total
+// conserved so other columns are unaffected), floors at 0.4 fr, live-updates
+// the grid's template, and commits to state.config on pointerup.
+function startWidthResize(ev, grid, colIndex) {
+  ev.preventDefault();
+  ev.stopPropagation();
+  const k = previewScale();
+  const frs = effectiveColWidths(editorScreen);
+  if (colIndex < 0 || colIndex >= frs.length - 1) return;
+  const cols = [...grid.children].filter(el => el.hasAttribute("data-preview-col"));
+  if (cols.length < 2 || !cols[0].offsetWidth) return;
+  const pxPerFr = cols[0].offsetWidth / frs[0];
+  const startX = ev.clientX;
+  const pointerId = ev.pointerId;
+  let cur = frs.slice();
+  const onMove = e => {
+    if (e.pointerId !== pointerId) return;
+    let dfr = (e.clientX - startX) / (k * pxPerFr);
+    dfr = Math.max(0.4 - frs[colIndex], Math.min(frs[colIndex + 1] - 0.4, dfr));
+    cur = frs.slice();
+    cur[colIndex] = frs[colIndex] + dfr;
+    cur[colIndex + 1] = frs[colIndex + 1] - dfr;
+    grid.style.gridTemplateColumns = cur.map(n => n + "fr").join(" ");
+  };
+  const onUp = e => {
+    if (e.pointerId !== pointerId) return;
+    document.removeEventListener("pointermove", onMove);
+    document.removeEventListener("pointerup", onUp);
+    document.removeEventListener("pointercancel", onUp);
+    state.config.colWidths = state.config.colWidths || {};
+    state.config.colWidths[editorScreen] = cur.map(n => Math.round(n * 100) / 100);
+    refreshEditorAfterEdit();
+  };
+  document.addEventListener("pointermove", onMove);
+  document.addEventListener("pointerup", onUp);
+  document.addEventListener("pointercancel", onUp);
+}
+
 // Post-render editor affordances on the scaled preview: × remove overlays on
 // section-backed entity cards AND on aggregated per-room cells (roomMonitors),
 // registry note chips on fixed/auto/entity panel titles, and inline title/icon
@@ -41,6 +152,8 @@ export function decoratePreviewPanels(inner) {
     state.config.entities && state.config.entities.weather,
     state.config.entities && state.config.entities.mediaPlayer
   ].filter(Boolean));
+  const sizes = effectiveSizes(editorScreen);
+  const multiCol = effectivePanels(editorScreen).length > 1;
   inner.querySelectorAll("[data-panel-id]").forEach(panel => {
     const panelId = panel.getAttribute("data-panel-id");
     const entry = PANEL_REGISTRY[panelId];
@@ -70,6 +183,32 @@ export function decoratePreviewPanels(inner) {
       note.style.cssText = "color:var(--text-muted);font-size:0.65rem;margin-left:8px;";
       note.textContent = "Ⓘ " + entry.note;
       title.appendChild(note);
+    }
+    // Editor-only sizing chrome: ⇔ full-width toggle (multi-column screens)
+    // and a bottom-edge height handle. The panel element is the flex child
+    // that carries the weight, so the handle anchors to it directly.
+    if (!panel.querySelector(".preview-size-h")) {
+      panel.style.position = panel.style.position || "relative";
+      const h = document.createElement("div");
+      h.className = "preview-size-h";
+      h.title = "Drag to resize height";
+      h.addEventListener("pointerdown", ev => startHeightResize(ev, panel, panelId));
+      panel.appendChild(h);
+    }
+    if (multiCol && !panel.querySelector(".preview-full")) {
+      const on = !!(sizes[panelId] && sizes[panelId].full);
+      const btn = document.createElement("button");
+      btn.className = "preview-full";
+      btn.style.cssText = "position:absolute;top:4px;right:4px;z-index:6;background:rgba(0,0,0,0.6);border:1px solid " +
+        (on ? "var(--accent)" : "var(--border)") + ";color:" + (on ? "var(--accent)" : "var(--text-muted)") +
+        ";border-radius:4px;padding:0 6px;cursor:pointer;font-family:var(--font-mono);";
+      btn.textContent = "⇔";
+      btn.title = on ? "Restore to column" : "Span full width";
+      btn.addEventListener("click", ev => {
+        ev.stopPropagation();
+        toggleFull(panelId);
+      });
+      panel.appendChild(btn);
     }
     if (entry.kind !== "section") return;
     const section = entry.section;
@@ -140,6 +279,40 @@ export function decoratePreviewPanels(inner) {
       card.appendChild(btn);
     });
   });
+
+  // Full-width rows hoist their panel out of the columns; the row div (not
+  // the panel) carries the row's flex weight, so its height handle anchors
+  // to the row.
+  inner.querySelectorAll("[data-full-row]").forEach(row => {
+    if (row.querySelector(":scope > .preview-size-h")) return;
+    row.style.position = row.style.position || "relative";
+    const h = document.createElement("div");
+    h.className = "preview-size-h";
+    h.title = "Drag to resize row height";
+    h.addEventListener("pointerdown", ev => startHeightResize(ev, row, row.getAttribute("data-full-row")));
+    row.appendChild(h);
+  });
+
+  // Column dividers: one handle per boundary, anchored to each band grid so
+  // overflow-y:auto columns can't clip them. Skip single-column grids.
+  const grids = new Set();
+  inner.querySelectorAll("[data-preview-col]").forEach(col => { if (col.parentElement) grids.add(col.parentElement); });
+  grids.forEach(grid => {
+    const cols = [...grid.children].filter(el => el.hasAttribute("data-preview-col"));
+    if (cols.length < 2) return;
+    grid.style.position = grid.style.position || "relative";
+    for (let i = 0; i < cols.length - 1; i++) {
+      if (grid.querySelector(`.preview-size-w[data-divider="${i}"]`)) continue;
+      const d = document.createElement("div");
+      d.className = "preview-size-w";
+      d.setAttribute("data-divider", String(i));
+      d.title = "Drag to resize columns";
+      // Center the 14px-wide handle over the inter-column gap.
+      d.style.left = (cols[i].offsetLeft + cols[i].offsetWidth - 7) + "px";
+      d.addEventListener("pointerdown", ev => startWidthResize(ev, grid, i));
+      grid.appendChild(d);
+    }
+  });
 }
 
 // Entity/palette drop: drag to the palette removes from the source section, a
@@ -198,12 +371,13 @@ export function initPreviewDrag() {
   if (!body) return;
   const stage = document.getElementById("preview-stage");
   // Belt-and-braces against any missed inline handlers (sanitization already
-  // strips them). .panel-title clicks (inline title editing) and
-  // .preview-remove clicks (× overlays / strip chips) are let through.
+  // strips them). .panel-title clicks (inline title editing), .preview-remove
+  // clicks (× overlays / strip chips), and .preview-full clicks (⇔ width
+  // toggle) are let through.
   if (stage && !stage.dataset.clickGuard) {
     stage.dataset.clickGuard = "1";
     stage.addEventListener("click", e => {
-      if (!e.target.closest(".panel-title") && !e.target.closest(".preview-remove")) {
+      if (!e.target.closest(".panel-title") && !e.target.closest(".preview-remove") && !e.target.closest(".preview-full")) {
         e.preventDefault();
         e.stopPropagation();
       }
