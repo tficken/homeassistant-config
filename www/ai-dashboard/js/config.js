@@ -75,6 +75,55 @@ export function ensureConfigPanels() {
   }
 }
 
+// Hardcoded per-screen grid column ratios (the builders' defaults today).
+// security is single-column and has no entry: width dragging is disabled there.
+export const SCREEN_DEFAULT_FR = {
+  home: [0.85, 1, 1.2],
+  control: [1, 1, 1.1],
+  status: [1, 1]
+};
+
+// Resolve the effective per-panel sizing for a screen: state.config.sizes[screen]
+// validated against the effective layout — unknown/stale panel ids dropped, `h`
+// clamped to the 0.25 weight floor, `full` kept only as a boolean. Pure.
+export function effectiveSizes(screen) {
+  const raw = (state.config.sizes && state.config.sizes[screen]) || {};
+  const valid = new Set(effectivePanels(screen).flat());
+  const out = {};
+  for (const id of Object.keys(raw)) {
+    const v = raw[id];
+    if (!valid.has(id) || !v || typeof v !== "object") continue;
+    const entry = {};
+    if (typeof v.h === "number" && isFinite(v.h)) entry.h = Math.max(0.25, v.h);
+    if (v.full === true) entry.full = true;
+    if (Object.keys(entry).length) out[id] = entry;
+  }
+  return out;
+}
+
+// Resolve the effective grid column fr values for a screen: a valid config
+// array (right length, every entry >= the 0.4 fr floor) wins, else the
+// hardcoded defaults. Pure.
+export function effectiveColWidths(screen) {
+  const defaults = SCREEN_DEFAULT_FR[screen] || [1, 1, 1];
+  const raw = state.config.colWidths && state.config.colWidths[screen];
+  if (Array.isArray(raw) && raw.length === defaults.length &&
+      raw.every(n => typeof n === "number" && isFinite(n) && n >= 0.4)) {
+    return raw.slice();
+  }
+  return defaults.slice();
+}
+
+// Panel wrapper flex declaration: the `h` weight override replaces the
+// builder's hardcoded default (auto-height panels become weighted on first
+// drag); anything else returns the default verbatim. Builders compose this
+// with their non-flex declarations.
+export function panelFlex(screen, panelId, defaultFlex) {
+  const s = effectiveSizes(screen)[panelId];
+  if (s && typeof s.h === "number") return `flex:${s.h} 1 0;min-height:0;`;
+  return defaultFlex;
+}
+
 // Backing state.config.sections key for a section-kind panel, else null. The
 // presence panel's entities live in sections.home (filtered to
 // person.*/device_tracker.* by getPresenceEntities()), so presence -> "home".
@@ -87,6 +136,8 @@ export const DEFAULT_CONFIG = {
   theme: { backgroundImage: "", accentColor: "#2dd4bf" },
   panels: DEFAULT_PANELS,
   layout: { clock24h: false },
+  sizes: {},
+  colWidths: {},
   entities: {
     weather: "weather.forecast_home",
     mediaPlayer: "media_player.living_room_fire_tv_living_room"
@@ -147,7 +198,31 @@ export function migrateConfig(cfg) {
   delete cfg.sectionOrder; // superseded by state.config.panels
 }
 
+// Drop sizes entries for panel ids no longer on their screen and empty
+// per-screen buckets, so stale config doesn't accumulate across saves.
+function pruneSizes() {
+  const sizes = state.config.sizes;
+  if (sizes && typeof sizes === "object") {
+    for (const screen of Object.keys(sizes)) {
+      const valid = new Set(effectivePanels(screen).flat());
+      const bucket = sizes[screen];
+      if (!bucket || typeof bucket !== "object") { delete sizes[screen]; continue; }
+      for (const id of Object.keys(bucket)) {
+        if (!valid.has(id)) delete bucket[id];
+      }
+      if (!Object.keys(bucket).length) delete sizes[screen];
+    }
+  }
+  const cw = state.config.colWidths;
+  if (cw && typeof cw === "object") {
+    for (const screen of Object.keys(cw)) {
+      if (!DEFAULT_PANELS[screen]) delete cw[screen];
+    }
+  }
+}
+
 export async function saveConfig() {
+  pruneSizes();
   const res = await apiCall("POST", "/ai-dashboard/api/config", state.config);
   if (res && res.success === true) return true;
   setSettingsStatus("SAVE FAILED — changes are live but not persisted. Use Data > Export JSON as a backup.");
