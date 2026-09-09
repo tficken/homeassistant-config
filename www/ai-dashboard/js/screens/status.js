@@ -2,7 +2,7 @@
 // comes from ../api.js; assembleColumns from ./index.js (runtime-only cycle).
 import { state } from '../state.js';
 import { friendlyName, sectionTitle, entityArea, escapeHtml } from '../utils.js';
-import { effectivePanels } from '../config.js';
+import { effectivePanels, effectiveSizes, effectiveColWidths, panelFlex } from '../config.js';
 import { fetchHistory } from '../api.js';
 import { renderTerminalPanel } from '../components/panels.js';
 import { renderMetricCard, renderEnvMetric } from '../components/cards.js';
@@ -64,20 +64,20 @@ export async function buildStatusPanels() {
     </div>`;
   }).join("");
 
+  const fr = effectiveColWidths("status").map(n => n + "fr").join(" ");
   const panels = {
-    environment: `<div style="min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="environment">${renderTerminalPanel(sectionTitle("environment"), envMetrics, "fill")}</div>`,
-    system: `<div style="min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="system">${renderTerminalPanel(sectionTitle("system"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${sysMetrics + vacuumCards + printerCards}</div>`, "fill")}</div>`,
+    environment: `<div style="${panelFlex("status", "environment", "flex:1;min-height:0;")}overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="environment">${renderTerminalPanel(sectionTitle("environment"), envMetrics, "fill")}</div>`,
+    system: `<div style="${panelFlex("status", "system", "flex:1;min-height:0;")}overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="system">${renderTerminalPanel(sectionTitle("system"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${sysMetrics + vacuumCards + printerCards}</div>`, "fill")}</div>`,
   };
   return {
     panels,
-    gridStyle: "display:grid;grid-template-columns:1fr 1fr;gap:14px;flex:1;min-height:0;overflow:hidden;",
-    // Single-panel columns use display:grid so each panel wrapper (a grid item)
-    // stretches to full column height exactly as it did as a direct grid item;
-    // a flex column would collapse it to content height and break the
-    // .terminal-panel.fill height:100% chain.
+    gridStyle: `display:grid;grid-template-columns:${fr};gap:14px;flex:1;min-height:0;overflow:hidden;`,
+    // Flex columns (not grid) so per-panel height weights apply; each wrapper's
+    // default flex:1 keeps the single panel stretched to full column height,
+    // preserving the .terminal-panel.fill height:100% chain.
     colStyles: [
-      "min-height:0;display:grid;",
-      "min-height:0;display:grid;",
+      "display:flex;flex-direction:column;gap:14px;min-height:0;",
+      "display:flex;flex-direction:column;gap:14px;min-height:0;",
     ],
   };
 }
@@ -97,5 +97,5 @@ export async function renderStatusScreen() {
   await fetchHistory(historyIds.concat(sysHistoryIds), 24);
   const b = await buildStatusPanels();
   document.getElementById("status-screen").innerHTML = assembleColumns(b.panels,
-    effectivePanels("status"), b.gridStyle, b.colStyles);
+    effectivePanels("status"), b.gridStyle, b.colStyles, effectiveSizes("status"));
 }

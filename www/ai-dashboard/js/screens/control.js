@@ -2,7 +2,7 @@
 // assembleColumns comes from ./index.js — runtime-only circular function ref.
 import { state } from '../state.js';
 import { sectionTitle } from '../utils.js';
-import { effectivePanels } from '../config.js';
+import { effectivePanels, effectiveSizes, effectiveColWidths, panelFlex } from '../config.js';
 import { renderTerminalPanel, renderSceneButton } from '../components/panels.js';
 import { renderLightCard, renderSwitchCard, renderMediaCard } from '../components/cards.js';
 import { assembleColumns } from './index.js';
@@ -23,15 +23,16 @@ export function buildControlPanels() {
   // full-width row layout below.
   const controlCards = (lightCards ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;align-content:start;">${lightCards}</div>` : "") + switchCards;
 
+  const fr = effectiveColWidths("control").map(n => n + "fr").join(" ");
   const panels = {
-    scenes: renderTerminalPanel(sectionTitle("scenes"), `<div class="stretch-btns" style="display:flex;flex-direction:column;gap:10px;height:100%;">${sceneButtons || "<div style='color:var(--text-muted)'>NO SCENES</div>"}</div>`, "fill", 'data-panel-id="scenes"'),
-    quickControls: `<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="quickControls">${renderTerminalPanel(sectionTitle("quickControls"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${controlCards || "<div style='color:var(--text-muted)'>NO CONTROLS</div>"}</div>`, "fill")}</div>`,
-    media: `<div style="flex-shrink:0;" data-panel-id="media">${renderMediaCard(mediaId)}</div>`,
-    scripts: renderTerminalPanel(sectionTitle("scripts"), `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${scriptButtons || "<div style='color:var(--text-muted)'>NO SCRIPTS</div>"}</div>`, "", 'data-panel-id="scripts"'),
+    scenes: renderTerminalPanel(sectionTitle("scenes"), `<div class="stretch-btns" style="display:flex;flex-direction:column;gap:10px;height:100%;">${sceneButtons || "<div style='color:var(--text-muted)'>NO SCENES</div>"}</div>`, "fill", `data-panel-id="scenes" style="${panelFlex("control", "scenes", "")}"`),
+    quickControls: `<div style="${panelFlex("control", "quickControls", "flex:1;min-height:0;")}overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="quickControls">${renderTerminalPanel(sectionTitle("quickControls"), `<div class="stretch-cards" style="display:flex;flex-direction:column;gap:10px;height:100%;">${controlCards || "<div style='color:var(--text-muted)'>NO CONTROLS</div>"}</div>`, "fill")}</div>`,
+    media: `<div style="${panelFlex("control", "media", "flex-shrink:0;")}" data-panel-id="media">${renderMediaCard(mediaId)}</div>`,
+    scripts: renderTerminalPanel(sectionTitle("scripts"), `<div style="display:grid;grid-template-columns:1fr;gap:10px;">${scriptButtons || "<div style='color:var(--text-muted)'>NO SCRIPTS</div>"}</div>`, "", `data-panel-id="scripts" style="${panelFlex("control", "scripts", "")}"`),
   };
   return {
     panels,
-    gridStyle: "display:grid;grid-template-columns:1fr 1fr 1.1fr;gap:14px;flex:1;min-height:0;",
+    gridStyle: `display:grid;grid-template-columns:${fr};gap:14px;flex:1;min-height:0;`,
     colStyles: [
       "display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto;",
       "display:flex;flex-direction:column;gap:10px;min-height:0;",
@@ -43,5 +44,5 @@ export function buildControlPanels() {
 export function renderControlScreen() {
   const b = buildControlPanels();
   document.getElementById("control-screen").innerHTML = assembleColumns(b.panels,
-    effectivePanels("control"), b.gridStyle, b.colStyles);
+    effectivePanels("control"), b.gridStyle, b.colStyles, effectiveSizes("control"));
 }

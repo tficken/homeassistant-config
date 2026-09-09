@@ -6,7 +6,7 @@ import { state } from '../state.js';
 import { friendlyName, presenceLabel, sectionTitle, entityArea, isActive, isUnavailable,
   renderOfflineBadge, weatherIcon, escapeHtml, formatTemp, relativeTime,
   lastEventTime, recentDoorIds } from '../utils.js';
-import { effectivePanels } from '../config.js';
+import { effectivePanels, effectiveSizes, effectiveColWidths, panelFlex } from '../config.js';
 import { renderRadarFrame, initRadarMap } from '../radar.js';
 import { renderTerminalPanel, renderStatusLed, renderAlertBanner } from '../components/panels.js';
 import { renderLightCard } from '../components/cards.js';
@@ -169,7 +169,7 @@ export function buildHomePanels() {
       </div>
     </div>
     ${forecastHtml}
-  `, "", 'data-panel-id="weather"');
+  `, "", `data-panel-id="weather" style="${panelFlex("home", "weather", "")}"`);
 
   const presence = getPresenceEntities().map(id => {
     const st = state.states[id];
@@ -243,22 +243,23 @@ export function buildHomePanels() {
     ? renderTerminalPanel(sectionTitle("lights"), `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;">${homeLightIds.map(id => renderLightCard(id)).join("")}</div>`)
     : "";
 
+  const fr = effectiveColWidths("home").map(n => n + "fr").join(" ");
   const panels = {
-    clock: `<div style="flex-shrink:0;padding:8px 0 0 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;" data-panel-id="clock">
+    clock: `<div style="${panelFlex("home", "clock", "flex-shrink:0;")}padding:8px 0 0 8px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;" data-panel-id="clock">
       <div id="clock" style="font-family:var(--font-mono);font-size:clamp(4rem,9vw,6.5rem);line-height:0.9;color:var(--green);text-shadow:0 0 24px rgba(20,254,23,0.4);white-space:nowrap;">${timeStrMarked}</div>
       <div id="date" style="font-family:var(--font-mono);font-size:1.1rem;color:var(--text-muted);margin-top:8px;">${escapeHtml(dateStr)}</div>
     </div>`,
-    presence: `<div style="flex:1;min-height:0;" data-panel-id="presence">${presencePanel}</div>`,
-    lights: lightsPanel ? `<div style="flex-shrink:0;" data-panel-id="lights">${lightsPanel}</div>` : "",
-    oncall: oncallPanel ? `<div style="flex-shrink:0;" data-panel-id="oncall">${oncallPanel}</div>` : "",
+    presence: `<div style="${panelFlex("home", "presence", "flex:1;min-height:0;")}" data-panel-id="presence">${presencePanel}</div>`,
+    lights: lightsPanel ? `<div style="${panelFlex("home", "lights", "flex-shrink:0;")}" data-panel-id="lights">${lightsPanel}</div>` : "",
+    oncall: oncallPanel ? `<div style="${panelFlex("home", "oncall", "flex-shrink:0;")}" data-panel-id="oncall">${oncallPanel}</div>` : "",
     weather: weatherPanel,
-    roomMonitors: `<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="roomMonitors">${renderTerminalPanel(sectionTitle("roomMonitors"), renderRoomMonitors(), "fill")}</div>`,
-    radar: `<div style="flex:1;min-height:0;" data-panel-id="radar">${renderRadarFrame()}</div>`,
-    doors: `<div style="flex-shrink:0;" data-panel-id="doors"><div id="doors-panel">${renderTerminalPanel(sectionTitle("doors"), renderDoors())}</div></div>`,
+    roomMonitors: `<div style="${panelFlex("home", "roomMonitors", "flex:1;min-height:0;")}overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="roomMonitors">${renderTerminalPanel(sectionTitle("roomMonitors"), renderRoomMonitors(), "fill")}</div>`,
+    radar: `<div style="${panelFlex("home", "radar", "flex:1;min-height:0;")}" data-panel-id="radar">${renderRadarFrame()}</div>`,
+    doors: `<div style="${panelFlex("home", "doors", "flex-shrink:0;")}" data-panel-id="doors"><div id="doors-panel">${renderTerminalPanel(sectionTitle("doors"), renderDoors())}</div></div>`,
   };
   return {
     panels,
-    gridStyle: "display:grid;grid-template-columns:0.85fr 1fr 1.2fr;gap:14px;flex:1;min-height:0;",
+    gridStyle: `display:grid;grid-template-columns:${fr};gap:14px;flex:1;min-height:0;`,
     colStyles: [
       "display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;",
       "display:flex;flex-direction:column;gap:14px;min-height:0;height:100%;",
@@ -271,7 +272,7 @@ export function renderHomeScreen() {
   const b = buildHomePanels();
   const main = `${renderAlertBanner(getAlerts())}${assembleColumns(b.panels,
     effectivePanels("home"),
-    b.gridStyle, b.colStyles)}`;
+    b.gridStyle, b.colStyles, effectiveSizes("home"))}`;
   document.getElementById("home-screen").innerHTML = main;
   initRadarMap();
   measureClock();

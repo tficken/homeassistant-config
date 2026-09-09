@@ -2,7 +2,7 @@
 // assembleColumns comes from ./index.js — runtime-only circular function ref.
 import { state } from '../state.js';
 import { sectionTitle } from '../utils.js';
-import { effectivePanels } from '../config.js';
+import { effectivePanels, effectiveSizes, panelFlex } from '../config.js';
 import { renderCameraFeed } from '../cameras.js';
 import { renderTerminalPanel, renderSceneButton } from '../components/panels.js';
 import { renderMetricCard } from '../components/cards.js';
@@ -22,8 +22,8 @@ export function buildSecurityPanels() {
   }).join("");
 
   const panels = {
-    cameras: `<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:14px;min-height:0;overflow:hidden;" data-panel-id="cameras">${cameraFeeds}</div>`,
-    security: `<div style="flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="security">${renderTerminalPanel(sectionTitle("security"), `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;grid-auto-rows:1fr;height:100%;">${securityCards}</div>`, "fill")}</div>`,
+    cameras: `<div style="${panelFlex("security", "cameras", "")}display:grid;grid-template-columns:repeat(2,1fr);gap:14px;min-height:0;overflow:hidden;" data-panel-id="cameras">${cameraFeeds}</div>`,
+    security: `<div style="${panelFlex("security", "security", "flex:1;min-height:0;")}overflow-y:auto;display:flex;flex-direction:column;" data-panel-id="security">${renderTerminalPanel(sectionTitle("security"), `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;grid-auto-rows:1fr;height:100%;">${securityCards}</div>`, "fill")}</div>`,
   };
   return {
     panels,
@@ -38,5 +38,5 @@ export function buildSecurityPanels() {
 export function renderSecurityScreen() {
   const b = buildSecurityPanels();
   document.getElementById("security-screen").innerHTML = assembleColumns(b.panels,
-    effectivePanels("security"), b.gridStyle, b.colStyles);
+    effectivePanels("security"), b.gridStyle, b.colStyles, effectiveSizes("security"));
 }
