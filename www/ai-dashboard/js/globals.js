@@ -6,7 +6,7 @@ import {
   switchSettingsTab, setEditorScreen,
 } from './settings/editor.js';
 import { addLabelOverride, removeLabelOverride, setLabelOverride } from './settings/labels.js';
-import { removeMissingEntity } from './settings/layout.js';
+import { removeMissingEntity, resetSizes } from './settings/layout.js';
 import { showScreen } from './screens/index.js';
 import { streamFeedFallback, cameraFeedLoaded } from './cameras.js';
 import { toggleEntity, mediaCmd, setBrightness, setColorTemp } from './api.js';
@@ -25,5 +25,5 @@ Object.assign(window, {
   streamFeedFallback, cameraFeedLoaded,
   openSettings, closeSettings, saveSettings, exportConfig, importConfig, logout,
   switchSettingsTab, setEditorScreen,
-  addLabelOverride, removeLabelOverride, setLabelOverride, removeMissingEntity,
+  addLabelOverride, removeLabelOverride, setLabelOverride, removeMissingEntity, resetSizes,
 });

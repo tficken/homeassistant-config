@@ -7,12 +7,12 @@
 // runtime reads of live bindings only.
 import { state } from '../state.js';
 import { friendlyName, entityArea, escapeHtml } from '../utils.js';
-import { effectivePanels } from '../config.js';
+import { effectivePanels, effectiveSizes } from '../config.js';
 import { buildHomePanels } from '../screens/home.js';
 import { buildControlPanels } from '../screens/control.js';
 import { buildSecurityPanels } from '../screens/security.js';
 import { buildStatusPanels } from '../screens/status.js';
-import { renderAll } from '../screens/index.js';
+import { renderAll, assembleColumns } from '../screens/index.js';
 import { EDITOR_SCREENS, editorScreen, buildSettings } from './editor.js';
 import { decoratePreviewPanels, initPreviewDrag } from './drag.js';
 
@@ -81,7 +81,9 @@ export function renderLayoutTab() {
         <p style="color:var(--text-muted);font-size:0.72rem;margin:8px 0 0;flex-shrink:0;">Drag an entity onto a panel to add it. Drag a card back here to remove it.</p>
       </div>
       <div id="preview" style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;">
-        <div id="preview-tabs" style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0;">${previewTabs}</div>
+        <div id="preview-tabs" style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0;">${previewTabs}
+          <button class="btn" style="margin-left:auto;" onclick="resetSizes()" title="Clear saved tile heights and column widths for this screen">RESET SIZES</button>
+        </div>
         <div id="preview-stage" style="flex:1;min-height:0;overflow:auto;border:1px solid var(--border);border-radius:6px;padding:10px;">
           <div id="preview-stage-inner"></div>
         </div>
@@ -147,15 +149,14 @@ export async function renderEditorPreview() {
     const active = document.querySelector(".screen.active");
     w = active && active.clientWidth ? active.clientWidth : stage.clientWidth;
   }
-  // Assemble inline (assembleColumns' signature stays untouched) so each
-  // column div carries data-preview-col for panel drop targeting.
-  const colsHtml = effectivePanels(screen).map((col, i) =>
-    `<div data-preview-col="${i}" style="${b.colStyles[i]}">${col.map(id => b.panels[id] || "").join("")}</div>`
-  ).join("");
+  // Shared assembly with the live path; preview:true puts data-preview-col on
+  // column divs for drop targeting and omits data-screen-grid.
+  const assembled = assembleColumns(b.panels, effectivePanels(screen),
+    b.gridStyle, b.colStyles, effectiveSizes(screen), { preview: true });
   // Sanitize once and share the exact same HTML with the hidden measure
   // container so overflow math reflects the current (post-edit) effective
   // layout, never a stale cache.
-  const sanitized = sanitizePreviewHtml(`<div style="${b.gridStyle}">${colsHtml}</div>`);
+  const sanitized = sanitizePreviewHtml(assembled);
   inner.style.width = w + "px";
   inner.innerHTML = sanitized;
   // Scale against the stage's content-box width so the stage padding doesn't
@@ -165,6 +166,9 @@ export async function renderEditorPreview() {
   const k = Math.min(1, stageContentW / w);
   inner.style.transform = `scale(${k})`;
   inner.style.transformOrigin = "top left";
+  // Expose the scale factor for resize-drag math in drag.js (pointer deltas
+  // are viewport px; unscaled layout px = delta / k).
+  stage.dataset.scale = String(k);
   // transform doesn't affect layout: shrink the layout box to the scaled
   // footprint or the stage shows scrollbars/dead space around the preview.
   inner.style.height = (inner.scrollHeight * k) + "px";
@@ -234,6 +238,10 @@ export function updateOverflowBadges(html, width) {
   // inner.innerHTML is only a defensive fallback (it includes editor
   // affordances like × buttons/entity strips, which would skew heights).
   measure.innerHTML = html || inner.innerHTML;
+  // Full-width rows sit outside the columns; subtract their heights (plus one
+  // 14px wrapper gap each) from the height available to column content.
+  measure.querySelectorAll("[data-full-row]").forEach(row => { avail -= row.offsetHeight + 14; });
+  if (avail <= 0) return;
 
   const previewCols = inner.querySelectorAll("[data-preview-col]");
   measure.querySelectorAll("[data-preview-col]").forEach((mcol, i) => {
@@ -262,6 +270,14 @@ export function updateOverflowBadges(html, width) {
 export function refreshEditorAfterEdit() {
   renderAll();
   buildSettings();
+}
+
+// Clear saved tile heights and column widths for the previewed screen.
+// In-memory only until Save & Apply, like every other layout edit.
+export function resetSizes() {
+  if (state.config.sizes) delete state.config.sizes[editorScreen];
+  if (state.config.colWidths) delete state.config.colWidths[editorScreen];
+  refreshEditorAfterEdit();
 }
 
 // Click a section-kind panel's title to edit its icon/title inline (same input
