@@ -42,16 +42,76 @@ export function renderDock() {
   return screens + items;
 }
 
+// Split column arrays into render bands around full-width panels. A full
+// panel hoists out of its column into its own full-width row; the row lands
+// as far down as the panel's position among the non-full panels above it in
+// its own column (ties: leftmost column first). A column shorter than that
+// position contributes nothing to the upper band. Pure.
+export function splitBands(columns, fullIds) {
+  const bands = [];
+  let cols = columns.map(c => c.slice());
+  for (;;) {
+    let pick = null;
+    for (const col of cols) {
+      let prefix = 0;
+      for (const id of col) {
+        if (fullIds.has(id)) {
+          if (!pick || prefix < pick.i) pick = { id, i: prefix };
+          break; // only the first full panel per column matters this round
+        }
+        prefix++;
+      }
+    }
+    if (!pick) break;
+    const top = [], rest = [];
+    for (const col of cols) {
+      const fi = col.indexOf(pick.id);
+      if (fi !== -1) { top.push(col.slice(0, fi)); rest.push(col.slice(fi + 1)); }
+      else { top.push(col.slice(0, pick.i)); rest.push(col.slice(pick.i)); }
+    }
+    if (top.some(c => c.length)) bands.push({ kind: "cols", columns: top });
+    bands.push({ kind: "full", id: pick.id });
+    cols = rest;
+  }
+  if (cols.some(c => c.length)) bands.push({ kind: "cols", columns: cols });
+  return bands;
+}
+
 // Assemble a screen grid from prebuilt panel HTML. `columns` is an array of
 // columns, each an ordered array of panel ids; every panel string's outermost
-// element carries data-panel-id (inert live, used by the layout editor). The
-// outer grid div carries data-screen-grid so the editor's overflow check can
-// measure the live grid's available height.
-export function assembleColumns(panelHtml, columns, gridStyle, colStyles) {
-  const cols = columns.map((col, i) =>
-    `<div style="${colStyles[i]}">${col.map(id => panelHtml[id] || "").join("")}</div>`
+// element carries data-panel-id (inert live, used by the layout editor).
+// `sizes` (effectiveSizes output) hoists full:true panels into their own
+// full-width rows via splitBands; an `h` weight on a full panel sizes its row
+// (default: content height). opts.preview swaps live chrome for editor chrome
+// (data-preview-col on column divs, no data-screen-grid). The live outer grid
+// div carries data-screen-grid so the editor's overflow check can measure the
+// live grid's available height. With no full panels the output is identical
+// to the pre-banding single-grid shape.
+export function assembleColumns(panelHtml, columns, gridStyle, colStyles, sizes = {}, opts = {}) {
+  const fullIds = new Set(
+    Object.keys(sizes).filter(id => sizes[id] && sizes[id].full && panelHtml[id])
+  );
+  const renderCols = cols => cols.map((col, i) =>
+    `<div ${opts.preview ? `data-preview-col="${i}" ` : ""}style="${colStyles[i]}">${col.map(id => panelHtml[id] || "").join("")}</div>`
   ).join("");
-  return `<div data-screen-grid style="${gridStyle}">${cols}</div>`;
+  const gridAttr = opts.preview ? "" : "data-screen-grid ";
+  if (!fullIds.size) {
+    return `<div ${gridAttr}style="${gridStyle}">${renderCols(columns)}</div>`;
+  }
+  // Banded layout: a flex wrapper stacks column-band grids (each flex:1 via
+  // gridStyle) and full-width rows. The 14px wrapper gap matches every
+  // screen's grid gap today.
+  const html = splitBands(columns, fullIds).map(band => {
+    if (band.kind === "full") {
+      const h = sizes[band.id] && sizes[band.id].h;
+      const rowStyle = typeof h === "number"
+        ? `flex:${h} 1 0;min-height:0;`
+        : "flex-shrink:0;min-height:0;";
+      return `<div data-full-row="${band.id}" style="${rowStyle}">${panelHtml[band.id] || ""}</div>`;
+    }
+    return `<div style="${gridStyle}">${renderCols(band.columns)}</div>`;
+  }).join("");
+  return `<div ${gridAttr}style="display:flex;flex-direction:column;gap:14px;flex:1;min-height:0;">${html}</div>`;
 }
 
 export async function showScreen(name) {
