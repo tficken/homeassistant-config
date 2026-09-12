@@ -234,6 +234,7 @@ There is no automated deployment to the live Home Assistant instance; deploy man
 
 ## Notes for Future Agents
 
+- **Tool paths**: the working directory is a UNC path (`\\HOMEASSISTANT\config`), and the Read/Write/Edit tools do not resolve relative paths against it — always pass absolute paths in the form `//HOMEASSISTANT/config/<file>` to file tools. Bash commands work with relative paths as usual.
 - This is a personal/single-instance Home Assistant configuration. Changes affect a live home automation system.
 - Always prefer minimal, targeted edits.
 - Verify YAML changes with Home Assistant's configuration validation before restarting. Use the local Node.js in `.tools/node/` or the Python fallback for syntax checks.
