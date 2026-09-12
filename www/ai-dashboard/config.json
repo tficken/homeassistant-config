@@ -8,6 +8,7 @@
       [
         "clock",
         "presence",
+        "lights",
         "oncall"
       ],
       [
@@ -48,6 +49,13 @@
   },
   "layout": {
     "clock24h": false
+  },
+  "sizes": {},
+  "colWidths": {
+    "status": [
+      0.91,
+      1.09
+    ]
   },
   "entities": {
     "weather": "weather.forecast_home",
@@ -183,9 +191,12 @@
         "sensor.hobeian_zg_204zx_temperature_2",
         "sensor.hobeian_zg_204zx_humidity_2",
         "sensor.hobeian_zg_204zx_illuminance_2",
+        "sensor.hobeian_zg_204zx_temperature_4",
         "sensor.hobeian_zg_204zx_temperature_3",
         "sensor.hobeian_zg_204zx_humidity_3",
-        "sensor.hobeian_zg_204zx_illuminance_3"
+        "sensor.hobeian_zg_204zx_illuminance_3",
+        "sensor.hobeian_zg_204zx_humidity_4",
+        "sensor.hobeian_zg_204zx_illuminance_4"
       ]
     },
     "presence": {
