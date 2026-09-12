@@ -78,7 +78,7 @@ export function renderLayoutTab() {
         </label>
         ${missingBlock}
         <div id="palette-list" style="overflow-y:auto;flex:1;min-height:0;">${renderPaletteList()}</div>
-        <p style="color:var(--text-muted);font-size:0.72rem;margin:8px 0 0;flex-shrink:0;">Drag an entity onto a panel to add it. Drag a card back here to remove it.</p>
+        <p style="color:var(--text-muted);font-size:0.72rem;margin:8px 0 0;flex-shrink:0;">Drag an entity onto a panel to add it. Drag a card back here to remove it. Drag a card onto another card — or a room onto another room in Room Monitors — to reorder.</p>
       </div>
       <div id="preview" style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;">
         <div id="preview-tabs" style="display:flex;gap:8px;margin-bottom:8px;flex-shrink:0;">${previewTabs}

@@ -1,6 +1,7 @@
 // Pointer-drag interactions for the settings layout editor: panel reordering
 // between preview columns, entity add/move/remove via palette and card drags,
-// and the post-render editor affordances on the scaled preview. Circular with
+// room-cell reorder drags in the aggregated roomMonitors panel, and the
+// post-render editor affordances on the scaled preview. Circular with
 // layout.js (sectionOfEntity, removeSectionEntity, refreshEditorAfterEdit,
 // wireTitleEdit) and editor.js (editorScreen, setSettingsStatus, buildSettings)
 // — function references at runtime only.
@@ -216,8 +217,9 @@ export function decoratePreviewPanels(inner) {
     const cards = panel.querySelectorAll("[data-entity-id]");
     if (!cards.length) {
       // Aggregated panel: no per-entity cards to drag or ×. roomMonitors gets
-      // per-room × overlays below; other aggregated sections manage entities
-      // from the palette/labels instead.
+      // per-room × overlays below and room-cell reorder drags (wired in
+      // initPreviewDrag); other aggregated sections manage entities from the
+      // palette/labels instead.
       const ents = (state.config.sections[section] && state.config.sections[section].entities) || [];
       const panelBody = panel.querySelector(".panel-body") || panel;
       if (!ents.length) {
@@ -313,6 +315,24 @@ export function decoratePreviewPanels(inner) {
       grid.appendChild(d);
     }
   });
+}
+
+// Room-cell drop (roomMonitors aggregated panel): move the dragged room's
+// whole entity group — the same area-or-name grouping renderRoomMonitors uses
+// — before the target room's first entity, or to the end when dropped on the
+// panel body. Room drags are confined to their own panel by findDropTarget.
+export function applyRoomDrop(d, target) {
+  const sec = state.config.sections[d.key];
+  if (!sec || !Array.isArray(sec.entities)) return;
+  const groupOf = id => entityArea(id) || friendlyName(id);
+  const moving = sec.entities.filter(id => groupOf(id) === d.id);
+  const rest = sec.entities.filter(id => groupOf(id) !== d.id);
+  if (!moving.length) return;
+  const targetRoom = target.getAttribute("data-room");
+  let index = targetRoom ? rest.findIndex(id => groupOf(id) === targetRoom) : -1;
+  if (index === -1) index = rest.length;
+  sec.entities = rest.slice(0, index).concat(moving, rest.slice(index));
+  refreshEditorAfterEdit();
 }
 
 // Entity/palette drop: drag to the palette removes from the source section, a
@@ -419,6 +439,20 @@ export function initPreviewDrag() {
         startDrag(ev, "entity", el);
       });
     });
+    // Room-cell drag sources (aggregated roomMonitors panel — the cells carry
+    // no data-entity-id, so the entity wiring above never sees them). Drag a
+    // room onto another room to reorder, onto the panel body to move to end.
+    stage.querySelectorAll("[data-room]").forEach(el => {
+      if (el.dataset.dragWired) return;
+      const panel = el.closest("[data-panel-id]");
+      const entry = panel && PANEL_REGISTRY[panel.getAttribute("data-panel-id")];
+      if (!entry || entry.kind !== "section") return;
+      el.dataset.dragWired = "1";
+      el.addEventListener("pointerdown", ev => {
+        if (ev.target.closest(".preview-remove") || ev.target.closest("input")) return;
+        startDrag(ev, "room", el);
+      });
+    });
   }
   let drag = null;
 
@@ -428,6 +462,10 @@ export function initPreviewDrag() {
     let id, key = null;
     if (kind === "panel") {
       id = el.getAttribute("data-panel-id");
+    } else if (kind === "room") {
+      id = el.getAttribute("data-room");
+      const panel = el.closest("[data-panel-id]");
+      key = panel ? panelSection(panel.getAttribute("data-panel-id")) : null;
     } else {
       id = el.getAttribute("data-entity-id") || el.getAttribute("data-entity");
       if (kind === "palette") {
@@ -514,6 +552,7 @@ export function initPreviewDrag() {
     cleanupDrag(d);
     if (d.moved && target) {
       if (d.kind === "panel") applyPanelDrop(d.id, target);
+      else if (d.kind === "room") applyRoomDrop(d, target);
       else applyEntityDrop(d, target);
     }
   }
@@ -521,6 +560,17 @@ export function initPreviewDrag() {
   function findDropTarget(ev) {
     const el = document.elementFromPoint(ev.clientX, ev.clientY);
     if (!el || !stage) return null;
+    if (drag.kind === "room") {
+      // Confined to the source panel: another room cell (insert before it) or
+      // the panel body (move to end).
+      const homePanel = drag.el.closest("[data-panel-id]");
+      const cell = el.closest("[data-room]");
+      if (cell && stage.contains(cell) && cell !== drag.el &&
+          homePanel && cell.closest("[data-panel-id]") === homePanel) return cell;
+      const panel = el.closest("[data-panel-id]");
+      if (panel && panel === homePanel) return panel;
+      return null;
+    }
     if (drag.kind === "entity" || drag.kind === "palette") {
       const palette = el.closest("#palette");
       if (palette) return palette;
