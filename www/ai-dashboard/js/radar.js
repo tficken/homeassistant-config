@@ -12,6 +12,14 @@ export function renderRadarFrame() {
   </div>`;
 }
 
+// Supersede token for initRadarMap: a home re-render can land while a prior
+// init is still awaiting the RainViewer fetch. Without the token both inits
+// proceed and the later finisher overwrites state.radarMap /
+// state.radarAnimInterval, orphaning the earlier map and its 700ms animation
+// interval forever — leaked intervals accumulate over hours of uptime and
+// churn the tablet's main thread.
+let radarInitSeq = 0;
+
 export async function initRadarMap() {
   const el = document.getElementById("radar-map");
   if (!el || !window.L || !state.haConfig) return;
@@ -21,9 +29,11 @@ export async function initRadarMap() {
   if (state.radarMap && state.radarMapEl === el) return;
   if (state.radarMap) { state.radarMap.remove(); state.radarMap = null; state.radarMapEl = null; }
   if (state.radarAnimInterval) { clearInterval(state.radarAnimInterval); state.radarAnimInterval = null; }
+  const seq = ++radarInitSeq;
   try {
     const res = await fetch("https://api.rainviewer.com/public/weather-maps.json", { cache: "no-store" });
     const data = await res.json();
+    if (seq !== radarInitSeq) return; // superseded by a newer re-render mid-fetch
     const frames = data.radar && data.radar.past;
     if (!frames || !frames.length) throw new Error("no radar frames");
     const map = window.L.map(el, { zoomControl: false, maxZoom: 10 }).setView(
@@ -79,6 +89,7 @@ export async function initRadarMap() {
     state.radarMap = map;
     state.radarMapEl = el;
   } catch (e) {
+    if (seq !== radarInitSeq) return; // superseded: the newer init owns the outcome
     console.error("radar init failed", e);
     el.innerHTML = '<div style="color:var(--text-muted);padding:14px;">RADAR OFFLINE</div>';
   }
