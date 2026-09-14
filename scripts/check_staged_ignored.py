@@ -19,7 +19,7 @@ def get_staged_files():
 def is_ignored(path):
     """Return True if git considers path ignored."""
     result = subprocess.run(
-        ["git", "check-ignore", "-q", path],
+        ["git", "check-ignore", "-q", "--no-index", path],
         capture_output=True,
         text=True,
     )
