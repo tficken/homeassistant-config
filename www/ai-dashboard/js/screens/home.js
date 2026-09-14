@@ -45,6 +45,22 @@ export function getAlerts() {
       alerts.push(`${friendlyName(id)} available`);
     }
   }
+  // Config-driven rules (config.alerts): first matching condition trips the rule.
+  const rules = Array.isArray(state.config.alerts) ? state.config.alerts : [];
+  for (const rule of rules) {
+    if (!rule || typeof rule.entity !== "string") continue;
+    const st = state.states[rule.entity];
+    if (!st) continue;
+    const num = parseFloat(st.state);
+    const tripped =
+      (typeof rule.above === "number" && !isNaN(num) && num > rule.above) ||
+      (typeof rule.below === "number" && !isNaN(num) && num < rule.below) ||
+      (typeof rule.equals === "string" && String(st.state).toLowerCase() === rule.equals.toLowerCase());
+    if (tripped) {
+      const label = typeof rule.label === "string" && rule.label ? rule.label : friendlyName(rule.entity);
+      alerts.push(label.replace(/\{state\}/g, st.state));
+    }
+  }
   return alerts;
 }
 

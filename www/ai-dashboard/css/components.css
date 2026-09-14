@@ -262,6 +262,49 @@
   box-shadow: 0 0 10px rgba(20, 254, 23, 0.4); transition: width .3s;
 }
 
+/* Event-triggered camera popup */
+.event-popup-backdrop { background: rgba(0, 0, 0, 0.82); }
+
+/* Night / idle mode overlay */
+.night-overlay {
+  position: fixed; inset: 0; z-index: 2000;
+  background: #000;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.night-clock-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  transition: transform 0.6s ease-out;
+}
+#night-clock {
+  font-family: var(--font-mono);
+  font-size: clamp(5rem, 16vw, 11rem);
+  line-height: 0.9;
+  color: rgba(20, 254, 23, 0.16);
+  text-shadow: 0 0 40px rgba(20, 254, 23, 0.12);
+  white-space: nowrap;
+}
+#night-date {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(20, 254, 23, 0.16);
+}
+.event-popup-panel { width: min(840px, 92vw); }
+.event-popup-body {
+  padding: 0;
+  cursor: pointer;
+}
+.event-popup-body .terminal-panel {
+  margin-bottom: 0;
+  border: none;
+  box-shadow: none;
+}
+.event-popup-body .terminal-panel::before,
+.event-popup-body .terminal-panel::after { display: none; }
+.event-popup-body .camera-feed { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; }
+
 /* Snapshot history modal (no box chrome — floating media viewer) */
 .snapshot-modal-backdrop { background: rgba(0, 0, 0, 0.88); }
 .snapshot-modal-panel {

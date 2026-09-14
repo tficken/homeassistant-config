@@ -9,6 +9,7 @@ import { connect } from './connection.js';
 import { refreshCameraSnapshot, snapshotLastActivityMs,
   SNAPSHOT_IDLE_EVENT_WINDOW_MS, SNAPSHOT_IDLE_POLL_MS, SNAPSHOT_CHECK_MS } from './cameras.js';
 import { renderDock, showScreen, updateClock, measureClock } from './screens/index.js';
+import { startIdleWatch } from './components/night-mode.js';
 
 // ---- Init ----
 
@@ -18,6 +19,7 @@ async function init() {
   await fetchHAConfig();
   document.getElementById("dock").innerHTML = renderDock();
   showScreen("home");
+  startIdleWatch();
   setInterval(refreshForecast, 15 * 60 * 1000);
   if (window.HA_INTEGRATION_PROXY) {
     state.token = "";

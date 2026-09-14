@@ -175,10 +175,10 @@
         "sensor.hobeian_zg_204zx_humidity",
         "sensor.hobeian_zg_204zx_temperature_2",
         "sensor.hobeian_zg_204zx_humidity_2",
-        "sensor.hobeian_zg_204zx_temperature_3",
-        "sensor.hobeian_zg_204zx_humidity_3",
         "sensor.hobeian_zg_204zx_temperature_4",
-        "sensor.hobeian_zg_204zx_humidity_4"
+        "sensor.hobeian_zg_204zx_humidity_4",
+        "sensor.hobeian_zg_204zx_temperature_3",
+        "sensor.hobeian_zg_204zx_humidity_3"
       ]
     },
     "environment": {
@@ -214,10 +214,11 @@
         "sensor.home_assistant_core_cpu_percent",
         "sensor.home_assistant_core_memory_percent",
         "sensor.ha_disk_usage",
-        "vacuum.pooper_litter_box",
         "update.home_assistant_core_update",
         "update.home_assistant_operating_system_update",
-        "update.home_assistant_supervisor_update"
+        "update.home_assistant_supervisor_update",
+        "sensor.exos_router_download_speed",
+        "sensor.exos_router_upload_speed"
       ]
     }
   },
@@ -230,6 +231,39 @@
       }
     ]
   },
+  "idle": {
+    "returnHomeSeconds": 60,
+    "nightStart": "22:00",
+    "nightEnd": "07:00"
+  },
+  "eventPopups": [
+    {
+      "events": [
+        "event.front_door_ding",
+        "event.front_door_motion"
+      ],
+      "camera": "camera.front_door_live_view",
+      "title": "FRONT DOOR",
+      "timeout": 30
+    }
+  ],
+  "alerts": [
+    {
+      "entity": "sensor.ha_last_backup_age",
+      "above": 8,
+      "label": "Backup is {state}d old"
+    },
+    {
+      "entity": "sensor.ha_disk_usage",
+      "above": 85,
+      "label": "Disk {state}% full"
+    },
+    {
+      "entity": "binary_sensor.exos_router_wan_status",
+      "equals": "off",
+      "label": "Internet down"
+    }
+  ],
   "presenceLabels": {
     "person.woteg": "Travis",
     "person.bobbie": "Bobbie"

@@ -15,6 +15,8 @@ import {
 } from './components/light-modal.js';
 import { openPrinterModal, closePrinterModal, pressPrinterButton } from './components/printer-modal.js';
 import { openSnapshotHistory, closeSnapshotHistory, stepSnapshotHistory } from './components/snapshot-viewer.js';
+import { closeEventPopup } from './components/event-popup.js';
+import { exitNightMode } from './components/night-mode.js';
 
 Object.assign(window, {
   toggleEntity, mediaCmd, setBrightness, setColorTemp,
@@ -22,6 +24,7 @@ Object.assign(window, {
   openLightModal, closeLightModal, lightPressStart, lightPressMove, lightPressEnd, lightPressCancel, lightWheelPick,
   openPrinterModal, closePrinterModal, pressPrinterButton,
   openSnapshotHistory, closeSnapshotHistory, stepSnapshotHistory,
+  closeEventPopup, exitNightMode,
   streamFeedFallback, cameraFeedLoaded,
   openSettings, closeSettings, saveSettings, exportConfig, importConfig, logout,
   switchSettingsTab, setEditorScreen,

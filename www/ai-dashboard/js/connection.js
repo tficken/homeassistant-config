@@ -10,6 +10,7 @@ import { trackLastEvent, primeLastEventCache } from './utils.js';
 import { fetchRegistry, refreshForecast } from './api.js';
 import { renderAll, updateCard } from './screens/index.js';
 import { scheduleSnapshotRefresh } from './cameras.js';
+import { handleEventStateChange } from './components/event-popup.js';
 
 export function setStatus(cls) {
   const led = document.getElementById("status-led");
@@ -120,7 +121,7 @@ export function connectProxy() {
     }
     if (msg.type === "event" && msg.event && msg.event.event_type === "state_changed") {
       const s = msg.event.data.new_state;
-      if (s) { trackLastEvent(state.states[s.entity_id], s); state.states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
+      if (s) { trackLastEvent(state.states[s.entity_id], s); handleEventStateChange(s); state.states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
     }
   };
   state.ws.onclose = () => {
@@ -163,7 +164,7 @@ export function connect() {
     }
     if (msg.type === "event" && msg.event && msg.event.event_type === "state_changed") {
       const s = msg.event.data.new_state;
-      if (s) { trackLastEvent(state.states[s.entity_id], s); state.states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
+      if (s) { trackLastEvent(state.states[s.entity_id], s); handleEventStateChange(s); state.states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
     }
   };
   state.ws.onclose = () => {

@@ -101,7 +101,6 @@ class PagerDutyCalendar(CalendarEntity):
             "identifiers": {(DOMAIN, unique_device_name)},
             "name": unique_device_name,
             "manufacturer": "PagerDuty Inc.",
-            "via_device": (DOMAIN, unique_device_name),
         }
 
     async def async_get_events(self, hass, start_date, end_date):

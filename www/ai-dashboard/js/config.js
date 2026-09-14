@@ -156,7 +156,26 @@ export const DEFAULT_CONFIG = {
     presence: { title: "Presence", icon: "👤", entities: ["binary_sensor.hobeian_zg_204zx", "binary_sensor.hobeian_zg_204zx_2"] },
     system: { title: "System", icon: "⚙️", entities: ["sensor.home_assistant_core_cpu_percent", "sensor.home_assistant_core_memory_percent", "sensor.ha_disk_usage", "vacuum.geordi_la_forge", "vacuum.pooper_litter_box", "update.home_assistant_core_update", "update.home_assistant_operating_system_update", "update.home_assistant_supervisor_update"] }
   },
-  dock: { items: [{ icon: "⚙️", action: "settings", label: "Settings" }] }
+  dock: { items: [{ icon: "⚙️", action: "settings", label: "Settings" }] },
+  // Idle / night mode (see js/components/night-mode.js).
+  idle: { returnHomeSeconds: 60, nightStart: "22:00", nightEnd: "07:00" },
+  // Event-triggered camera popups (see js/components/event-popup.js).
+  eventPopups: [
+    {
+      events: ["event.front_door_ding", "event.front_door_motion"],
+      camera: "camera.front_door_live_view",
+      title: "FRONT DOOR",
+      timeout: 30
+    }
+  ],
+  // Config-driven alert rules for the Home banner (see getAlerts() in screens/home.js).
+  // Each rule: entity + one condition (above/below for numeric states, equals for
+  // string states) + a label template where {state} interpolates the current state.
+  alerts: [
+    { entity: "sensor.ha_last_backup_age", above: 8, label: "Backup is {state}d old" },
+    { entity: "sensor.ha_disk_usage", above: 85, label: "Disk {state}% full" },
+    { entity: "binary_sensor.exos_router_wan_status", equals: "off", label: "Internet down" }
+  ]
 };
 
 export function deepMerge(target, ...sources) {
