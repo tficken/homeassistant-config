@@ -23,3 +23,21 @@ www/alexa_tts/
 www/media/
 www/ai-dashboard/snapshots/
 config.code-workspace
+
+# HACS-managed integrations (reinstalled via HACS; see docs/hacs-inventory.md)
+/custom_components/alexa_media/
+/custom_components/bambu_lab/
+/custom_components/extended_openai_conversation/
+/custom_components/hacs/
+/custom_components/openhasp/
+/custom_components/pagerduty/
+/custom_components/uix/
+
+# HACS-managed Lovelace cards
+/www/community/
+
+# Downloaded third-party theme
+/themes/google_dark_theme/
+
+# Scratch / working files
+/tmp/
