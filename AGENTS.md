@@ -138,11 +138,11 @@ For the full current entity list, parse `.storage/core.entity_registry`.
 
 Each integration is a standard HA package with a `manifest.json`, `__init__.py`, and platform modules — consult each `manifest.json` for the authoritative version, dependencies, and requirements rather than trusting docs.
 
-**Warning**: HACS-managed integrations (`alexa_media`, `bambu_lab`, `extended_openai_conversation`, `hacs`, `openhasp`, `uix`) have their directories **replaced on update** — never store your own files (including AGENTS.md or notes) inside them.
+**Warning**: HACS-managed integrations (`alexa_media`, `bambu_lab`, `extended_openai_conversation`, `hacs`, `openhasp`, `pagerduty`, `uix`) and HACS-downloaded Lovelace cards (`www/community/`) and the theme (`themes/google_dark_theme/`) are **excluded from git**. HACS replaces these directories on update. See `docs/hacs-inventory.md` for the restore checklist. Never store your own files inside HACS-managed directories.
 
 - **`ai_dashboard_proxy`** (self-written): Serves `/ai-dashboard/` and handles HA auth server-side for the dashboard. Documented in `www/ai-dashboard/AGENTS.md`. **Any Python change requires a Home Assistant restart.**
 - **`alexa_media`** (HACS): Announcements/TTS on Echo/Fire TV. Key usage: Echo announcements use `notify.alexa_media_<device_name>` with `data: {type: announce}`. The `media_player.everywhere` group and Fire TV devices are unreliable for announcements; prefer individual Echo devices.
-- **`bambu_lab`** (HACS): Bambu Lab 3D printers. Contains the embedded `pybambu/` library with the repo's only tests (see Testing).
+- **`bambu_lab`** (HACS): Bambu Lab 3D printers. Contains the embedded `pybambu/` library.
 - **`extended_openai_conversation`** (HACS): OpenAI-backed conversation agent for chat/voice control.
 - **`hacs`** (HACS): Home Assistant Community Store itself.
 - **`openhasp`** (HACS): Physical wall plate; plate layout is defined in `openhasp/wall_panel.yaml` (config lives outside the integration dir) and pushed over MQTT.
@@ -161,12 +161,10 @@ Each integration is a standard HA package with a `manifest.json`, `__init__.py`,
 
 ## Testing
 
-There is no top-level test harness. Only the `bambu_lab` integration contains tests:
+There is no top-level test harness. The `bambu_lab` integration previously contained tests under `custom_components/bambu_lab/pybambu/tests/`; those files were removed when the integration was restructured and are no longer tracked. The only custom code owned by this repo is `custom_components/ai_dashboard_proxy` and `custom_components/pagerduty` (note: pagerduty is HACS-managed; see `docs/hacs-inventory.md`).
 
-- **Location**: `custom_components/bambu_lab/pybambu/tests/` (Python `unittest`, JSON mock payloads).
-- **How to Run**: Create a venv inside `custom_components/bambu_lab/pybambu/venv/`, `pip install -r tests/requirements.txt`, then run `custom_components/bambu_lab/pybambu/run_tests.sh`.
-- The runner script preloads the stdlib `select` module before importing HA platform modules to avoid shadowing by `custom_components/bambu_lab/select.py`.
-- Run these tests when a change touches `pybambu/`.
+- **Python syntax check**: `python -m compileall custom_components/ai_dashboard_proxy -q`
+- **Lint**: `flake8 custom_components/ai_dashboard_proxy --max-line-length=120 --extend-ignore=E501,W503`
 
 ---
 
