@@ -19,9 +19,10 @@ These directories are installed/managed by HACS and will be added to `.gitignore
 - `custom_components/extended_openai_conversation/` — Extended OpenAI Conversation
 - `custom_components/hacs/` — HACS itself
 - `custom_components/openhasp/` — openHASP custom component
+- `custom_components/pagerduty/` — PagerDuty (HACS-managed, despite being listed separately in AGENTS.md)
 - `custom_components/uix/` — UI eXtension for Lovelace
 - `www/community/` — HACS-downloaded Lovelace cards
-- `themes/google_dark_theme/` — Google Dark Theme by JuanMTech
+- `themes/google_dark_theme/` — Google Dark Theme by JuanMTech (downloaded manually; treated as replaceable third-party content)
 
 Also excluded:
 
@@ -31,7 +32,6 @@ Also excluded:
 
 - `configuration.yaml`, `automations.yaml`, `scripts.yaml`, `secrets.yaml`
 - `custom_components/ai_dashboard_proxy/` — self-written integration
-- `custom_components/pagerduty/` — self-written integration
 - `www/ai-dashboard/` — self-written wall dashboard
 - `openhasp/wall_panel.yaml` and related config
 - `scripts/` maintenance scripts
