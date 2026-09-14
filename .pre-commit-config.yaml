@@ -1,0 +1,38 @@
+---
+repos:
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.35.1
+    hooks:
+      - id: yamllint
+        args: [-c, .yamllint.yaml, .]
+        pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: validate-ha-yaml
+        name: Validate Home Assistant YAML
+        entry: python scripts/validate_ha_yaml.py
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: flake8-ai-dashboard-proxy
+        name: flake8 ai_dashboard_proxy
+        entry: flake8 custom_components/ai_dashboard_proxy --max-line-length=120 --extend-ignore=E501,W503
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: compileall-ai-dashboard-proxy
+        name: compile ai_dashboard_proxy
+        entry: python -m compileall custom_components/ai_dashboard_proxy -q
+        language: system
+        pass_filenames: false
+        always_run: true
+
+      - id: check-staged-ignored
+        name: Check staged files are not git-ignored
+        entry: python scripts/check_staged_ignored.py
+        language: system
+        pass_filenames: false
+        always_run: true
