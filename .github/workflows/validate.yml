@@ -7,31 +7,28 @@ on:
     branches: [master, main]
 
 jobs:
-  lint-yaml:
-    name: Lint YAML
+  pre-commit:
+    name: Pre-commit checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install yamllint
-      - run: yamllint -c .yamllint.yaml .
+      - run: pip install pre-commit yamllint pyyaml flake8
+      - uses: pre-commit/action@v3.0.0
 
-  validate-config:
-    name: Validate HA YAML / JSON / HTML
+  validate-dashboard:
+    name: Validate AI dashboard assets
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install pyyaml
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate Home Assistant YAML files
-        run: python scripts/validate_ha_yaml.py
       - name: Validate AI dashboard config JSON
         run: python -m json.tool www/ai-dashboard/config.json > /dev/null
       - name: Dashboard JS syntax
@@ -42,17 +39,3 @@ jobs:
           echo "Dashboard JS modules OK"
       - name: Validate AI dashboard HTML
         run: python -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
-
-  lint-python:
-    name: Lint Python integrations
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: pip install flake8
-      - name: Lint ai_dashboard_proxy
-        run: flake8 custom_components/ai_dashboard_proxy --max-line-length=120 --extend-ignore=E501,W503
-      - name: Compile ai_dashboard_proxy Python files
-        run: python -m compileall custom_components/ai_dashboard_proxy -q
