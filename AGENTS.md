@@ -201,6 +201,24 @@ There is no top-level test harness. The `bambu_lab` integration previously conta
 - **Check Logs**: Use Home Assistant's logs to debug integration errors or configuration problems.
 - **Update Integrations**: HACS-managed integrations are updated via HACS, which replaces their directories wholesale — see the warning under Custom Integrations.
 
+### Pre-commit hooks
+
+Install once:
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+Now every `git commit` runs the same checks as CI:
+`yamllint`, HA YAML syntax validation, Python lint/compile for `ai_dashboard_proxy`,
+and a check that no git-ignored files (HACS-managed code, `tmp/`, `secrets.yaml`)
+are staged.
+
+To run the checks manually on all files:
+```bash
+pre-commit run --all-files
+```
+
 ---
 
 ## CI/CD
