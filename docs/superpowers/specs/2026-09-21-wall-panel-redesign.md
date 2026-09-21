@@ -25,7 +25,7 @@ Redesign the 7" CrowPanel wall-mounted touch display from its current two-page w
 ## Device
 
 - **Product:** GrowCube / CrowPanel 7" 800×480 capacitive touch display
-- **Board profile in openHASP flasher:** `Sunton ESP32-8048S070C` (capacitive). Fallback to `CrowPanel 7" RGB` if touch does not respond.
+- **Board profile in openHASP flasher:** `CrowPanel 7" RGB` first, because the device is branded CrowPanel and the previous attempt had screen/touch-response issues. Fallback to `Sunton ESP32-8048S070C` (capacitive 7") if the display or touch does not respond.
 - **Resolution:** 800 × 480 px, landscape
 - **MQTT topic prefix:** `hasp/wall_panel`
 - **openHASP node name:** `wall_panel`

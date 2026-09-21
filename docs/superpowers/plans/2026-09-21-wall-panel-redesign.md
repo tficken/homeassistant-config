@@ -43,11 +43,19 @@
 
 - [ ] **Step 2: Select board and flash**
 
-  Select board **Sunton ESP32-8048S070C** (capacitive 7"). If touch does not respond after boot, re-flash with **CrowPanel 7" RGB**. Click **Install** and choose the serial port.
+  Select board **CrowPanel 7" RGB** first. The device is branded CrowPanel and the previous attempt had screen/touch-response issues, so start with the profile that matches the hardware label. If the display does not initialize or touch does not respond after boot, re-flash with **Sunton ESP32-8048S070C** (capacitive 7") as a fallback. Click **Install** and choose the serial port.
 
-- [ ] **Step 3: Join Wi-Fi and configure MQTT**
+- [ ] **Step 3: Verify display and touch response**
 
-  After reboot, connect to the `openHASP-...` captive portal or find the device's IP from the router. In the plate web UI set:
+  After the panel boots, confirm:
+  - The openHASP splash/logo appears and the screen is oriented correctly (landscape).
+  - Touch input is recognized (the openHASP UI should respond to taps; if not, re-flash with the other board profile from Step 2).
+
+  Do not proceed to MQTT setup until the screen and touch are working.
+
+- [ ] **Step 4: Join Wi-Fi and configure MQTT**
+
+  Connect to the `openHASP-...` captive portal or find the device's IP from the router. In the plate web UI set:
   - Wi-Fi SSID / Password
   - MQTT Broker: HA host (e.g., `homeassistant.local` or `192.168.x.x`)
   - MQTT Port: `1883`
@@ -56,15 +64,15 @@
   - Idle: `off`
   - Start Page: `1`
 
-- [ ] **Step 4: Enable battery reporting**
+- [ ] **Step 5: Enable battery reporting**
 
   In the openHASP web UI, enable the battery sensor and set the correct ADC pin and voltage divider for the added battery. Save and reboot.
 
-- [ ] **Step 5: Discover the plate in Home Assistant**
+- [ ] **Step 6: Discover the plate in Home Assistant**
 
   In HA go to **Settings > Devices & Services**. The **openHASP** integration should discover a new device named `wall_panel`. Add it and finish the config flow.
 
-- [ ] **Step 6: Verify entity and battery**
+- [ ] **Step 7: Verify entity and battery**
 
   Check **Developer Tools > States** for `openhasp.wall_panel`. Inspect its attributes; note whether battery is reported as an attribute (e.g., `battery`) or as a separate sensor. Record this for Task 3.
 
