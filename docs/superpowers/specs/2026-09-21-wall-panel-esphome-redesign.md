@@ -6,7 +6,7 @@ Redesign the 7" CrowPanel Advance wall-mounted touch display into a cleaner, mor
 
 ## Current State
 
-- The panel is physically a **CrowPanel 7" Advance** with ESP32-S3-WROOM-1-N16R8, SC7277 RGB display driver, GT911 capacitive touch, and a PCA9557 IO expander.
+- The panel is physically a **CrowPanel 7" Advance** with ESP32-S3-WROOM-1-N16R8, SC7277 RGB display driver, GT911 capacitive touch, and an STC8H1K28 backlight controller.
 - The user is restoring a previously working ESPHome firmware image.
 - The `openhasp:` integration, `openhasp/wall_panel.yaml`, and `openhasp/wall_panel/pages.jsonl` files are inactive and will be removed or deprecated.
 - The user has added a physical battery to the panel and wants the battery level shown on screen.
@@ -27,7 +27,7 @@ Redesign the 7" CrowPanel Advance wall-mounted touch display into a cleaner, mor
 - **MCU:** ESP32-S3-WROOM-1-N16R8
 - **Display:** 800 × 480 RGB DPI (SC7277 driver)
 - **Touch:** GT911 capacitive
-- **IO expander:** PCA9557 (I²C 0x18) — controls backlight, audio amp, etc.
+- **IO expander / backlight controller:** STC8H1K28 (I²C 0x30) — controls display backlight
 - **Battery:** physical LiPo added by user; measured via ADC voltage divider
 - **Board profile in ESPHome:** `esp32-s3-devkitc-1` with ESP-IDF framework
 
@@ -101,11 +101,11 @@ A single ESPHome YAML file for the panel, e.g. `esphome/crowpanel-hasp.yaml` (or
 - `esp32` block with board, framework, sdkconfig for PSRAM and CPU frequency.
 - `psram` octal 80 MHz.
 - `logger`, `api`, `ota`, `wifi`, `captive_portal`.
-- `i2c` on pins 15/16 for PCA9557 and GT911.
+- `i2c` on pins 15/16 for STC8H1K28 and GT911.
 - `rpi_dpi_rgb` display with Advance-specific pins, `invert_colors: true`, `color_order: RGB`, 18 MHz PCLK.
 - `gt911` touchscreen at address `0x5D`.
-- `i2c_device` for PCA9557 at `0x18`.
-- Backlight controlled via PCA9557 (template output → binary light).
+- `i2c_device` for STC8H1K28 at `0x30`.
+- Backlight controlled via STC8H1K28 (template output → monochromatic light).
 - Battery ADC sensor with voltage divider.
 - Internal `homeassistant` sensors/switches for HA entities.
 
@@ -130,8 +130,9 @@ A single ESPHome YAML file for the panel, e.g. `esphome/crowpanel-hasp.yaml` (or
 
 ### Services called from ESPHome
 
-- `script.all_lights_off`, `script.relax_mode`, `script.movie_mode`, `script.focus_mode`.
-- `light.toggle` / `light.turn_on` for Living Room and Office lights.
+- `scene.turn_on` for `scene.all_lights_off`, `scene.movie_mode`, `scene.relax_mode`.
+- `script.turn_on` for `script.goodnight`.
+- `light.toggle` / `light.turn_on` for ceiling fan, living room ceiling fan, and fan light entities.
 - `switch.toggle` for motion-detection switches.
 
 ### Backlight control

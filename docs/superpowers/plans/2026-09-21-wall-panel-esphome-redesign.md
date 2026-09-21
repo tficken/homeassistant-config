@@ -6,7 +6,7 @@
 
 **Architecture:** The panel runs ESPHome firmware and connects to Home Assistant via the native API. HA entity state is pulled into ESPHome via `homeassistant.*` platforms, and touch events call HA services. The UI is built with ESPHome's LVGL YAML support.
 
-**Tech Stack:** Home Assistant OS, ESPHome add-on, ESP32-S3, LVGL, ESP-IDF framework, I²C (PCA9557 + GT911), RGB DPI display (SC7277).
+**Tech Stack:** Home Assistant OS, ESPHome add-on, ESP32-S3, LVGL, ESP-IDF framework, I²C (STC8H1K28 + GT911), RGB DPI display (SC7277).
 
 **Spec:** `docs/superpowers/specs/2026-09-21-wall-panel-esphome-redesign.md`
 
@@ -71,8 +71,8 @@
   - `i2c` on pins 15/16.
   - `rpi_dpi_rgb` display with Advance-specific pins, `invert_colors: true`, `color_order: RGB`, 18 MHz PCLK, 800×480 dimensions.
   - `gt911` touchscreen at address `0x5D`.
-  - `i2c_device` for PCA9557 at `0x18`.
-  - Template output + binary light for backlight control via PCA9557.
+  - `i2c_device` for STC8H1K28 at `0x30`.
+  - Template output + monochromatic light for backlight control via STC8H1K28.
   - ADC sensor for battery with placeholder pin and voltage divider.
 
 - [ ] **Step 2: Add internal HA entity mappings**
