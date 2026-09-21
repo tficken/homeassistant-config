@@ -1,0 +1,1410 @@
+# =============================================================================
+# CrowPanel 7" (ESP32-S3) wall panel — ESPHome + LVGL dashboard
+#
+# Three-page control-first dashboard: Home / Lights / Security.
+# Hardware sections below the header are the PROVEN, WORKING base for this
+# panel — do not "fix" display/touch/I2C/backlight/PSRAM/framework values.
+#
+# Before compiling:
+#   1. Fill in the BATTERY ADC placeholder (pin + voltage divider) — see TODOs
+#      in the sensor section.
+#   2. Requires secrets: wifi_ssid, wifi_password,
+#      crowpanel_hasp__encryption_key.
+#   3. In Home Assistant, allow this device to make service calls:
+#      Settings > Devices & services > ESPHome > CrowPanel HASP > Configure >
+#      enable "Allow the device to make Home Assistant service calls".
+#   4. Note: scenes were retired on this HA instance; the dashboard's scene
+#      buttons call the equivalent scripts (script.all_lights_off,
+#      script.relax_mode, script.movie_mode, script.goodnight).
+# =============================================================================
+
+esphome:
+  name: crowpanel-hasp
+  friendly_name: CrowPanel HASP
+  on_boot:
+    priority: -100
+    then:
+      - delay: 2s
+      - light.turn_on: backlight
+
+esp32:
+  board: esp32-s3-devkitc-1
+  variant: esp32s3
+  framework:
+    type: esp-idf
+    sdkconfig_options:
+      CONFIG_ESP32S3_DEFAULT_CPU_FREQ_240: y
+      CONFIG_ESP32S3_DATA_CACHE_64KB: y
+      CONFIG_SPIRAM_FETCH_INSTRUCTIONS: y
+      CONFIG_SPIRAM_RODATA: y
+
+psram:
+  mode: octal
+  speed: 80MHz
+
+logger:
+  level: DEBUG
+
+api:
+  encryption:
+    key: !secret crowpanel_hasp__encryption_key
+
+ota:
+  - platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+i2c:
+  sda: 15
+  scl: 16
+  frequency: 400000
+  scan: true
+  id: i2c_bus
+
+i2c_device:
+  id: stc8h1k28
+  address: 0x30
+  i2c_id: i2c_bus
+
+output:
+  - platform: template
+    id: backlight_output
+    type: float
+    write_action:
+      - lambda: |-
+          uint8_t val;
+          if (state == 0.0f) {
+            val = 0xF5;
+          } else {
+            val = (uint8_t)(244.0f * (1.0f - state));
+          }
+          id(stc8h1k28).write_byte(0x00, val);
+
+light:
+  - platform: monochromatic
+    output: backlight_output
+    name: "Display Backlight"
+    id: backlight
+    restore_mode: ALWAYS_ON
+
+display:
+  - platform: rpi_dpi_rgb
+    id: my_display
+    color_order: RGB
+    invert_colors: true
+    update_interval: never
+    auto_clear_enabled: false
+    dimensions:
+      width: 800
+      height: 480
+    de_pin: 42
+    hsync_pin: 40
+    vsync_pin: 41
+    pclk_pin: 39
+    pclk_frequency: 18MHz
+    data_pins:
+      red:
+        - 7
+        - 17
+        - 18
+        - 3
+        - 46
+      green:
+        - 9
+        - 10
+        - 11
+        - 12
+        - 13
+        - 14
+      blue:
+        - 21
+        - 47
+        - 48
+        - 45
+        - 38
+
+touchscreen:
+  platform: gt911
+  id: my_touchscreen
+  display: my_display
+  address: 0x5D
+
+# Clock source for the top bar and the time-of-day greeting.
+time:
+  - platform: homeassistant
+    id: panel_time
+    on_time:
+      - seconds: /1
+        then:
+          # Top-bar clock
+          - lvgl.label.update:
+              id: topbar_clock
+              text: !lambda |-
+                auto t = id(panel_time).now();
+                if (!t.is_valid()) {
+                  return std::string("--:--");
+                }
+                char buf[6];
+                snprintf(buf, sizeof(buf), "%02d:%02d", t.hour, t.minute);
+                return std::string(buf);
+          # Time-of-day greeting on the Home page
+          - lvgl.label.update:
+              id: home_greeting
+              text: !lambda |-
+                auto t = id(panel_time).now();
+                if (!t.is_valid()) {
+                  return std::string("Hello");
+                }
+                int h = t.hour;
+                if (h < 5) {
+                  return std::string("Good night");
+                } else if (h < 12) {
+                  return std::string("Good morning");
+                } else if (h < 18) {
+                  return std::string("Good afternoon");
+                } else {
+                  return std::string("Good evening");
+                }
+
+font:
+  - file:
+      type: gfonts
+      family: Roboto
+    id: font_small
+    size: 14
+    bpp: 4
+  - file:
+      type: gfonts
+      family: Roboto
+    id: font_medium
+    size: 22
+    bpp: 4
+  - file:
+      type: gfonts
+      family: Roboto
+    id: font_large
+    size: 36
+    bpp: 4
+
+sensor:
+  # ---------------------------------------------------------------------------
+  # BATTERY — PLACEHOLDER, NEEDS HARDWARE DETAILS
+  #
+  # A LiPo battery was added to the panel, but the ADC GPIO and the voltage
+  # divider values are not yet known. TWO values must be filled in below:
+  #
+  #   TODO 1: `pin:`        — the GPIO the battery voltage divider output is
+  #                           wired to. MUST be an ADC1 pin (GPIO1..GPIO10 on
+  #                           the ESP32-S3) because ADC2 cannot be used
+  #                           alongside Wi-Fi. GPIO4 (ADC1_CH3) is a guess and
+  #                           is free on this panel's pin map — change it.
+  #   TODO 2: divider ratio  — the lambda filter on the adc sensor must multiply
+  #                           the measured voltage back up by the divider ratio,
+  #                           e.g. `return x * 2.0f;` for a 100k/100k divider.
+  #
+  # Percentage mapping (3.0 V -> 0%, 4.2 V -> 100%, clamped) is implemented in
+  # the template sensor `battery_percent` below and needs no changes.
+  # ---------------------------------------------------------------------------
+  - platform: adc
+    pin: GPIO4  # TODO: confirm the actual battery divider pin (must be ADC1)
+    attenuation: 12db
+    id: battery_voltage
+    name: "Panel battery voltage"
+    update_interval: 30s
+    filters:
+      - lambda: |-
+          // TODO: apply the voltage divider ratio here, e.g.:
+          // return x * 2.0f;   // 100k/100k divider
+          return x;
+    on_value:
+      then:
+        - script.execute: update_battery_label
+
+  - platform: template
+    name: "Panel battery"
+    id: battery_percent
+    unit_of_measurement: "%"
+    update_interval: 30s
+    lambda: |-
+      float v = id(battery_voltage).state;
+      if (isnan(v)) {
+        return NAN;
+      }
+      // 3.0 V -> 0%, 4.2 V -> 100%, clamped to 0-100.
+      float pct = (v - 3.0f) / (4.2f - 3.0f) * 100.0f;
+      if (pct < 0.0f) {
+        pct = 0.0f;
+      }
+      if (pct > 100.0f) {
+        pct = 100.0f;
+      }
+      return pct;
+    on_value:
+      then:
+        - script.execute: update_battery_label
+
+  # ----- Home Assistant imports: numeric values -----
+  - platform: homeassistant
+    id: ha_weather_temp
+    entity_id: weather.forecast_home
+    attribute: temperature
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: home_weather_temp
+            text:
+              format: "%.0f°"
+              args: [ 'x' ]
+              if_nan: "--°"
+
+  - platform: homeassistant
+    id: ha_backup_age
+    entity_id: sensor.ha_last_backup_age
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - script.execute: update_alert_banner
+
+  - platform: homeassistant
+    id: ha_disk_usage
+    entity_id: sensor.ha_disk_usage
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - script.execute: update_alert_banner
+
+  - platform: homeassistant
+    id: ha_nws_alerts
+    entity_id: sensor.nws_warnings_watches
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - script.execute: update_alert_banner
+
+  # Living room ceiling fan brightness (0-255), used to position the slider.
+  - platform: homeassistant
+    id: ha_lr_fan_brightness
+    entity_id: light.living_room_ceiling_fan
+    attribute: brightness
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - lvgl.slider.update:
+            id: lr_fan_slider
+            value: !lambda |-
+              if (isnan(x) || x <= 0.0f) {
+                return 0;
+              }
+              return (int) (x / 255.0f * 100.0f);
+
+text_sensor:
+  # ----- Home Assistant imports: text states -----
+  - platform: homeassistant
+    id: ts_weather_condition
+    entity_id: weather.forecast_home
+    attribute: condition
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: home_weather_cond
+            text: !lambda |-
+              if (x == "sunny") return std::string("Sunny");
+              if (x == "clear-night") return std::string("Clear night");
+              if (x == "partlycloudy") return std::string("Partly cloudy");
+              if (x == "cloudy") return std::string("Cloudy");
+              if (x == "fog") return std::string("Fog");
+              if (x == "rainy") return std::string("Rain");
+              if (x == "pouring") return std::string("Heavy rain");
+              if (x == "snowy") return std::string("Snow");
+              if (x == "snowy-rainy") return std::string("Snow & rain");
+              if (x == "hail") return std::string("Hail");
+              if (x == "lightning") return std::string("Thunderstorms");
+              if (x == "lightning-rainy") return std::string("Storms & rain");
+              if (x == "wind") return std::string("Windy");
+              if (x == "wind-variant") return std::string("Windy");
+              if (x == "exceptional") return std::string("Severe weather");
+              return x.empty() ? std::string("—") : x;
+
+  - platform: homeassistant
+    id: ts_person_woteg
+    entity_id: person.woteg
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: home_travis
+            text: !lambda |-
+              return std::string("Travis: ") + ((x == "home") ? "Home" : "Away");
+        - lvgl.widget.update:
+            id: home_travis
+            text_color: !lambda |-
+              return (x == "home") ? lv_color_hex(0x4CAF50) : lv_color_hex(0xB0BEC5);
+
+  - platform: homeassistant
+    id: ts_person_bobbie
+    entity_id: person.bobbie
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: home_bobbie
+            text: !lambda |-
+              return std::string("Bobbie: ") + ((x == "home") ? "Home" : "Away");
+        - lvgl.widget.update:
+            id: home_bobbie
+            text_color: !lambda |-
+              return (x == "home") ? lv_color_hex(0x4CAF50) : lv_color_hex(0xB0BEC5);
+
+  # Light on/off states for the Lights page cards.
+  - platform: homeassistant
+    id: ts_ceiling_fan
+    entity_id: light.ceiling_fan
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: ceiling_fan_state
+            text: !lambda |-
+              return (x == "on") ? std::string("On") : std::string("Off");
+
+  - platform: homeassistant
+    id: ts_lr_fan
+    entity_id: light.living_room_ceiling_fan
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: lr_fan_state
+            text: !lambda |-
+              return (x == "on") ? std::string("On") : std::string("Off");
+
+  - platform: homeassistant
+    id: ts_fan1
+    entity_id: light.third_reality_inc_3rcb01057z_4
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: fan1_state
+            text: !lambda |-
+              return (x == "on") ? std::string("On") : std::string("Off");
+
+  - platform: homeassistant
+    id: ts_fan2
+    entity_id: light.third_reality_inc_3rcb01057z_5
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: fan2_state
+            text: !lambda |-
+              return (x == "on") ? std::string("On") : std::string("Off");
+
+  - platform: homeassistant
+    id: ts_fan3
+    entity_id: light.third_reality_inc_3rcb01057z_6
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: fan3_state
+            text: !lambda |-
+              return (x == "on") ? std::string("On") : std::string("Off");
+
+  # Ring last-activity timestamps. HA timestamp states arrive as ISO strings
+  # in UTC (e.g. "2026-09-21T20:18:34+00:00"); the lambda trims them to
+  # "MM-DD HH:MM" (UTC, not local time).
+  - platform: homeassistant
+    id: ts_front_last
+    entity_id: sensor.front_door_last_activity
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: sec_front_last
+            text: !lambda |-
+              if (x.size() >= 16) {
+                std::string out = x.substr(5, 11);
+                out[5] = ' ';
+                return out;
+              }
+              return x.empty() ? std::string("—") : x;
+
+  - platform: homeassistant
+    id: ts_downstairs_last
+    entity_id: sensor.downstairs_last_activity
+    internal: true
+    publish_initial_state: true
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: sec_downstairs_last
+            text: !lambda |-
+              if (x.size() >= 16) {
+                std::string out = x.substr(5, 11);
+                out[5] = ' ';
+                return out;
+              }
+              return x.empty() ? std::string("—") : x;
+
+binary_sensor:
+  # ----- Home Assistant imports: binary states -----
+  - platform: homeassistant
+    id: bs_front_door
+    entity_id: binary_sensor.living_room_front_door
+    internal: true
+    publish_initial_state: true
+    on_state:
+      then:
+        - lvgl.label.update:
+            id: home_door_front
+            text: !lambda |-
+              return x ? std::string("Front Door: Open") : std::string("Front Door: Closed");
+        - lvgl.widget.update:
+            id: home_door_front
+            text_color: !lambda |-
+              return x ? lv_color_hex(0xFF9800) : lv_color_hex(0x4CAF50);
+        - lvgl.label.update:
+            id: sec_front_state
+            text: !lambda |-
+              return x ? std::string("Open") : std::string("Closed");
+        - lvgl.widget.update:
+            id: sec_front_state
+            text_color: !lambda |-
+              return x ? lv_color_hex(0xFF9800) : lv_color_hex(0x4CAF50);
+
+  - platform: homeassistant
+    id: bs_backdoor
+    entity_id: binary_sensor.backdoor
+    internal: true
+    publish_initial_state: true
+    on_state:
+      then:
+        - lvgl.label.update:
+            id: home_door_back
+            text: !lambda |-
+              return x ? std::string("Back Door: Open") : std::string("Back Door: Closed");
+        - lvgl.widget.update:
+            id: home_door_back
+            text_color: !lambda |-
+              return x ? lv_color_hex(0xFF9800) : lv_color_hex(0x4CAF50);
+        - lvgl.label.update:
+            id: sec_back_state
+            text: !lambda |-
+              return x ? std::string("Open") : std::string("Closed");
+        - lvgl.widget.update:
+            id: sec_back_state
+            text_color: !lambda |-
+              return x ? lv_color_hex(0xFF9800) : lv_color_hex(0x4CAF50);
+
+  - platform: homeassistant
+    id: bs_wan
+    entity_id: binary_sensor.exos_router_wan_status
+    internal: true
+    publish_initial_state: true
+    on_state:
+      then:
+        - script.execute: update_alert_banner
+
+  # Light entities imported as binary states drive the "checked" (on) look of
+  # the toggle cards on the Lights page.
+  - platform: homeassistant
+    id: bs_ceiling_fan
+    entity_id: light.ceiling_fan
+    internal: true
+    publish_initial_state: true
+    on_state:
+      then:
+        - lvgl.widget.update:
+            id: ceiling_fan_btn
+            state:
+              checked: !lambda return x;
+
+  - platform: homeassistant
+    id: bs_lr_fan
+    entity_id: light.living_room_ceiling_fan
+    internal: true
+    publish_initial_state: true
+    on_state:
+      then:
+        - lvgl.widget.update:
+            id: lr_fan_btn
+            state:
+              checked: !lambda return x;
+
+  - platform: homeassistant
+    id: bs_fan1
+    entity_id: light.third_reality_inc_3rcb01057z_4
+    internal: true
+    publish_initial_state: true
+    on_state:
+      then:
+        - lvgl.widget.update:
+            id: fan1_btn
+            state:
+              checked: !lambda return x;
+
+  - platform: homeassistant
+    id: bs_fan2
+    entity_id: light.third_reality_inc_3rcb01057z_5
+    internal: true
+    publish_initial_state: true
+    on_state:
+      then:
+        - lvgl.widget.update:
+            id: fan2_btn
+            state:
+              checked: !lambda return x;
+
+  - platform: homeassistant
+    id: bs_fan3
+    entity_id: light.third_reality_inc_3rcb01057z_6
+    internal: true
+    publish_initial_state: true
+    on_state:
+      then:
+        - lvgl.widget.update:
+            id: fan3_btn
+            state:
+              checked: !lambda return x;
+
+switch:
+  # Ring motion-detection switches (imported for state + toggle actions).
+  - platform: homeassistant
+    id: sw_front_motion
+    entity_id: switch.front_door_motion_detection
+    internal: true
+    publish_initial_state: true
+    on_turn_on:
+      then:
+        - lvgl.widget.update:
+            id: motion_front_btn
+            state:
+              checked: true
+        - lvgl.label.update:
+            id: motion_front_state
+            text: Armed
+        - script.execute: update_motion_summary
+    on_turn_off:
+      then:
+        - lvgl.widget.update:
+            id: motion_front_btn
+            state:
+              checked: false
+        - lvgl.label.update:
+            id: motion_front_state
+            text: "Off"
+        - script.execute: update_motion_summary
+
+  - platform: homeassistant
+    id: sw_downstairs_motion
+    entity_id: switch.downstairs_motion_detection
+    internal: true
+    publish_initial_state: true
+    on_turn_on:
+      then:
+        - lvgl.widget.update:
+            id: motion_downstairs_btn
+            state:
+              checked: true
+        - lvgl.label.update:
+            id: motion_downstairs_state
+            text: Armed
+        - script.execute: update_motion_summary
+    on_turn_off:
+      then:
+        - lvgl.widget.update:
+            id: motion_downstairs_btn
+            state:
+              checked: false
+        - lvgl.label.update:
+            id: motion_downstairs_state
+            text: "Off"
+        - script.execute: update_motion_summary
+
+script:
+  # Recomputes the alert banner from all four alert inputs; called from each
+  # input's on_value/on_state. Starts hidden; first real evaluation happens as
+  # soon as Home Assistant publishes initial states.
+  - id: update_alert_banner
+    mode: single
+    then:
+      - lvgl.widget.update:
+          id: alert_banner
+          hidden: !lambda |-
+            bool backup_stale = id(ha_backup_age).state > 7.0f;
+            bool disk_high = id(ha_disk_usage).state > 85.0f;
+            bool wan_down = !id(bs_wan).state;
+            bool nws_alerts = id(ha_nws_alerts).state > 0.0f;
+            return !(backup_stale || disk_high || wan_down || nws_alerts);
+      - lvgl.label.update:
+          id: alert_banner_text
+          text: !lambda |-
+            std::string msg = "Alerts:";
+            if (id(ha_backup_age).state > 7.0f) {
+              msg += " backup stale,";
+            }
+            if (id(ha_disk_usage).state > 85.0f) {
+              msg += " disk high,";
+            }
+            if (!id(bs_wan).state) {
+              msg += " WAN down,";
+            }
+            if (id(ha_nws_alerts).state > 0.0f) {
+              msg += " NWS alerts,";
+            }
+            if (msg.back() == ',') {
+              msg.pop_back();
+            }
+            return msg;
+
+  # Motion-armed summary line on the Home page (0/2, 1/2, 2/2).
+  - id: update_motion_summary
+    mode: single
+    then:
+      - lvgl.label.update:
+          id: home_motion_summary
+          text: !lambda |-
+            int n = (id(sw_front_motion).state ? 1 : 0) + (id(sw_downstairs_motion).state ? 1 : 0);
+            return std::string("Motion armed: ") + std::to_string(n) + "/2";
+      - lvgl.widget.update:
+          id: home_motion_summary
+          text_color: !lambda |-
+            int n = (id(sw_front_motion).state ? 1 : 0) + (id(sw_downstairs_motion).state ? 1 : 0);
+            if (n == 2) {
+              return lv_color_hex(0x4CAF50);
+            }
+            if (n == 0) {
+              return lv_color_hex(0xFF9800);
+            }
+            return lv_color_hex(0xB0BEC5);
+
+  # Top-bar battery label text + threshold colors
+  # (< 15% red, < 30% orange, otherwise white).
+  - id: update_battery_label
+    mode: single
+    then:
+      - lvgl.label.update:
+          id: topbar_battery
+          text: !lambda |-
+            float pct = id(battery_percent).state;
+            if (isnan(pct)) {
+              return std::string("--%");
+            }
+            char buf[8];
+            snprintf(buf, sizeof(buf), "%.0f%%", pct);
+            return std::string(buf);
+      - lvgl.widget.update:
+          id: topbar_battery
+          text_color: !lambda |-
+            float pct = id(battery_percent).state;
+            if (!isnan(pct) && pct < 15.0f) {
+              return lv_color_hex(0xF44336);
+            }
+            if (!isnan(pct) && pct < 30.0f) {
+              return lv_color_hex(0xFF9800);
+            }
+            return lv_color_hex(0xFFFFFF);
+
+lvgl:
+  # ----- Design tokens -----
+  #   Canvas 800x480; top bar 50px and bottom nav 50px in #1A237E.
+  #   Content bg #121212, cards #1E1E1E, accent/active #00BCD4, on #4CAF50,
+  #   alert #FF9800, text #FFFFFF / secondary #B0BEC5, radius 8px.
+  style_definitions:
+    - id: page_bg_style
+      bg_color: 0x121212
+      radius: 0
+      pad_all: 0
+      border_width: 0
+    - id: bar_style
+      bg_color: 0x1A237E
+      radius: 0
+      pad_all: 0
+      border_width: 0
+    - id: card_style
+      bg_color: 0x1E1E1E
+      radius: 8
+      pad_all: 0
+      border_width: 0
+    - id: scene_btn_style
+      bg_color: 0x1E1E1E
+      radius: 8
+      pad_all: 0
+      border_width: 0
+      text_color: 0xFFFFFF
+      pressed:
+        bg_color: 0x00BCD4
+        text_color: 0x121212
+    - id: toggle_btn_style
+      bg_color: 0x1E1E1E
+      radius: 8
+      pad_all: 0
+      border_width: 0
+      text_color: 0xFFFFFF
+      checked:
+        bg_color: 0x4CAF50
+        text_color: 0x121212
+      pressed:
+        bg_color: 0x2A2A2A
+        text_color: 0xFFFFFF
+
+  # Shared top bar + bottom nav, drawn on LVGL's always-on-top layer so they
+  # appear on every page without duplicating widgets.
+  top_layer:
+    widgets:
+      # Top bar: clock (left), page title (center), battery (right).
+      - obj:
+          styles: bar_style
+          x: 0
+          y: 0
+          width: 800
+          height: 50
+          clickable: false
+          widgets:
+            - label:
+                id: topbar_clock
+                align: LEFT_MID
+                x: 16
+                width: 120
+                text_align: LEFT
+                text_font: font_medium
+                text_color: 0xFFFFFF
+                text: --:--
+            - label:
+                id: topbar_title
+                align: CENTER
+                width: 400
+                text_align: CENTER
+                text_font: font_medium
+                text_color: 0xFFFFFF
+                text: Home
+            - label:
+                id: topbar_battery
+                align: RIGHT_MID
+                x: -16
+                width: 100
+                text_align: RIGHT
+                text_font: font_medium
+                text_color: 0xFFFFFF
+                text: --%
+      # Bottom nav background.
+      - obj:
+          styles: bar_style
+          x: 0
+          y: 430
+          width: 800
+          height: 50
+          clickable: false
+      # Bottom nav tabs (radio group: one_checked keeps one tab highlighted).
+      - buttonmatrix:
+          id: nav_tabs
+          x: 6
+          y: 436
+          width: 788
+          height: 38
+          one_checked: true
+          pad_all: 0
+          outline_width: 0
+          bg_opa: TRANSP
+          border_width: 0
+          items:
+            bg_color: 0x283593
+            radius: 8
+            border_width: 0
+            text_color: 0xFFFFFF
+            text_font: font_medium
+            pressed:
+              bg_color: 0x3949AB
+            checked:
+              bg_color: 0x00BCD4
+              text_color: 0x121212
+          rows:
+            - buttons:
+                - text: HOME
+                  control:
+                    checkable: true
+                    checked: true
+                  on_press:
+                    then:
+                      - lvgl.page.show: home_page
+                      - lvgl.label.update:
+                          id: topbar_title
+                          text: Home
+                - text: LIGHTS
+                  control:
+                    checkable: true
+                  on_press:
+                    then:
+                      - lvgl.page.show: lights_page
+                      - lvgl.label.update:
+                          id: topbar_title
+                          text: Lights
+                - text: SECURITY
+                  control:
+                    checkable: true
+                  on_press:
+                    then:
+                      - lvgl.page.show: security_page
+                      - lvgl.label.update:
+                          id: topbar_title
+                          text: Security
+
+  pages:
+    # =========================================================================
+    # PAGE 1 — HOME
+    # =========================================================================
+    - id: home_page
+      widgets:
+        - obj:
+            styles: page_bg_style
+            x: 0
+            y: 0
+            width: 800
+            height: 480
+            clickable: false
+
+        - label:
+            id: home_greeting
+            x: 20
+            y: 58
+            text_font: font_large
+            text_color: 0xFFFFFF
+            text: Hello
+
+        - label:
+            id: home_travis
+            x: 20
+            y: 108
+            text_font: font_medium
+            text_color: 0xB0BEC5
+            text: "Travis: --"
+        - label:
+            id: home_bobbie
+            x: 20
+            y: 134
+            text_font: font_medium
+            text_color: 0xB0BEC5
+            text: "Bobbie: --"
+
+        # Weather card
+        - obj:
+            styles: card_style
+            x: 20
+            y: 170
+            width: 370
+            height: 150
+            clickable: false
+            widgets:
+              - label:
+                  x: 14
+                  y: 10
+                  text_font: font_small
+                  text_color: 0xB0BEC5
+                  text: WEATHER
+              - label:
+                  id: home_weather_temp
+                  x: 14
+                  y: 34
+                  width: 200
+                  text_align: LEFT
+                  text_font: font_large
+                  text_color: 0xFFFFFF
+                  text: --°
+              - label:
+                  id: home_weather_cond
+                  x: 14
+                  y: 92
+                  width: 340
+                  text_align: LEFT
+                  text_font: font_medium
+                  text_color: 0xB0BEC5
+                  text: —
+
+        # Status card
+        - obj:
+            styles: card_style
+            x: 410
+            y: 170
+            width: 370
+            height: 150
+            clickable: false
+            widgets:
+              - label:
+                  x: 14
+                  y: 10
+                  text_font: font_small
+                  text_color: 0xB0BEC5
+                  text: STATUS
+              - label:
+                  id: home_door_front
+                  x: 14
+                  y: 34
+                  width: 340
+                  text_font: font_medium
+                  text_color: 0xB0BEC5
+                  text: "Front Door: --"
+              - label:
+                  id: home_door_back
+                  x: 14
+                  y: 62
+                  width: 340
+                  text_font: font_medium
+                  text_color: 0xB0BEC5
+                  text: "Back Door: --"
+              - label:
+                  id: home_motion_summary
+                  x: 14
+                  y: 90
+                  width: 340
+                  text_font: font_medium
+                  text_color: 0xB0BEC5
+                  text: "Motion armed: --"
+
+        # Alert banner (visible only when at least one alert is active).
+        - obj:
+            id: alert_banner
+            x: 20
+            y: 332
+            width: 760
+            height: 72
+            bg_color: 0xFF9800
+            radius: 8
+            pad_all: 0
+            border_width: 0
+            clickable: false
+            hidden: true
+            widgets:
+              - label:
+                  id: alert_banner_text
+                  align: CENTER
+                  width: 732
+                  text_align: CENTER
+                  text_font: font_medium
+                  text_color: 0x121212
+                  text: Alerts
+
+    # =========================================================================
+    # PAGE 2 — LIGHTS & SCENES
+    # =========================================================================
+    - id: lights_page
+      widgets:
+        - obj:
+            styles: page_bg_style
+            x: 0
+            y: 0
+            width: 800
+            height: 480
+            clickable: false
+
+        - label:
+            x: 20
+            y: 58
+            text_font: font_small
+            text_color: 0xB0BEC5
+            text: SCENES
+        # Scene grid (2x2). Scenes are retired on this HA instance, so the
+        # equivalent scripts are called instead.
+        - button:
+            styles: scene_btn_style
+            x: 20
+            y: 82
+            width: 170
+            height: 64
+            text: ALL OFF
+            on_click:
+              - homeassistant.service:
+                  service: script.turn_on
+                  data:
+                    entity_id: script.all_lights_off
+        - button:
+            styles: scene_btn_style
+            x: 206
+            y: 82
+            width: 170
+            height: 64
+            text: RELAX
+            on_click:
+              - homeassistant.service:
+                  service: script.turn_on
+                  data:
+                    entity_id: script.relax_mode
+        - button:
+            styles: scene_btn_style
+            x: 20
+            y: 154
+            width: 170
+            height: 64
+            text: MOVIE
+            on_click:
+              - homeassistant.service:
+                  service: script.turn_on
+                  data:
+                    entity_id: script.movie_mode
+        - button:
+            styles: scene_btn_style
+            x: 206
+            y: 154
+            width: 170
+            height: 64
+            text: GOODNIGHT
+            on_click:
+              - homeassistant.service:
+                  service: script.turn_on
+                  data:
+                    entity_id: script.goodnight
+
+        - label:
+            x: 410
+            y: 58
+            text_font: font_small
+            text_color: 0xB0BEC5
+            text: LIGHTS
+
+        # Living Room Ceiling Fan: toggle + brightness slider.
+        - obj:
+            styles: card_style
+            x: 410
+            y: 82
+            width: 370
+            height: 96
+            clickable: false
+            widgets:
+              - button:
+                  id: lr_fan_btn
+                  styles: toggle_btn_style
+                  x: 0
+                  y: 0
+                  width: 370
+                  height: 44
+                  on_click:
+                    - homeassistant.service:
+                        service: light.toggle
+                        data:
+                          entity_id: light.living_room_ceiling_fan
+                  widgets:
+                    - label:
+                        align: LEFT_MID
+                        x: 14
+                        text_font: font_medium
+                        text: Living Room Fan
+                    - label:
+                        id: lr_fan_state
+                        align: RIGHT_MID
+                        x: -14
+                        text_font: font_medium
+                        text: —
+              - slider:
+                  id: lr_fan_slider
+                  x: 14
+                  y: 52
+                  width: 342
+                  height: 30
+                  min_value: 0
+                  max_value: 100
+                  adv_hittest: true
+                  bg_color: 0x2A2A2A
+                  radius: 8
+                  border_width: 0
+                  indicator:
+                    bg_color: 0x00BCD4
+                    radius: 8
+                  knob:
+                    bg_color: 0xFFFFFF
+                    radius: 12
+                  on_release:
+                    - homeassistant.service:
+                        service: light.turn_on
+                        data:
+                          entity_id: light.living_room_ceiling_fan
+                          brightness_pct: !lambda return int(x);
+
+        # Ceiling Fan (office group) — toggle only.
+        - button:
+            id: ceiling_fan_btn
+            styles: toggle_btn_style
+            x: 410
+            y: 184
+            width: 370
+            height: 56
+            checkable: true
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.ceiling_fan
+            widgets:
+              - label:
+                  align: LEFT_MID
+                  x: 14
+                  text_font: font_medium
+                  text: Ceiling Fan
+              - label:
+                  id: ceiling_fan_state
+                  align: RIGHT_MID
+                  x: -14
+                  text_font: font_medium
+                  text: —
+
+        # Fan Light 1 / 2 / 3 — toggle only.
+        - button:
+            id: fan1_btn
+            styles: toggle_btn_style
+            x: 410
+            y: 246
+            width: 370
+            height: 56
+            checkable: true
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.third_reality_inc_3rcb01057z_4
+            widgets:
+              - label:
+                  align: LEFT_MID
+                  x: 14
+                  text_font: font_medium
+                  text: Fan Light 1
+              - label:
+                  id: fan1_state
+                  align: RIGHT_MID
+                  x: -14
+                  text_font: font_medium
+                  text: —
+        - button:
+            id: fan2_btn
+            styles: toggle_btn_style
+            x: 410
+            y: 308
+            width: 370
+            height: 56
+            checkable: true
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.third_reality_inc_3rcb01057z_5
+            widgets:
+              - label:
+                  align: LEFT_MID
+                  x: 14
+                  text_font: font_medium
+                  text: Fan Light 2
+              - label:
+                  id: fan2_state
+                  align: RIGHT_MID
+                  x: -14
+                  text_font: font_medium
+                  text: —
+        - button:
+            id: fan3_btn
+            styles: toggle_btn_style
+            x: 410
+            y: 370
+            width: 370
+            height: 56
+            checkable: true
+            on_click:
+              - homeassistant.service:
+                  service: light.toggle
+                  data:
+                    entity_id: light.third_reality_inc_3rcb01057z_6
+            widgets:
+              - label:
+                  align: LEFT_MID
+                  x: 14
+                  text_font: font_medium
+                  text: Fan Light 3
+              - label:
+                  id: fan3_state
+                  align: RIGHT_MID
+                  x: -14
+                  text_font: font_medium
+                  text: —
+
+    # =========================================================================
+    # PAGE 3 — SECURITY
+    # =========================================================================
+    - id: security_page
+      widgets:
+        - obj:
+            styles: page_bg_style
+            x: 0
+            y: 0
+            width: 800
+            height: 480
+            clickable: false
+
+        - label:
+            x: 20
+            y: 58
+            text_font: font_small
+            text_color: 0xB0BEC5
+            text: DOORS
+        - obj:
+            styles: card_style
+            x: 20
+            y: 82
+            width: 760
+            height: 96
+            clickable: false
+            widgets:
+              - label:
+                  x: 16
+                  y: 12
+                  text_font: font_small
+                  text_color: 0xB0BEC5
+                  text: FRONT DOOR
+              - label:
+                  id: sec_front_state
+                  x: 16
+                  y: 36
+                  width: 340
+                  text_align: LEFT
+                  text_font: font_large
+                  text_color: 0xB0BEC5
+                  text: —
+              - label:
+                  x: 400
+                  y: 12
+                  text_font: font_small
+                  text_color: 0xB0BEC5
+                  text: BACK DOOR
+              - label:
+                  id: sec_back_state
+                  x: 400
+                  y: 36
+                  width: 340
+                  text_align: LEFT
+                  text_font: font_large
+                  text_color: 0xB0BEC5
+                  text: —
+
+        - label:
+            x: 20
+            y: 194
+            text_font: font_small
+            text_color: 0xB0BEC5
+            text: MOTION DETECTION
+        - button:
+            id: motion_front_btn
+            styles: toggle_btn_style
+            x: 20
+            y: 218
+            width: 370
+            height: 84
+            checkable: true
+            on_click:
+              - homeassistant.service:
+                  service: switch.toggle
+                  data:
+                    entity_id: switch.front_door_motion_detection
+            widgets:
+              - label:
+                  align: LEFT_MID
+                  x: 14
+                  text_font: font_medium
+                  text: Front Door Motion
+              - label:
+                  id: motion_front_state
+                  align: RIGHT_MID
+                  x: -14
+                  text_font: font_medium
+                  text: —
+        - button:
+            id: motion_downstairs_btn
+            styles: toggle_btn_style
+            x: 410
+            y: 218
+            width: 370
+            height: 84
+            checkable: true
+            on_click:
+              - homeassistant.service:
+                  service: switch.toggle
+                  data:
+                    entity_id: switch.downstairs_motion_detection
+            widgets:
+              - label:
+                  align: LEFT_MID
+                  x: 14
+                  text_font: font_medium
+                  text: Downstairs Motion
+              - label:
+                  id: motion_downstairs_state
+                  align: RIGHT_MID
+                  x: -14
+                  text_font: font_medium
+                  text: —
+
+        - label:
+            x: 20
+            y: 318
+            text_font: font_small
+            text_color: 0xB0BEC5
+            text: LAST ACTIVITY
+        - obj:
+            styles: card_style
+            x: 20
+            y: 342
+            width: 370
+            height: 64
+            clickable: false
+            widgets:
+              - label:
+                  x: 14
+                  y: 8
+                  text_font: font_small
+                  text_color: 0xB0BEC5
+                  text: Front Door
+              - label:
+                  id: sec_front_last
+                  x: 14
+                  y: 30
+                  width: 340
+                  text_align: LEFT
+                  text_font: font_medium
+                  text_color: 0xFFFFFF
+                  text: —
+        - obj:
+            styles: card_style
+            x: 410
+            y: 342
+            width: 370
+            height: 64
+            clickable: false
+            widgets:
+              - label:
+                  x: 14
+                  y: 8
+                  text_font: font_small
+                  text_color: 0xB0BEC5
+                  text: Downstairs Motion
+              - label:
+                  id: sec_downstairs_last
+                  x: 14
+                  y: 30
+                  width: 340
+                  text_align: LEFT
+                  text_font: font_medium
+                  text_color: 0xFFFFFF
+                  text: —

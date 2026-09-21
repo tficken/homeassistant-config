@@ -205,25 +205,9 @@
         message: "P1S UNO reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
   mode: single
 
-- id: wall_panel_push_pages_on_startup
-  alias: Wall panel push pages on startup
-  description: Push the pages.jsonl layout to the wall panel after HA starts
-  triggers:
-    - trigger: homeassistant
-      event: start
-  conditions: []
-  actions:
-    - delay: "00:00:10"
-    - service: openhasp.load_pages
-      target:
-        entity_id: openhasp.wall_panel
-      data:
-        path: /config/openhasp/wall_panel/pages.jsonl
-  mode: single
-
 - id: wall_panel_day_backlight
   alias: Wall panel day backlight
-  description: Set panel backlight to bright during the day
+  description: Set the CrowPanel display backlight to bright during the day
   triggers:
     - trigger: time
       at: "07:00:00"
@@ -234,24 +218,26 @@
       after: sunrise
       before: sunset
   actions:
-    - service: mqtt.publish
+    - action: light.turn_on
+      target:
+        entity_id: light.crowpanel_hasp_display_backlight
       data:
-        topic: hasp/wall_panel/command
-        payload: "backlight {'state':1,'brightness':200}"
+        brightness: 200
   mode: single
 
 - id: wall_panel_night_backlight
   alias: Wall panel night backlight
-  description: Dim panel backlight at night
+  description: Dim the CrowPanel display backlight at night
   triggers:
     - trigger: time
       at: "22:00:00"
   conditions: []
   actions:
-    - service: mqtt.publish
+    - action: light.turn_on
+      target:
+        entity_id: light.crowpanel_hasp_display_backlight
       data:
-        topic: hasp/wall_panel/command
-        payload: "backlight {'state':1,'brightness':50}"
+        brightness: 50
   mode: single
 
 - id: '1786652844327'

@@ -154,7 +154,7 @@ script: !include scripts.yaml
 # AI dashboard proxy (serves /ai-dashboard/ and handles auth server-side)
 ai_dashboard_proxy:
 
-openhasp: !include_dir_merge_named openhasp/
+# openhasp: !include_dir_merge_named openhasp/  # retired — panel now runs ESPHome + LVGL
 
 light:
   - platform: group
@@ -164,3 +164,16 @@ light:
       - light.third_reality_inc_3rcb01057z_4
       - light.third_reality_inc_3rcb01057z_5
       - light.third_reality_inc_3rcb01057z_6
+
+# Filter nws_alerts down to warnings and watches only for the AI dashboard banner
+template:
+  - sensor:
+      - name: "NWS warnings watches"
+        unique_id: nws_warnings_watches
+        state: >
+          {{ state_attr('sensor.nws_alerts_gps_40_8141_96_7503_nws_alerts_alerts', 'Alerts')
+             | default([])
+             | selectattr('Event', 'search', '(Warning|Watch)$')
+             | list | length }}
+        availability: >
+          {{ state_attr('sensor.nws_alerts_gps_40_8141_96_7503_nws_alerts_alerts', 'Alerts') is not none }}
