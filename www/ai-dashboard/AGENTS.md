@@ -43,11 +43,11 @@ Only edit `config.json` by hand for structural changes the editor doesn't cover.
 
 ### Event-triggered camera popups: `config.eventPopups`
 
-An array of rules in `config.json` that show a temporary camera modal when any listed event entity fires. Each entry: `events` (array of `event.*` entity IDs), `camera`, `title`, and `timeout` (seconds, default 30). Fired means the entity's state changes to a newer timestamp. The modal auto-closes after `timeout` and can be dismissed early by tapping it. There is no Settings-editor UI for these yet — edit `config.json` directly. See `js/components/event-popup.js`.
+An array of rules that show a temporary camera modal when any listed event entity fires. Each entry: `events` (array of entity IDs), `camera`, `title`, and `timeout` (seconds, default 30). Fired means the entity's state changes to a newer timestamp. The modal auto-closes after `timeout` and can be dismissed early by tapping it. Edit rules in **Settings → Event Popups**; the tab includes a **Test popup** button to verify a rule immediately. See `js/components/event-popup.js`.
 
 ### Alert rules: `config.alerts`
 
-An array of rules evaluated by `getAlerts()` in `js/screens/home.js`; tripped rules appear in the amber alert banner at the top of the HOME screen (the banner caps display at 3). Each rule is `{ entity, label, ...condition }` with exactly one condition: `above` / `below` (numeric state comparison) or `equals` (case-insensitive string match). `{state}` in `label` interpolates the entity's current state. A file-defined array fully replaces the defaults (arrays are not merged). There is no Settings-editor UI for rules yet — edit `config.json` directly.
+An array of rules evaluated by `getAlerts()` in `js/screens/home.js`; tripped rules appear in the amber alert banner at the top of the HOME screen (the banner caps display at 3). Each rule is `{ entity, label, ...condition }` with exactly one condition: `above` / `below` (numeric state comparison) or `equals` (case-insensitive string match). `{state}` in `label` interpolates the entity's current state; `{value}` interpolates the item value when attribute-list expansion is used. A file-defined array fully replaces the defaults (arrays are not merged). Edit rules in **Settings → Alerts**; hand-editing `config.json` is only needed for structural changes the UI does not cover.
 
 The Layout tab's measured overflow badge reflects current content only — it cannot predict future states such as printer cards appearing mid-print or the on-call panel appearing when a shift starts.
 
