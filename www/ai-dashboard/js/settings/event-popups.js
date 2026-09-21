@@ -44,7 +44,7 @@ export function renderEventPopupsTab() {
       </div>
       <div style="margin-bottom:10px;">
         <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">Camera entity</label>
-        <select class="popup-camera"><option value="">-- camera --</option>${entityOptionTags(['camera'])}</select>
+        <select class="popup-camera"><option value="">-- camera --</option>${entityOptionTags(['camera'])}${(popup.camera && !state.states[popup.camera]) ? `<option value="${popup.camera}" selected>${escapeHtml(popup.camera)} (missing)</option>` : ''}</select>
       </div>
       <div style="display:flex;gap:10px;margin-bottom:10px;">
         <input class="popup-title" type="text" value="${escapeHtml(popup.title || '')}" placeholder="Title" style="flex:1;">

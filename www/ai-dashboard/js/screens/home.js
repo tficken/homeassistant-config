@@ -56,10 +56,40 @@ export function getAlerts() {
       (typeof rule.above === "number" && !isNaN(num) && num > rule.above) ||
       (typeof rule.below === "number" && !isNaN(num) && num < rule.below) ||
       (typeof rule.equals === "string" && String(st.state).toLowerCase() === rule.equals.toLowerCase());
-    if (tripped) {
+    if (!tripped) continue;
+
+    // Expand a rule into one alert per item in another entity's attribute list.
+    if (rule.attribute && typeof rule.attribute === "object") {
+      const src = state.states[rule.attribute.entity];
+      const list = src && src.attributes && Array.isArray(src.attributes[rule.attribute.name])
+        ? src.attributes[rule.attribute.name] : [];
+      const key = typeof rule.attribute.key === "string" ? rule.attribute.key : null;
+      let filterRegex = null;
+      if (typeof rule.attribute.filter === "string" && rule.attribute.filter) {
+        try {
+          filterRegex = new RegExp(rule.attribute.filter);
+        } catch {
+          filterRegex = null;
+        }
+      }
       const label = typeof rule.label === "string" && rule.label ? rule.label : friendlyName(rule.entity);
-      alerts.push(label.replace(/\{state\}/g, st.state));
+      let emitted = 0;
+      for (const item of list) {
+        const value = key && item && typeof item === "object" ? item[key] : String(item);
+        if (filterRegex && !filterRegex.test(String(value))) continue;
+        alerts.push(label.replace(/\{state\}/g, st.state).replace(/\{value\}/g, value));
+        emitted++;
+        if (emitted >= 6) break;
+      }
+      if (emitted === 0) {
+        // Attribute unavailable or empty; fall back to the count label.
+        alerts.push(label.replace(/\{state\}/g, st.state).replace(/\{value\}/g, st.state));
+      }
+      continue;
     }
+
+    const label = typeof rule.label === "string" && rule.label ? rule.label : friendlyName(rule.entity);
+    alerts.push(label.replace(/\{state\}/g, st.state));
   }
   return alerts;
 }

@@ -29,6 +29,8 @@ Click `[ SETTINGS ]` in the bottom dock. Do this for any content/layout change b
 - **Layout tab** — a visual preview editor: an entity palette (filterable, grouped by area, with a "not on dashboard" toggle and a missing-entity cleanup block) on the left, and a scaled live preview of the selected screen (screen tabs across the top) on the right. Drag panels by their headers to reorder them within or between columns; drag entities from the palette onto a panel to add them (an entity can live in multiple sections at once — palette drags add, card drags move); drag cards between panels to move them; drag a card onto another card within a panel to reorder the section (in the aggregated Room Monitors panel, drag one room cell onto another to reorder whole rooms — a room's entities move as a group); click a card's × (or drag it back to the palette) to remove it. Section titles/icons are editable by clicking a panel's title. An amber badge warns when a column's panels overflow the screen height.
 - **Appearance tab** — accent color, clock format, weather/media entity picks.
 - **Labels tab** — per-entity display-name overrides (`config.labels`).
+- **Alerts tab** — config-driven alert rules for the HOME screen banner, including NWS-style attribute-list expansion.
+- **Event Popups tab** — event-triggered camera popups with a live test button.
 - **Save & Apply** persists to `config.json` on the server via `POST /ai-dashboard/api/config`. A timestamped `config.json.bak.*` backup is created on every save, pruned to the newest 10. Changes are shared by all devices.
 
 ### Layout model: `config.panels`
