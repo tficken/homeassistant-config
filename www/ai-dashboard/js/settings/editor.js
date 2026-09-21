@@ -11,6 +11,8 @@ import { renderLayoutTab, initLayoutEditor } from './layout.js';
 import { renderAppearanceTab, wireAppearanceTab } from './appearance.js';
 import { renderLabelsTab } from './labels.js';
 import { renderDataTab } from './data.js';
+import { renderAlertsTab, wireAlertsTab, validateAlerts } from './alerts.js';
+import { renderEventPopupsTab, wireEventPopupsTab, validatePopups } from './event-popups.js';
 
 export function setSettingsStatus(msg) {
   const el = document.getElementById("settings-status");
@@ -27,7 +29,7 @@ export function closeSettings() {
   document.getElementById("settings-overlay").style.display = "none";
 }
 
-export const SETTINGS_TABS = ["Layout", "Appearance", "Labels", "Data"];
+export const SETTINGS_TABS = ["Layout", "Appearance", "Labels", "Alerts", "Event Popups", "Data"];
 let settingsTab = "Layout";
 
 export const EDITOR_SCREENS = [["home", "HOME"], ["control", "CONTROL HUB"], ["security", "SECURITY"], ["status", "STATUS MONITOR"]];
@@ -64,6 +66,12 @@ export function buildSettings() {
     wireAppearanceTab();
   } else if (settingsTab === "Labels") {
     body.innerHTML = renderLabelsTab();
+  } else if (settingsTab === "Alerts") {
+    body.innerHTML = renderAlertsTab();
+    wireAlertsTab();
+  } else if (settingsTab === "Event Popups") {
+    body.innerHTML = renderEventPopupsTab();
+    wireEventPopupsTab();
   } else {
     body.innerHTML = renderDataTab();
   }
@@ -78,6 +86,18 @@ export async function saveSettings() {
   if (weatherEl) state.config.entities.weather = weatherEl.value || "";
   const mediaEl = document.getElementById("cfg-media");
   if (mediaEl) state.config.entities.mediaPlayer = mediaEl.value || "";
+
+  const alertErr = validateAlerts();
+  if (alertErr) {
+    setSettingsStatus(alertErr);
+    return;
+  }
+  const popupErr = validatePopups();
+  if (popupErr) {
+    setSettingsStatus(popupErr);
+    return;
+  }
+
   applyTheme();
   await renderAll();
   const ok = await saveConfig();
