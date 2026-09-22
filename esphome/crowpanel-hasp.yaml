@@ -180,11 +180,21 @@ output:
     type: float
     write_action:
       - lambda: |-
+          // CrowPanel Advance V1.1+ STC8H1K28 backlight: discrete levels only.
+          // 0x05 = off, 0x06-0x09 = dimming steps, 0x10 = maximum brightness.
           uint8_t val;
-          if (state == 0.0f) {
-            val = 0xF5;
+          if (state <= 0.0f) {
+            val = 0x05;
+          } else if (state < 0.2f) {
+            val = 0x06;
+          } else if (state < 0.4f) {
+            val = 0x07;
+          } else if (state < 0.6f) {
+            val = 0x08;
+          } else if (state < 0.8f) {
+            val = 0x09;
           } else {
-            val = (uint8_t)(244.0f * (1.0f - state));
+            val = 0x10;
           }
           id(stc8h1k28).write_byte(0x00, val);
 
