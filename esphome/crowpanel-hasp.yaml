@@ -322,6 +322,37 @@ sensor:
               }
               return (int) (x / 255.0f * 100.0f);
 
+  # Weather humidity and wind speed.
+  - platform: homeassistant
+    id: ha_weather_humidity
+    entity_id: weather.forecast_home
+    attribute: humidity
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: home_weather_humidity
+            text:
+              format: "Hum: %.0f%%"
+              args: [ 'x' ]
+              if_nan: "Hum: --"
+
+  - platform: homeassistant
+    id: ha_weather_wind
+    entity_id: weather.forecast_home
+    attribute: wind_speed
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: home_weather_wind
+            text:
+              format: "Wind: %.0f"
+              args: [ 'x' ]
+              if_nan: "Wind: --"
+
 text_sensor:
   # ----- Home Assistant imports: text states -----
   - platform: homeassistant
@@ -875,6 +906,24 @@ lvgl:
                   text_font: font_medium
                   text_color: 0x5A7A5A
                   text: —
+              - label:
+                  id: home_weather_humidity
+                  x: 200
+                  y: 38
+                  width: 156
+                  text_align: RIGHT
+                  text_font: font_small
+                  text_color: 0xE8FFE8
+                  text: "Hum: --"
+              - label:
+                  id: home_weather_wind
+                  x: 200
+                  y: 62
+                  width: 156
+                  text_align: RIGHT
+                  text_font: font_small
+                  text_color: 0xE8FFE8
+                  text: "Wind: --"
 
         # Status card
         - obj:
