@@ -74,6 +74,62 @@ image:
       then:
         - lvgl.widget.redraw:
             id: weather_icon_img
+  # Security page door/motion status icons (Noto Color Emoji PNGs). The two
+  # door widgets share the lock/unlock images and the two motion widgets share
+  # the shield/warning images; online_image.set_url swaps the URL on state
+  # changes and the redraw below refreshes the widgets when the new PNG lands.
+  - platform: online_image
+    id: icon_lock
+    url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f512.png"
+    format: PNG
+    type: RGB565
+    resize: 48x48
+    update_interval: never
+    on_download_finished:
+      then:
+        - lvgl.widget.redraw:
+            id: sec_front_icon
+        - lvgl.widget.redraw:
+            id: sec_back_icon
+  - platform: online_image
+    id: icon_unlock
+    url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f513.png"
+    format: PNG
+    type: RGB565
+    resize: 48x48
+    update_interval: never
+    on_download_finished:
+      then:
+        - lvgl.widget.redraw:
+            id: sec_front_icon
+        - lvgl.widget.redraw:
+            id: sec_back_icon
+  - platform: online_image
+    id: icon_shield
+    url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f6e1.png"
+    format: PNG
+    type: RGB565
+    resize: 48x48
+    update_interval: never
+    on_download_finished:
+      then:
+        - lvgl.widget.redraw:
+            id: motion_front_icon
+        - lvgl.widget.redraw:
+            id: motion_downstairs_icon
+  - platform: online_image
+    id: icon_warning
+    url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u26a0.png"
+    format: PNG
+    type: RGB565
+    resize: 48x48
+    update_interval: never
+    on_download_finished:
+      then:
+        - lvgl.widget.redraw:
+            id: motion_front_icon
+        - lvgl.widget.redraw:
+            id: motion_downstairs_icon
 
 i2c:
   sda: 15
@@ -531,6 +587,20 @@ binary_sensor:
             id: sec_front_state
             text_color: !lambda |-
               return x ? lv_color_hex(0xFFAE00) : lv_color_hex(0x14FE17);
+        - online_image.set_url:
+            id: icon_lock
+            url: !lambda |-
+                if (x) {
+                  return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f513.png");
+                }
+                return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f512.png");
+        - online_image.set_url:
+            id: icon_unlock
+            url: !lambda |-
+                if (x) {
+                  return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f513.png");
+                }
+                return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f512.png");
 
   - platform: homeassistant
     id: bs_backdoor
@@ -555,6 +625,20 @@ binary_sensor:
             id: sec_back_state
             text_color: !lambda |-
               return x ? lv_color_hex(0xFFAE00) : lv_color_hex(0x14FE17);
+        - online_image.set_url:
+            id: icon_lock
+            url: !lambda |-
+                if (x) {
+                  return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f513.png");
+                }
+                return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f512.png");
+        - online_image.set_url:
+            id: icon_unlock
+            url: !lambda |-
+                if (x) {
+                  return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f513.png");
+                }
+                return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f512.png");
 
   - platform: homeassistant
     id: bs_wan
@@ -607,6 +691,12 @@ switch:
         - lvgl.label.update:
             id: motion_front_state
             text: Armed
+        - online_image.set_url:
+            id: icon_shield
+            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f6e1.png"
+        - online_image.set_url:
+            id: icon_warning
+            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f6e1.png"
         - script.execute: update_motion_summary
     on_turn_off:
       then:
@@ -617,6 +707,12 @@ switch:
         - lvgl.label.update:
             id: motion_front_state
             text: "Off"
+        - online_image.set_url:
+            id: icon_shield
+            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u26a0.png"
+        - online_image.set_url:
+            id: icon_warning
+            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u26a0.png"
         - script.execute: update_motion_summary
 
   - platform: homeassistant
@@ -633,6 +729,12 @@ switch:
         - lvgl.label.update:
             id: motion_downstairs_state
             text: Armed
+        - online_image.set_url:
+            id: icon_shield
+            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f6e1.png"
+        - online_image.set_url:
+            id: icon_warning
+            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f6e1.png"
         - script.execute: update_motion_summary
     on_turn_off:
       then:
@@ -643,6 +745,12 @@ switch:
         - lvgl.label.update:
             id: motion_downstairs_state
             text: "Off"
+        - online_image.set_url:
+            id: icon_shield
+            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u26a0.png"
+        - online_image.set_url:
+            id: icon_warning
+            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u26a0.png"
         - script.execute: update_motion_summary
 
 script:
@@ -1309,11 +1417,18 @@ lvgl:
                   id: sec_front_state
                   x: 16
                   y: 36
-                  width: 340
+                  width: 272
                   text_align: LEFT
                   text_font: font_large
                   text_color: 0x5A7A5A
                   text: —
+              - image:
+                  id: sec_front_icon
+                  x: 304
+                  y: 24
+                  width: 48
+                  height: 48
+                  src: icon_lock
               - label:
                   x: 400
                   y: 12
@@ -1324,11 +1439,18 @@ lvgl:
                   id: sec_back_state
                   x: 400
                   y: 36
-                  width: 340
+                  width: 272
                   text_align: LEFT
                   text_font: font_large
                   text_color: 0x5A7A5A
                   text: —
+              - image:
+                  id: sec_back_icon
+                  x: 692
+                  y: 24
+                  width: 48
+                  height: 48
+                  src: icon_lock
 
         - label:
             x: 20
@@ -1356,9 +1478,16 @@ lvgl:
                   data:
                     entity_id: switch.front_door_motion_detection
             widgets:
+              - image:
+                  id: motion_front_icon
+                  x: 14
+                  y: 18
+                  width: 48
+                  height: 48
+                  src: icon_shield
               - label:
                   align: LEFT_MID
-                  x: 14
+                  x: 74
                   text_font: font_medium
                   text: Front Door Motion
               - label:
@@ -1387,9 +1516,16 @@ lvgl:
                   data:
                     entity_id: switch.downstairs_motion_detection
             widgets:
+              - image:
+                  id: motion_downstairs_icon
+                  x: 14
+                  y: 18
+                  width: 48
+                  height: 48
+                  src: icon_shield
               - label:
                   align: LEFT_MID
-                  x: 14
+                  x: 74
                   text_font: font_medium
                   text: Downstairs Motion
               - label:
