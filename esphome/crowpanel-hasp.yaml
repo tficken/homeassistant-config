@@ -56,6 +56,13 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
 
+# State flag so screensaver/wake scripts don't fight each other.
+globals:
+  - id: screensaver_active
+    type: bool
+    restore_value: no
+    initial_value: 'false'
+
 # Embedded status/weather icons (local PNGs with alpha transparency). The
 # update_weather_icon script and the door/motion state triggers swap the
 # widgets' src between these IDs at runtime; no network fetch is needed.
@@ -211,8 +218,30 @@ time:
                 if (!t.is_valid()) {
                   return std::string("--:--");
                 }
-                char buf[8];
-                snprintf(buf, sizeof(buf), "%02d:%02d", t.hour, t.minute);
+                char buf[12];
+                t.strftime(buf, sizeof(buf), "%I:%M %p");
+                return std::string(buf);
+          # Top-bar date
+          - lvgl.label.update:
+              id: topbar_date
+              text: !lambda |-
+                auto t = id(panel_time).now();
+                if (!t.is_valid()) {
+                  return std::string("--- --");
+                }
+                char buf[16];
+                t.strftime(buf, sizeof(buf), "%a %b %d");
+                return std::string(buf);
+          # Screensaver clock
+          - lvgl.label.update:
+              id: screensaver_clock
+              text: !lambda |-
+                auto t = id(panel_time).now();
+                if (!t.is_valid()) {
+                  return std::string("--:--");
+                }
+                char buf[12];
+                t.strftime(buf, sizeof(buf), "%I:%M %p");
                 return std::string(buf);
           # Time-of-day greeting on the Home page
           - lvgl.label.update:
@@ -369,6 +398,15 @@ sensor:
                 return 0;
               }
               return (int) (x / 255.0f * 100.0f);
+        - lvgl.label.update:
+            id: lr_fan_pct
+            text: !lambda |-
+              if (isnan(x) || x <= 0.0f) {
+                return std::string("--%");
+              }
+              char buf[8];
+              snprintf(buf, sizeof(buf), "%d%%", (int)(x / 255.0f * 100.0f));
+              return std::string(buf);
 
   # Office ceiling fan brightness (0-255), used to position the slider.
   - platform: homeassistant
@@ -386,6 +424,15 @@ sensor:
                 return 0;
               }
               return (int) (x / 255.0f * 100.0f);
+        - lvgl.label.update:
+            id: office_fan_pct
+            text: !lambda |-
+              if (isnan(x) || x <= 0.0f) {
+                return std::string("--%");
+              }
+              char buf[8];
+              snprintf(buf, sizeof(buf), "%d%%", (int)(x / 255.0f * 100.0f));
+              return std::string(buf);
 
   # Weather humidity and wind speed.
   - platform: homeassistant
@@ -815,12 +862,116 @@ script:
             }
             return lv_color_hex(0xE8FFE8);
 
+  # ---------------------------------------------------------------------------
+  # SCREENSAVER + WAKE
+  # ---------------------------------------------------------------------------
+  - id: enter_screensaver
+    mode: single
+    then:
+      - if:
+          condition:
+            lambda: return id(screensaver_active);
+          then:
+            - script.stop: enter_screensaver
+      - globals.set:
+          id: screensaver_active
+          value: 'true'
+      - lvgl.label.update:
+          id: screensaver_clock
+          text: !lambda |-
+            auto t = id(panel_time).now();
+            if (!t.is_valid()) {
+              return std::string("--:--");
+            }
+            char buf[12];
+            t.strftime(buf, sizeof(buf), "%I:%M %p");
+            return std::string(buf);
+      - lvgl.widget.update:
+          id: topbar_clock
+          hidden: true
+      - lvgl.widget.update:
+          id: topbar_date
+          hidden: true
+      - lvgl.widget.update:
+          id: topbar_title
+          hidden: true
+      - lvgl.widget.update:
+          id: topbar_battery
+          hidden: true
+      - lvgl.widget.update:
+          id: nav_tabs
+          hidden: true
+      - lvgl.page.show: screensaver_page
+      - light.turn_on:
+          id: backlight
+          brightness: 5%
+          transition_length: 0s
+
+  - id: wake_screen
+    mode: single
+    then:
+      - if:
+          condition:
+            lambda: return !id(screensaver_active);
+          then:
+            - script.stop: wake_screen
+      - globals.set:
+          id: screensaver_active
+          value: 'false'
+      - light.turn_on:
+          id: backlight
+          brightness: 100%
+          transition_length: 0s
+      - lvgl.page.show: home_page
+      - lvgl.widget.update:
+          id: topbar_clock
+          hidden: false
+      - lvgl.widget.update:
+          id: topbar_date
+          hidden: false
+      - lvgl.widget.update:
+          id: topbar_title
+          hidden: false
+      - lvgl.widget.update:
+          id: topbar_battery
+          hidden: false
+      - lvgl.widget.update:
+          id: nav_tabs
+          hidden: false
+
+  - id: go_home
+    mode: single
+    then:
+      - if:
+          condition:
+            lambda: return !id(screensaver_active);
+          then:
+            - lvgl.page.show: home_page
+
 lvgl:
+  # Idle handling: screensaver after 60s of no touch, auto-return Home after 5min.
+  on_idle:
+    - timeout: 60s
+      then:
+        - script.execute: enter_screensaver
+    - timeout: 5min
+      then:
+        - script.execute: go_home
+
   # ----- Design tokens -----  (match the AI dashboard green-phosphor theme)
   #   Canvas 800x480; top bar 50px and bottom nav 50px in #0A140A.
   #   Content bg #030503, cards #1A4A1A, pressed/hover #2D7A2D,
   #   accent/active #14FE17, alert #FFAE00, danger #FF3333,
   #   text #E8FFE8 / secondary #5A7A5A, radius 8px.
+  gradients:
+    - id: bg_gradient
+      direction: ver
+      stops:
+        - color: 0x0A140A
+          position: 0
+        - color: 0x030503
+          position: 255
+
   style_definitions:
     - id: page_bg_style
       bg_color: 0x030503
@@ -837,6 +988,11 @@ lvgl:
       radius: 8
       pad_all: 0
       border_width: 0
+      shadow_color: 0x000000
+      shadow_opa: 60%
+      shadow_width: 10
+      shadow_offset_x: 0
+      shadow_offset_y: 4
     - id: scene_btn_style
       bg_color: 0x1A4A1A
       radius: 8
@@ -852,6 +1008,15 @@ lvgl:
 
   # Shared top bar + bottom nav, drawn on LVGL's always-on-top layer so they
   # appear on every page without duplicating widgets.
+  bottom_layer:
+    widgets:
+      - obj:
+          width: 800
+          height: 480
+          border_width: 0
+          pad_all: 0
+          bg_grad: bg_gradient
+
   top_layer:
     widgets:
       # Top bar: clock (left), page title (center), battery (right).
@@ -867,11 +1032,20 @@ lvgl:
                 id: topbar_clock
                 align: LEFT_MID
                 x: 16
-                width: 120
+                width: 95
                 text_align: LEFT
                 text_font: font_medium
                 text_color: 0xE8FFE8
                 text: --:--
+            - label:
+                id: topbar_date
+                align: LEFT_MID
+                x: 110
+                width: 150
+                text_align: LEFT
+                text_font: font_small
+                text_color: 0x5A7A5A
+                text: "--- --"
             - label:
                 id: topbar_title
                 align: CENTER
@@ -1243,7 +1417,7 @@ lvgl:
                   id: lr_fan_slider
                   x: 14
                   y: 52
-                  width: 342
+                  width: 280
                   height: 30
                   min_value: 0
                   max_value: 100
@@ -1258,11 +1432,26 @@ lvgl:
                     bg_color: 0xE8FFE8
                     radius: 12
                   on_release:
+                    - lvgl.label.update:
+                        id: lr_fan_pct
+                        text: !lambda |-
+                          char buf[8];
+                          snprintf(buf, sizeof(buf), "%d%%", int(x));
+                          return std::string(buf);
                     - homeassistant.service:
                         service: light.turn_on
                         data:
                           entity_id: light.living_room_ceiling_fan
-                          brightness_pct: !lambda return int(x);
+                          brightness: !lambda return int(x / 100.0f * 255.0f);
+              - label:
+                  id: lr_fan_pct
+                  x: 310
+                  y: 58
+                  width: 46
+                  text_align: RIGHT
+                  text_font: font_small
+                  text_color: 0x5A7A5A
+                  text: "--%"
 
         # Office ceiling fan group: toggle + brightness slider.
         - obj:
@@ -1308,7 +1497,7 @@ lvgl:
                   id: office_fan_slider
                   x: 14
                   y: 52
-                  width: 342
+                  width: 280
                   height: 30
                   min_value: 0
                   max_value: 100
@@ -1323,11 +1512,26 @@ lvgl:
                     bg_color: 0xE8FFE8
                     radius: 12
                   on_release:
+                    - lvgl.label.update:
+                        id: office_fan_pct
+                        text: !lambda |-
+                          char buf[8];
+                          snprintf(buf, sizeof(buf), "%d%%", int(x));
+                          return std::string(buf);
                     - homeassistant.service:
                         service: light.turn_on
                         data:
                           entity_id: light.ceiling_fan
-                          brightness_pct: !lambda return int(x);
+                          brightness: !lambda return int(x / 100.0f * 255.0f);
+              - label:
+                  id: office_fan_pct
+                  x: 310
+                  y: 58
+                  width: 46
+                  text_align: RIGHT
+                  text_font: font_small
+                  text_color: 0x5A7A5A
+                  text: "--%"
 
     # =========================================================================
     # PAGE 3 — SECURITY
@@ -1536,3 +1740,35 @@ lvgl:
                   text_font: font_medium
                   text_color: 0xE8FFE8
                   text: —
+
+    # =========================================================================
+    # PAGE 4 — SCREENSAVER (clock-only, wakes on touch)
+    # =========================================================================
+    - id: screensaver_page
+      widgets:
+        - obj:
+            styles: page_bg_style
+            x: 0
+            y: 0
+            width: 800
+            height: 480
+            clickable: false
+
+        - label:
+            id: screensaver_clock
+            align: CENTER
+            text_font: font_large
+            text_color: 0xE8FFE8
+            text: --:--
+
+        # Invisible full-screen touch target to wake the panel.
+        - button:
+            x: 0
+            y: 0
+            width: 800
+            height: 480
+            bg_opa: TRANSP
+            border_width: 0
+            on_press:
+              then:
+                - script.execute: wake_screen
