@@ -56,80 +56,70 @@ wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
 
-http_request:
-  verify_ssl: false
-
-# Dynamic weather icon for the Home page weather card, fetched from
-# OpenWeatherMap's free PNG icon set. The URL is recomputed by the
-# update_weather_icon script whenever the condition or sun state changes.
+# Embedded status/weather icons (local PNGs with alpha transparency). The
+# update_weather_icon script and the door/motion state triggers swap the
+# widgets' src between these IDs at runtime; no network fetch is needed.
 image:
-  - platform: online_image
-    id: weather_icon
-    url: "https://openweathermap.org/img/wn/01d@2x.png"
-    format: PNG
-    type: RGB565
-    resize: 80x80
-    update_interval: never
-    on_download_finished:
-      then:
-        - lvgl.widget.redraw:
-            id: weather_icon_img
-  # Security page door/motion status icons (Noto Color Emoji PNGs). The two
-  # door widgets share the lock/unlock images and the two motion widgets share
-  # the shield/warning images; online_image.set_url swaps the URL on state
-  # changes and the redraw below refreshes the widgets when the new PNG lands.
-  - platform: online_image
+  - platform: image
     id: icon_lock
-    url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f512.png"
-    format: PNG
-    type: RGB565
+    file: lock_closed.png
+    type: RGBA
     resize: 48x48
-    update_interval: never
-    on_download_finished:
-      then:
-        - lvgl.widget.redraw:
-            id: sec_front_icon
-        - lvgl.widget.redraw:
-            id: sec_back_icon
-  - platform: online_image
+  - platform: image
     id: icon_unlock
-    url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f513.png"
-    format: PNG
-    type: RGB565
+    file: lock_open.png
+    type: RGBA
     resize: 48x48
-    update_interval: never
-    on_download_finished:
-      then:
-        - lvgl.widget.redraw:
-            id: sec_front_icon
-        - lvgl.widget.redraw:
-            id: sec_back_icon
-  - platform: online_image
+  - platform: image
     id: icon_shield
-    url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f6e1.png"
-    format: PNG
-    type: RGB565
+    file: shield.png
+    type: RGBA
     resize: 48x48
-    update_interval: never
-    on_download_finished:
-      then:
-        - lvgl.widget.redraw:
-            id: motion_front_icon
-        - lvgl.widget.redraw:
-            id: motion_downstairs_icon
-  - platform: online_image
+  - platform: image
     id: icon_warning
-    url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u26a0.png"
-    format: PNG
-    type: RGB565
+    file: warning.png
+    type: RGBA
     resize: 48x48
-    update_interval: never
-    on_download_finished:
-      then:
-        - lvgl.widget.redraw:
-            id: motion_front_icon
-        - lvgl.widget.redraw:
-            id: motion_downstairs_icon
+  - platform: image
+    id: icon_sun
+    file: sun.png
+    type: RGBA
+    resize: 80x80
+  - platform: image
+    id: icon_moon
+    file: moon.png
+    type: RGBA
+    resize: 80x80
+  - platform: image
+    id: icon_partly_cloudy
+    file: partly_cloudy.png
+    type: RGBA
+    resize: 80x80
+  - platform: image
+    id: icon_cloud
+    file: cloud.png
+    type: RGBA
+    resize: 80x80
+  - platform: image
+    id: icon_rain
+    file: rain.png
+    type: RGBA
+    resize: 80x80
+  - platform: image
+    id: icon_snow
+    file: snow.png
+    type: RGBA
+    resize: 80x80
+  - platform: image
+    id: icon_thunder
+    file: thunder.png
+    type: RGBA
+    resize: 80x80
+  - platform: image
+    id: icon_fog
+    file: fog.png
+    type: RGBA
+    resize: 80x80
 
 i2c:
   sda: 15
@@ -587,20 +577,10 @@ binary_sensor:
             id: sec_front_state
             text_color: !lambda |-
               return x ? lv_color_hex(0xFFAE00) : lv_color_hex(0x14FE17);
-        - online_image.set_url:
-            id: icon_lock
-            url: !lambda |-
-                if (x) {
-                  return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f513.png");
-                }
-                return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f512.png");
-        - online_image.set_url:
-            id: icon_unlock
-            url: !lambda |-
-                if (x) {
-                  return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f513.png");
-                }
-                return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f512.png");
+        - lvgl.image.update:
+            id: sec_front_icon
+            src: !lambda |-
+                return x ? id(icon_unlock) : id(icon_lock);
 
   - platform: homeassistant
     id: bs_backdoor
@@ -625,20 +605,10 @@ binary_sensor:
             id: sec_back_state
             text_color: !lambda |-
               return x ? lv_color_hex(0xFFAE00) : lv_color_hex(0x14FE17);
-        - online_image.set_url:
-            id: icon_lock
-            url: !lambda |-
-                if (x) {
-                  return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f513.png");
-                }
-                return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f512.png");
-        - online_image.set_url:
-            id: icon_unlock
-            url: !lambda |-
-                if (x) {
-                  return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f513.png");
-                }
-                return std::string("https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f512.png");
+        - lvgl.image.update:
+            id: sec_back_icon
+            src: !lambda |-
+                return x ? id(icon_unlock) : id(icon_lock);
 
   - platform: homeassistant
     id: bs_wan
@@ -691,12 +661,9 @@ switch:
         - lvgl.label.update:
             id: motion_front_state
             text: Armed
-        - online_image.set_url:
-            id: icon_shield
-            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f6e1.png"
-        - online_image.set_url:
-            id: icon_warning
-            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f6e1.png"
+        - lvgl.image.update:
+            id: motion_front_icon
+            src: icon_shield
         - script.execute: update_motion_summary
     on_turn_off:
       then:
@@ -707,12 +674,9 @@ switch:
         - lvgl.label.update:
             id: motion_front_state
             text: "Off"
-        - online_image.set_url:
-            id: icon_shield
-            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u26a0.png"
-        - online_image.set_url:
-            id: icon_warning
-            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u26a0.png"
+        - lvgl.image.update:
+            id: motion_front_icon
+            src: icon_warning
         - script.execute: update_motion_summary
 
   - platform: homeassistant
@@ -729,12 +693,9 @@ switch:
         - lvgl.label.update:
             id: motion_downstairs_state
             text: Armed
-        - online_image.set_url:
-            id: icon_shield
-            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f6e1.png"
-        - online_image.set_url:
-            id: icon_warning
-            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u1f6e1.png"
+        - lvgl.image.update:
+            id: motion_downstairs_icon
+            src: icon_shield
         - script.execute: update_motion_summary
     on_turn_off:
       then:
@@ -745,43 +706,31 @@ switch:
         - lvgl.label.update:
             id: motion_downstairs_state
             text: "Off"
-        - online_image.set_url:
-            id: icon_shield
-            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u26a0.png"
-        - online_image.set_url:
-            id: icon_warning
-            url: "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/128/emoji_u26a0.png"
+        - lvgl.image.update:
+            id: motion_downstairs_icon
+            src: icon_warning
         - script.execute: update_motion_summary
 
 script:
-  # Maps the HA weather condition + sun state to an OpenWeatherMap icon URL
-  # and points the online_image at it. Called from ts_weather_condition and
-  # ts_sun on_value triggers.
+  # Maps the HA weather condition to one of the embedded weather icons and
+  # points the weather card image widget at it. Called from
+  # ts_weather_condition and ts_sun on_value triggers.
   - id: update_weather_icon
     mode: single
     then:
-      - online_image.set_url:
-          id: weather_icon
-          url: !lambda |-
+      - lvgl.image.update:
+          id: weather_icon_img
+          src: !lambda |-
               std::string cond = id(ts_weather_condition).state;
-              std::string code = "01";  // sunny / clear-night (suffix picks d/n)
-              if (cond == "partlycloudy") {
-                code = "02";
-              } else if (cond == "cloudy") {
-                code = "03";
-              } else if (cond == "fog" || cond == "wind" || cond == "wind-variant") {
-                code = "50";
-              } else if (cond == "rainy") {
-                code = "10";
-              } else if (cond == "pouring") {
-                code = "09";
-              } else if (cond == "snowy" || cond == "snowy-rainy" || cond == "hail") {
-                code = "13";
-              } else if (cond == "lightning" || cond == "lightning-rainy" || cond == "exceptional") {
-                code = "11";
-              }
-              std::string suffix = (id(ts_sun).state == "above_horizon") ? "d" : "n";
-              return "https://openweathermap.org/img/wn/" + code + suffix + "@2x.png";
+              if (cond == "sunny") return id(icon_sun);
+              if (cond == "clear-night") return id(icon_moon);
+              if (cond == "partlycloudy") return id(icon_partly_cloudy);
+              if (cond == "cloudy") return id(icon_cloud);
+              if (cond == "fog" || cond == "wind" || cond == "wind-variant") return id(icon_fog);
+              if (cond == "rainy" || cond == "pouring") return id(icon_rain);
+              if (cond == "snowy" || cond == "snowy-rainy" || cond == "hail") return id(icon_snow);
+              if (cond == "lightning" || cond == "lightning-rainy" || cond == "exceptional") return id(icon_thunder);
+              return id(icon_cloud);
 
   # Recomputes the alert banner from all four alert inputs; called from each
   # input's on_value/on_state. Starts hidden; first real evaluation happens as
@@ -1060,7 +1009,7 @@ lvgl:
                   y: 10
                   width: 80
                   height: 80
-                  src: weather_icon
+                  src: icon_cloud
               - label:
                   id: home_weather_temp
                   x: 14
