@@ -751,21 +751,12 @@ lvgl:
       pad_all: 0
       border_width: 0
       text_color: 0xFFFFFF
-      pressed:
-        bg_color: 0x00BCD4
-        text_color: 0x121212
     - id: toggle_btn_style
       bg_color: 0x1E1E1E
       radius: 8
       pad_all: 0
       border_width: 0
       text_color: 0xFFFFFF
-      checked:
-        bg_color: 0x4CAF50
-        text_color: 0x121212
-      pressed:
-        bg_color: 0x2A2A2A
-        text_color: 0xFFFFFF
 
   # Shared top bar + bottom nav, drawn on LVGL's always-on-top layer so they
   # appear on every page without duplicating widgets.
@@ -1025,6 +1016,9 @@ lvgl:
         # equivalent scripts are called instead.
         - button:
             styles: scene_btn_style
+            pressed:
+              bg_color: 0x00BCD4
+              text_color: 0x121212
             x: 20
             y: 82
             width: 170
@@ -1037,6 +1031,9 @@ lvgl:
                     entity_id: script.all_lights_off
         - button:
             styles: scene_btn_style
+            pressed:
+              bg_color: 0x00BCD4
+              text_color: 0x121212
             x: 206
             y: 82
             width: 170
@@ -1049,6 +1046,9 @@ lvgl:
                     entity_id: script.relax_mode
         - button:
             styles: scene_btn_style
+            pressed:
+              bg_color: 0x00BCD4
+              text_color: 0x121212
             x: 20
             y: 154
             width: 170
@@ -1061,6 +1061,9 @@ lvgl:
                     entity_id: script.movie_mode
         - button:
             styles: scene_btn_style
+            pressed:
+              bg_color: 0x00BCD4
+              text_color: 0x121212
             x: 206
             y: 154
             width: 170
@@ -1091,6 +1094,13 @@ lvgl:
               - button:
                   id: lr_fan_btn
                   styles: toggle_btn_style
+                  checkable: true
+                  checked:
+                    bg_color: 0x4CAF50
+                    text_color: 0x121212
+                  pressed:
+                    bg_color: 0x2A2A2A
+                    text_color: 0xFFFFFF
                   x: 0
                   y: 0
                   width: 370
@@ -1141,6 +1151,12 @@ lvgl:
         - button:
             id: ceiling_fan_btn
             styles: toggle_btn_style
+            checked:
+              bg_color: 0x4CAF50
+              text_color: 0x121212
+            pressed:
+              bg_color: 0x2A2A2A
+              text_color: 0xFFFFFF
             x: 410
             y: 184
             width: 370
@@ -1168,6 +1184,12 @@ lvgl:
         - button:
             id: fan1_btn
             styles: toggle_btn_style
+            checked:
+              bg_color: 0x4CAF50
+              text_color: 0x121212
+            pressed:
+              bg_color: 0x2A2A2A
+              text_color: 0xFFFFFF
             x: 410
             y: 246
             width: 370
@@ -1193,6 +1215,12 @@ lvgl:
         - button:
             id: fan2_btn
             styles: toggle_btn_style
+            checked:
+              bg_color: 0x4CAF50
+              text_color: 0x121212
+            pressed:
+              bg_color: 0x2A2A2A
+              text_color: 0xFFFFFF
             x: 410
             y: 308
             width: 370
@@ -1218,6 +1246,12 @@ lvgl:
         - button:
             id: fan3_btn
             styles: toggle_btn_style
+            checked:
+              bg_color: 0x4CAF50
+              text_color: 0x121212
+            pressed:
+              bg_color: 0x2A2A2A
+              text_color: 0xFFFFFF
             x: 410
             y: 370
             width: 370
@@ -1308,6 +1342,12 @@ lvgl:
         - button:
             id: motion_front_btn
             styles: toggle_btn_style
+            checked:
+              bg_color: 0x4CAF50
+              text_color: 0x121212
+            pressed:
+              bg_color: 0x2A2A2A
+              text_color: 0xFFFFFF
             x: 20
             y: 218
             width: 370
@@ -1333,6 +1373,12 @@ lvgl:
         - button:
             id: motion_downstairs_btn
             styles: toggle_btn_style
+            checked:
+              bg_color: 0x4CAF50
+              text_color: 0x121212
+            pressed:
+              bg_color: 0x2A2A2A
+              text_color: 0xFFFFFF
             x: 410
             y: 218
             width: 370
