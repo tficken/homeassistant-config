@@ -175,11 +175,16 @@ output:
     type: float
     write_action:
       - lambda: |-
-          // CrowPanel Advance V1.1+ STC8H1K28 backlight control.
-          // The STC8 expects a single-byte command written to I2C address 0x30
-          // (no register prefix). 0x05 = off, 0x06-0x0F = dimming steps,
-          // 0x10 = maximum brightness.
-          uint8_t brightness = 0x05 + (uint8_t)(state * (0x10 - 0x05));
+          // CrowPanel Advance V1.2+ (tested on V1.4) STC8H1K28 backlight control.
+          // The STC8 expects a single byte written to I2C address 0x30.
+          // Scale is inverted: 0 = full brightness, 245 = off.
+          // See: https://www.espboards.dev/esp32/elecrow-crowpanel-advance-7-esp32-s3/
+          uint8_t brightness;
+          if (state == 0.0f) {
+            brightness = 0xF5;  // 245 = off
+          } else {
+            brightness = (uint8_t)(245.0f * (1.0f - state));
+          }
           id(i2c_bus).write(0x30, &brightness, 1, true);
           ESP_LOGD("backlight", "set level %.0f%% -> 0x%02X", state * 100.0f, brightness);
 
@@ -1077,7 +1082,7 @@ script:
       # has not been reliably dimming on this panel.
       - output.set_level:
           id: backlight_output
-          level: 10%
+          level: 25%
 
   - id: wake_screen
     mode: single
