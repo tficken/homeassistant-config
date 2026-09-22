@@ -305,6 +305,23 @@ sensor:
               }
               return (int) (x / 255.0f * 100.0f);
 
+  # Office ceiling fan brightness (0-255), used to position the slider.
+  - platform: homeassistant
+    id: ha_office_fan_brightness
+    entity_id: light.ceiling_fan
+    attribute: brightness
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.slider.update:
+            id: office_fan_slider
+            value: !lambda |-
+              if (isnan(x) || x <= 0.0f) {
+                return 0;
+              }
+              return (int) (x / 255.0f * 100.0f);
+
 text_sensor:
   # ----- Home Assistant imports: text states -----
   - platform: homeassistant
@@ -389,42 +406,6 @@ text_sensor:
       then:
         - lvgl.label.update:
             id: lr_fan_state
-            text: !lambda |-
-              return (x == "on") ? std::string("On") : std::string("Off");
-
-  - platform: homeassistant
-    id: ts_fan1
-    entity_id: light.third_reality_inc_3rcb01057z_4
-    internal: true
-
-    on_value:
-      then:
-        - lvgl.label.update:
-            id: fan1_state
-            text: !lambda |-
-              return (x == "on") ? std::string("On") : std::string("Off");
-
-  - platform: homeassistant
-    id: ts_fan2
-    entity_id: light.third_reality_inc_3rcb01057z_5
-    internal: true
-
-    on_value:
-      then:
-        - lvgl.label.update:
-            id: fan2_state
-            text: !lambda |-
-              return (x == "on") ? std::string("On") : std::string("Off");
-
-  - platform: homeassistant
-    id: ts_fan3
-    entity_id: light.third_reality_inc_3rcb01057z_6
-    internal: true
-
-    on_value:
-      then:
-        - lvgl.label.update:
-            id: fan3_state
             text: !lambda |-
               return (x == "on") ? std::string("On") : std::string("Off");
 
@@ -547,42 +528,6 @@ binary_sensor:
       then:
         - lvgl.widget.update:
             id: lr_fan_btn
-            state:
-              checked: !lambda return x;
-
-  - platform: homeassistant
-    id: bs_fan1
-    entity_id: light.third_reality_inc_3rcb01057z_4
-    internal: true
-
-    on_state:
-      then:
-        - lvgl.widget.update:
-            id: fan1_btn
-            state:
-              checked: !lambda return x;
-
-  - platform: homeassistant
-    id: bs_fan2
-    entity_id: light.third_reality_inc_3rcb01057z_5
-    internal: true
-
-    on_state:
-      then:
-        - lvgl.widget.update:
-            id: fan2_btn
-            state:
-              checked: !lambda return x;
-
-  - platform: homeassistant
-    id: bs_fan3
-    entity_id: light.third_reality_inc_3rcb01057z_6
-    internal: true
-
-    on_state:
-      then:
-        - lvgl.widget.update:
-            id: fan3_btn
             state:
               checked: !lambda return x;
 
@@ -1147,133 +1092,70 @@ lvgl:
                           entity_id: light.living_room_ceiling_fan
                           brightness_pct: !lambda return int(x);
 
-        # Ceiling Fan (office group) — toggle only.
-        - button:
-            id: ceiling_fan_btn
-            styles: toggle_btn_style
-            checked:
-              bg_color: 0x4CAF50
-              text_color: 0x121212
-            pressed:
-              bg_color: 0x2A2A2A
-              text_color: 0xFFFFFF
+        # Office ceiling fan group: toggle + brightness slider.
+        - obj:
+            styles: card_style
             x: 410
             y: 184
             width: 370
-            height: 56
-            checkable: true
-            on_click:
-              - homeassistant.service:
-                  service: light.toggle
-                  data:
-                    entity_id: light.ceiling_fan
+            height: 96
+            clickable: false
             widgets:
-              - label:
-                  align: LEFT_MID
+              - button:
+                  id: ceiling_fan_btn
+                  styles: toggle_btn_style
+                  checkable: true
+                  checked:
+                    bg_color: 0x4CAF50
+                    text_color: 0x121212
+                  pressed:
+                    bg_color: 0x2A2A2A
+                    text_color: 0xFFFFFF
+                  x: 0
+                  y: 0
+                  width: 370
+                  height: 44
+                  on_click:
+                    - homeassistant.service:
+                        service: light.toggle
+                        data:
+                          entity_id: light.ceiling_fan
+                  widgets:
+                    - label:
+                        align: LEFT_MID
+                        x: 14
+                        text_font: font_medium
+                        text: Office
+                    - label:
+                        id: ceiling_fan_state
+                        align: RIGHT_MID
+                        x: -14
+                        text_font: font_medium
+                        text: —
+              - slider:
+                  id: office_fan_slider
                   x: 14
-                  text_font: font_medium
-                  text: Ceiling Fan
-              - label:
-                  id: ceiling_fan_state
-                  align: RIGHT_MID
-                  x: -14
-                  text_font: font_medium
-                  text: —
-
-        # Fan Light 1 / 2 / 3 — toggle only.
-        - button:
-            id: fan1_btn
-            styles: toggle_btn_style
-            checked:
-              bg_color: 0x4CAF50
-              text_color: 0x121212
-            pressed:
-              bg_color: 0x2A2A2A
-              text_color: 0xFFFFFF
-            x: 410
-            y: 246
-            width: 370
-            height: 56
-            checkable: true
-            on_click:
-              - homeassistant.service:
-                  service: light.toggle
-                  data:
-                    entity_id: light.third_reality_inc_3rcb01057z_4
-            widgets:
-              - label:
-                  align: LEFT_MID
-                  x: 14
-                  text_font: font_medium
-                  text: Fan Light 1
-              - label:
-                  id: fan1_state
-                  align: RIGHT_MID
-                  x: -14
-                  text_font: font_medium
-                  text: —
-        - button:
-            id: fan2_btn
-            styles: toggle_btn_style
-            checked:
-              bg_color: 0x4CAF50
-              text_color: 0x121212
-            pressed:
-              bg_color: 0x2A2A2A
-              text_color: 0xFFFFFF
-            x: 410
-            y: 308
-            width: 370
-            height: 56
-            checkable: true
-            on_click:
-              - homeassistant.service:
-                  service: light.toggle
-                  data:
-                    entity_id: light.third_reality_inc_3rcb01057z_5
-            widgets:
-              - label:
-                  align: LEFT_MID
-                  x: 14
-                  text_font: font_medium
-                  text: Fan Light 2
-              - label:
-                  id: fan2_state
-                  align: RIGHT_MID
-                  x: -14
-                  text_font: font_medium
-                  text: —
-        - button:
-            id: fan3_btn
-            styles: toggle_btn_style
-            checked:
-              bg_color: 0x4CAF50
-              text_color: 0x121212
-            pressed:
-              bg_color: 0x2A2A2A
-              text_color: 0xFFFFFF
-            x: 410
-            y: 370
-            width: 370
-            height: 56
-            checkable: true
-            on_click:
-              - homeassistant.service:
-                  service: light.toggle
-                  data:
-                    entity_id: light.third_reality_inc_3rcb01057z_6
-            widgets:
-              - label:
-                  align: LEFT_MID
-                  x: 14
-                  text_font: font_medium
-                  text: Fan Light 3
-              - label:
-                  id: fan3_state
-                  align: RIGHT_MID
-                  x: -14
-                  text_font: font_medium
-                  text: —
+                  y: 52
+                  width: 342
+                  height: 30
+                  min_value: 0
+                  max_value: 100
+                  adv_hittest: true
+                  bg_color: 0x2A2A2A
+                  radius: 8
+                  border_width: 0
+                  indicator:
+                    bg_color: 0x00BCD4
+                    radius: 8
+                  knob:
+                    bg_color: 0xFFFFFF
+                    radius: 12
+                  on_release:
+                    - homeassistant.service:
+                        service: light.turn_on
+                        data:
+                          entity_id: light.ceiling_fan
+                          brightness_pct: !lambda return int(x);
 
     # =========================================================================
     # PAGE 3 — SECURITY
