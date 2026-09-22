@@ -128,6 +128,40 @@ image:
     transparency: alpha_channel
     resize: 80x80
 
+  # Scene / light tile icons (rendered from MDI glyphs, 64 px source,
+  # resized at the point of use).
+  - id: icon_scene_all_off
+    file: icon_scene_all_off.png
+    type: RGB
+    transparency: alpha_channel
+    resize: 32x32
+  - id: icon_scene_relax
+    file: icon_scene_relax.png
+    type: RGB
+    transparency: alpha_channel
+    resize: 32x32
+  - id: icon_scene_movie
+    file: icon_scene_movie.png
+    type: RGB
+    transparency: alpha_channel
+    resize: 32x32
+  - id: icon_scene_goodnight
+    file: icon_scene_goodnight.png
+    type: RGB
+    transparency: alpha_channel
+    resize: 32x32
+  - id: icon_light_fan
+    file: icon_light_fan.png
+    type: RGB
+    transparency: alpha_channel
+    resize: 32x32
+
+  # Background image for the Home-page weather card.
+  - id: weather_bg
+    file: weather_bg.png
+    type: RGB
+    resize: 370x150
+
 i2c:
   sda: 15
   scl: 16
@@ -520,6 +554,10 @@ text_sensor:
             id: home_travis
             text_color: !lambda |-
               return (x == "home") ? lv_color_hex(0x14FE17) : lv_color_hex(0x5A7A5A);
+        - lvgl.widget.update:
+            id: dot_travis
+            bg_color: !lambda |-
+              return (x == "home") ? lv_color_hex(0x14FE17) : lv_color_hex(0x5A7A5A);
 
   - platform: homeassistant
     id: ts_person_bobbie
@@ -535,6 +573,10 @@ text_sensor:
         - lvgl.widget.update:
             id: home_bobbie
             text_color: !lambda |-
+              return (x == "home") ? lv_color_hex(0x14FE17) : lv_color_hex(0x5A7A5A);
+        - lvgl.widget.update:
+            id: dot_bobbie
+            bg_color: !lambda |-
               return (x == "home") ? lv_color_hex(0x14FE17) : lv_color_hex(0x5A7A5A);
 
   # Light on/off states for the Lights page cards.
@@ -616,6 +658,10 @@ binary_sensor:
             id: home_door_front
             text_color: !lambda |-
               return x ? lv_color_hex(0xFFAE00) : lv_color_hex(0x14FE17);
+        - lvgl.widget.update:
+            id: dot_door_front
+            bg_color: !lambda |-
+              return x ? lv_color_hex(0xFFAE00) : lv_color_hex(0x14FE17);
         - lvgl.label.update:
             id: sec_front_state
             text: !lambda |-
@@ -643,6 +689,10 @@ binary_sensor:
         - lvgl.widget.update:
             id: home_door_back
             text_color: !lambda |-
+              return x ? lv_color_hex(0xFFAE00) : lv_color_hex(0x14FE17);
+        - lvgl.widget.update:
+            id: dot_door_back
+            bg_color: !lambda |-
               return x ? lv_color_hex(0xFFAE00) : lv_color_hex(0x14FE17);
         - lvgl.label.update:
             id: sec_back_state
@@ -826,6 +876,17 @@ script:
       - lvgl.widget.update:
           id: home_motion_summary
           text_color: !lambda |-
+            int n = (id(sw_front_motion).state ? 1 : 0) + (id(sw_downstairs_motion).state ? 1 : 0);
+            if (n == 2) {
+              return lv_color_hex(0x14FE17);
+            }
+            if (n == 0) {
+              return lv_color_hex(0xFFAE00);
+            }
+            return lv_color_hex(0x5A7A5A);
+      - lvgl.widget.update:
+          id: dot_motion_summary
+          bg_color: !lambda |-
             int n = (id(sw_front_motion).state ? 1 : 0) + (id(sw_downstairs_motion).state ? 1 : 0);
             if (n == 2) {
               return lv_color_hex(0x14FE17);
@@ -1154,6 +1215,15 @@ lvgl:
             text_font: font_medium
             text_color: 0x5A7A5A
             text: "Travis: --"
+        - obj:
+            id: dot_travis
+            x: 180
+            y: 113
+            width: 12
+            height: 12
+            radius: circle
+            border_width: 0
+            bg_color: 0x5A7A5A
         - label:
             id: home_bobbie
             x: 20
@@ -1161,6 +1231,15 @@ lvgl:
             text_font: font_medium
             text_color: 0x5A7A5A
             text: "Bobbie: --"
+        - obj:
+            id: dot_bobbie
+            x: 180
+            y: 139
+            width: 12
+            height: 12
+            radius: circle
+            border_width: 0
+            bg_color: 0x5A7A5A
 
         # Weather card
         - obj:
@@ -1170,6 +1249,7 @@ lvgl:
             width: 370
             height: 150
             clickable: false
+            bg_image_src: weather_bg
             widgets:
               - label:
                   x: 14
@@ -1244,6 +1324,15 @@ lvgl:
                   text_font: font_medium
                   text_color: 0x5A7A5A
                   text: "Front Door: --"
+              - obj:
+                  id: dot_door_front
+                  x: 340
+                  y: 39
+                  width: 12
+                  height: 12
+                  radius: circle
+                  border_width: 0
+                  bg_color: 0x5A7A5A
               - label:
                   id: home_door_back
                   x: 14
@@ -1252,6 +1341,15 @@ lvgl:
                   text_font: font_medium
                   text_color: 0x5A7A5A
                   text: "Back Door: --"
+              - obj:
+                  id: dot_door_back
+                  x: 340
+                  y: 67
+                  width: 12
+                  height: 12
+                  radius: circle
+                  border_width: 0
+                  bg_color: 0x5A7A5A
               - label:
                   id: home_motion_summary
                   x: 14
@@ -1260,6 +1358,15 @@ lvgl:
                   text_font: font_medium
                   text_color: 0x5A7A5A
                   text: "Motion armed: --"
+              - obj:
+                  id: dot_motion_summary
+                  x: 340
+                  y: 95
+                  width: 12
+                  height: 12
+                  radius: circle
+                  border_width: 0
+                  bg_color: 0x5A7A5A
 
         # Alert banner (visible only when at least one alert is active).
         - obj:
@@ -1304,67 +1411,132 @@ lvgl:
             text_color: 0x5A7A5A
             text: SCENES
         # Scene grid (2x2). Scenes are retired on this HA instance, so the
-        # equivalent scripts are called instead.
+        # equivalent scripts are called instead. Each tile is an icon over a
+        # short text label, centered inside the button.
         - button:
             styles: scene_btn_style
             pressed:
               bg_color: 0x14FE17
               text_color: 0x081208
+              transform_scale: 0.95
+              transform_pivot_x: 85
+              transform_pivot_y: 32
             x: 20
             y: 82
             width: 170
             height: 64
-            text: ALL OFF
             on_click:
               - homeassistant.service:
                   service: script.turn_on
                   data:
                     entity_id: script.all_lights_off
+            widgets:
+              - image:
+                  align: CENTER
+                  x: 0
+                  y: -12
+                  width: 32
+                  height: 32
+                  src: icon_scene_all_off
+              - label:
+                  align: CENTER
+                  x: 0
+                  y: 16
+                  text_font: font_small
+                  text: All Off
         - button:
             styles: scene_btn_style
             pressed:
               bg_color: 0x14FE17
               text_color: 0x081208
+              transform_scale: 0.95
+              transform_pivot_x: 85
+              transform_pivot_y: 32
             x: 206
             y: 82
             width: 170
             height: 64
-            text: RELAX
             on_click:
               - homeassistant.service:
                   service: script.turn_on
                   data:
                     entity_id: script.relax_mode
+            widgets:
+              - image:
+                  align: CENTER
+                  x: 0
+                  y: -12
+                  width: 32
+                  height: 32
+                  src: icon_scene_relax
+              - label:
+                  align: CENTER
+                  x: 0
+                  y: 16
+                  text_font: font_small
+                  text: Relax
         - button:
             styles: scene_btn_style
             pressed:
               bg_color: 0x14FE17
               text_color: 0x081208
+              transform_scale: 0.95
+              transform_pivot_x: 85
+              transform_pivot_y: 32
             x: 20
             y: 154
             width: 170
             height: 64
-            text: MOVIE
             on_click:
               - homeassistant.service:
                   service: script.turn_on
                   data:
                     entity_id: script.movie_mode
+            widgets:
+              - image:
+                  align: CENTER
+                  x: 0
+                  y: -12
+                  width: 32
+                  height: 32
+                  src: icon_scene_movie
+              - label:
+                  align: CENTER
+                  x: 0
+                  y: 16
+                  text_font: font_small
+                  text: Movie
         - button:
             styles: scene_btn_style
             pressed:
               bg_color: 0x14FE17
               text_color: 0x081208
+              transform_scale: 0.95
+              transform_pivot_x: 85
+              transform_pivot_y: 32
             x: 206
             y: 154
             width: 170
             height: 64
-            text: GOODNIGHT
             on_click:
               - homeassistant.service:
                   service: script.turn_on
                   data:
                     entity_id: script.goodnight
+            widgets:
+              - image:
+                  align: CENTER
+                  x: 0
+                  y: -12
+                  width: 32
+                  height: 32
+                  src: icon_scene_goodnight
+              - label:
+                  align: CENTER
+                  x: 0
+                  y: 16
+                  text_font: font_small
+                  text: Goodnight
 
         - label:
             x: 410
@@ -1392,6 +1564,9 @@ lvgl:
                   pressed:
                     bg_color: 0x2D7A2D
                     text_color: 0xE8FFE8
+                    transform_scale: 0.98
+                    transform_pivot_x: 185
+                    transform_pivot_y: 22
                   x: 0
                   y: 0
                   width: 370
@@ -1402,9 +1577,15 @@ lvgl:
                         data:
                           entity_id: light.living_room_ceiling_fan
                   widgets:
-                    - label:
+                    - image:
                         align: LEFT_MID
                         x: 14
+                        width: 28
+                        height: 28
+                        src: icon_light_fan
+                    - label:
+                        align: LEFT_MID
+                        x: 52
                         text_font: font_medium
                         text: Living Room Fan
                     - label:
@@ -1472,6 +1653,9 @@ lvgl:
                   pressed:
                     bg_color: 0x2D7A2D
                     text_color: 0xE8FFE8
+                    transform_scale: 0.98
+                    transform_pivot_x: 185
+                    transform_pivot_y: 22
                   x: 0
                   y: 0
                   width: 370
@@ -1482,9 +1666,15 @@ lvgl:
                         data:
                           entity_id: light.ceiling_fan
                   widgets:
-                    - label:
+                    - image:
                         align: LEFT_MID
                         x: 14
+                        width: 28
+                        height: 28
+                        src: icon_light_fan
+                    - label:
+                        align: LEFT_MID
+                        x: 52
                         text_font: font_medium
                         text: Office
                     - label:
@@ -1620,6 +1810,9 @@ lvgl:
             pressed:
               bg_color: 0x2D7A2D
               text_color: 0xE8FFE8
+              transform_scale: 0.98
+              transform_pivot_x: 185
+              transform_pivot_y: 42
             x: 20
             y: 218
             width: 370
@@ -1658,6 +1851,9 @@ lvgl:
             pressed:
               bg_color: 0x2D7A2D
               text_color: 0xE8FFE8
+              transform_scale: 0.98
+              transform_pivot_x: 185
+              transform_pivot_y: 42
             x: 410
             y: 218
             width: 370
