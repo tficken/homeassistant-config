@@ -494,6 +494,121 @@ sensor:
               args: ['x']
               if_nan: "Wind: --"
 
+  # ---------------------------------------------------------------------------
+  # Room climate sensors (temperature + humidity)
+  # ---------------------------------------------------------------------------
+  - platform: homeassistant
+    id: ha_climate_living_temp
+    entity_id: sensor.hobeian_zg_204zx_temperature_4
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: climate_living_temp
+            text:
+              format: "%.1f°"
+              args: ['x']
+              if_nan: "--°"
+
+  - platform: homeassistant
+    id: ha_climate_living_hum
+    entity_id: sensor.hobeian_zg_204zx_humidity_4
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: climate_living_hum
+            text:
+              format: "%.0f%%"
+              args: ['x']
+              if_nan: "--%"
+
+  - platform: homeassistant
+    id: ha_climate_bedroom_temp
+    entity_id: sensor.hobeian_zg_204zx_temperature_2
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: climate_bedroom_temp
+            text:
+              format: "%.1f°"
+              args: ['x']
+              if_nan: "--°"
+
+  - platform: homeassistant
+    id: ha_climate_bedroom_hum
+    entity_id: sensor.hobeian_zg_204zx_humidity_2
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: climate_bedroom_hum
+            text:
+              format: "%.0f%%"
+              args: ['x']
+              if_nan: "--%"
+
+  - platform: homeassistant
+    id: ha_climate_office_temp
+    entity_id: sensor.hobeian_zg_204zx_temperature_3
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: climate_office_temp
+            text:
+              format: "%.1f°"
+              args: ['x']
+              if_nan: "--°"
+
+  - platform: homeassistant
+    id: ha_climate_office_hum
+    entity_id: sensor.hobeian_zg_204zx_humidity_3
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: climate_office_hum
+            text:
+              format: "%.0f%%"
+              args: ['x']
+              if_nan: "--%"
+
+  - platform: homeassistant
+    id: ha_climate_basement_temp
+    entity_id: sensor.hobeian_zg_204zx_temperature
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: climate_basement_temp
+            text:
+              format: "%.1f°"
+              args: ['x']
+              if_nan: "--°"
+
+  - platform: homeassistant
+    id: ha_climate_basement_hum
+    entity_id: sensor.hobeian_zg_204zx_humidity
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: climate_basement_hum
+            text:
+              format: "%.0f%%"
+              args: ['x']
+              if_nan: "--%"
+
 text_sensor:
   # ----- Home Assistant imports: text states -----
   # Sun state drives the day/night suffix of the OWM weather icon.
@@ -1363,13 +1478,153 @@ lvgl:
                   border_width: 0
                   bg_color: 0x5A7A5A
 
+        # Climate
+        - label:
+            x: 20
+            y: 312
+            text_font: font_small
+            text_color: 0x5A7A5A
+            text: CLIMATE
+
+        - obj:
+            styles: card_style
+            x: 20
+            y: 330
+            width: 175
+            height: 70
+            clickable: false
+            widgets:
+              - label:
+                  x: 10
+                  y: 8
+                  text_font: font_small
+                  text_color: 0x5A7A5A
+                  text: Living Room
+              - label:
+                  id: climate_living_temp
+                  x: 10
+                  y: 28
+                  width: 155
+                  text_align: LEFT
+                  text_font: font_medium
+                  text_color: 0xE8FFE8
+                  text: --°
+              - label:
+                  id: climate_living_hum
+                  x: 10
+                  y: 48
+                  width: 155
+                  text_align: LEFT
+                  text_font: font_small
+                  text_color: 0x5A7A5A
+                  text: --%
+
+        - obj:
+            styles: card_style
+            x: 215
+            y: 330
+            width: 175
+            height: 70
+            clickable: false
+            widgets:
+              - label:
+                  x: 10
+                  y: 8
+                  text_font: font_small
+                  text_color: 0x5A7A5A
+                  text: Bedroom
+              - label:
+                  id: climate_bedroom_temp
+                  x: 10
+                  y: 28
+                  width: 155
+                  text_align: LEFT
+                  text_font: font_medium
+                  text_color: 0xE8FFE8
+                  text: --°
+              - label:
+                  id: climate_bedroom_hum
+                  x: 10
+                  y: 48
+                  width: 155
+                  text_align: LEFT
+                  text_font: font_small
+                  text_color: 0x5A7A5A
+                  text: --%
+
+        - obj:
+            styles: card_style
+            x: 410
+            y: 330
+            width: 175
+            height: 70
+            clickable: false
+            widgets:
+              - label:
+                  x: 10
+                  y: 8
+                  text_font: font_small
+                  text_color: 0x5A7A5A
+                  text: Office
+              - label:
+                  id: climate_office_temp
+                  x: 10
+                  y: 28
+                  width: 155
+                  text_align: LEFT
+                  text_font: font_medium
+                  text_color: 0xE8FFE8
+                  text: --°
+              - label:
+                  id: climate_office_hum
+                  x: 10
+                  y: 48
+                  width: 155
+                  text_align: LEFT
+                  text_font: font_small
+                  text_color: 0x5A7A5A
+                  text: --%
+
+        - obj:
+            styles: card_style
+            x: 605
+            y: 330
+            width: 175
+            height: 70
+            clickable: false
+            widgets:
+              - label:
+                  x: 10
+                  y: 8
+                  text_font: font_small
+                  text_color: 0x5A7A5A
+                  text: Basement
+              - label:
+                  id: climate_basement_temp
+                  x: 10
+                  y: 28
+                  width: 155
+                  text_align: LEFT
+                  text_font: font_medium
+                  text_color: 0xE8FFE8
+                  text: --°
+              - label:
+                  id: climate_basement_hum
+                  x: 10
+                  y: 48
+                  width: 155
+                  text_align: LEFT
+                  text_font: font_small
+                  text_color: 0x5A7A5A
+                  text: --%
+
         # Alert banner (visible only when at least one alert is active).
         - obj:
             id: alert_banner
             x: 20
-            y: 332
+            y: 400
             width: 760
-            height: 72
+            height: 30
             bg_color: 0xFFAE00
             radius: 8
             pad_all: 0
@@ -1382,7 +1637,7 @@ lvgl:
                   align: CENTER
                   width: 732
                   text_align: CENTER
-                  text_font: font_medium
+                  text_font: font_small
                   text_color: 0x081208
                   text: Alerts
 
