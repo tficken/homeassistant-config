@@ -366,7 +366,7 @@ text_sensor:
         - lvgl.widget.update:
             id: home_travis
             text_color: !lambda |-
-              return (x == "home") ? lv_color_hex(0x4CAF50) : lv_color_hex(0xB0BEC5);
+              return (x == "home") ? lv_color_hex(0x14FE17) : lv_color_hex(0x5A7A5A);
 
   - platform: homeassistant
     id: ts_person_bobbie
@@ -382,7 +382,7 @@ text_sensor:
         - lvgl.widget.update:
             id: home_bobbie
             text_color: !lambda |-
-              return (x == "home") ? lv_color_hex(0x4CAF50) : lv_color_hex(0xB0BEC5);
+              return (x == "home") ? lv_color_hex(0x14FE17) : lv_color_hex(0x5A7A5A);
 
   # Light on/off states for the Lights page cards.
   - platform: homeassistant
@@ -462,7 +462,7 @@ binary_sensor:
         - lvgl.widget.update:
             id: home_door_front
             text_color: !lambda |-
-              return x ? lv_color_hex(0xFF9800) : lv_color_hex(0x4CAF50);
+              return x ? lv_color_hex(0xFFAE00) : lv_color_hex(0x14FE17);
         - lvgl.label.update:
             id: sec_front_state
             text: !lambda |-
@@ -470,7 +470,7 @@ binary_sensor:
         - lvgl.widget.update:
             id: sec_front_state
             text_color: !lambda |-
-              return x ? lv_color_hex(0xFF9800) : lv_color_hex(0x4CAF50);
+              return x ? lv_color_hex(0xFFAE00) : lv_color_hex(0x14FE17);
 
   - platform: homeassistant
     id: bs_backdoor
@@ -486,7 +486,7 @@ binary_sensor:
         - lvgl.widget.update:
             id: home_door_back
             text_color: !lambda |-
-              return x ? lv_color_hex(0xFF9800) : lv_color_hex(0x4CAF50);
+              return x ? lv_color_hex(0xFFAE00) : lv_color_hex(0x14FE17);
         - lvgl.label.update:
             id: sec_back_state
             text: !lambda |-
@@ -494,7 +494,7 @@ binary_sensor:
         - lvgl.widget.update:
             id: sec_back_state
             text_color: !lambda |-
-              return x ? lv_color_hex(0xFF9800) : lv_color_hex(0x4CAF50);
+              return x ? lv_color_hex(0xFFAE00) : lv_color_hex(0x14FE17);
 
   - platform: homeassistant
     id: bs_wan
@@ -635,15 +635,15 @@ script:
           text_color: !lambda |-
             int n = (id(sw_front_motion).state ? 1 : 0) + (id(sw_downstairs_motion).state ? 1 : 0);
             if (n == 2) {
-              return lv_color_hex(0x4CAF50);
+              return lv_color_hex(0x14FE17);
             }
             if (n == 0) {
-              return lv_color_hex(0xFF9800);
+              return lv_color_hex(0xFFAE00);
             }
-            return lv_color_hex(0xB0BEC5);
+            return lv_color_hex(0x5A7A5A);
 
   # Top-bar battery label text + threshold colors
-  # (< 15% red, < 30% orange, otherwise white).
+  # (< 15% danger #FF3333, < 30% amber #FFAE00, otherwise #E8FFE8).
   - id: update_battery_label
     mode: single
     then:
@@ -662,46 +662,47 @@ script:
           text_color: !lambda |-
             float pct = id(battery_percent).state;
             if (!isnan(pct) && pct < 15.0f) {
-              return lv_color_hex(0xF44336);
+              return lv_color_hex(0xFF3333);
             }
             if (!isnan(pct) && pct < 30.0f) {
-              return lv_color_hex(0xFF9800);
+              return lv_color_hex(0xFFAE00);
             }
-            return lv_color_hex(0xFFFFFF);
+            return lv_color_hex(0xE8FFE8);
 
 lvgl:
-  # ----- Design tokens -----
-  #   Canvas 800x480; top bar 50px and bottom nav 50px in #1A237E.
-  #   Content bg #121212, cards #1E1E1E, accent/active #00BCD4, on #4CAF50,
-  #   alert #FF9800, text #FFFFFF / secondary #B0BEC5, radius 8px.
+  # ----- Design tokens -----  (match the AI dashboard green-phosphor theme)
+  #   Canvas 800x480; top bar 50px and bottom nav 50px in #0A140A.
+  #   Content bg #030503, cards #1A4A1A, pressed/hover #2D7A2D,
+  #   accent/active #14FE17, alert #FFAE00, danger #FF3333,
+  #   text #E8FFE8 / secondary #5A7A5A, radius 8px.
   style_definitions:
     - id: page_bg_style
-      bg_color: 0x121212
+      bg_color: 0x030503
       radius: 0
       pad_all: 0
       border_width: 0
     - id: bar_style
-      bg_color: 0x1A237E
+      bg_color: 0x0A140A
       radius: 0
       pad_all: 0
       border_width: 0
     - id: card_style
-      bg_color: 0x1E1E1E
+      bg_color: 0x1A4A1A
       radius: 8
       pad_all: 0
       border_width: 0
     - id: scene_btn_style
-      bg_color: 0x1E1E1E
+      bg_color: 0x1A4A1A
       radius: 8
       pad_all: 0
       border_width: 0
-      text_color: 0xFFFFFF
+      text_color: 0xE8FFE8
     - id: toggle_btn_style
-      bg_color: 0x1E1E1E
+      bg_color: 0x1A4A1A
       radius: 8
       pad_all: 0
       border_width: 0
-      text_color: 0xFFFFFF
+      text_color: 0xE8FFE8
 
   # Shared top bar + bottom nav, drawn on LVGL's always-on-top layer so they
   # appear on every page without duplicating widgets.
@@ -723,7 +724,7 @@ lvgl:
                 width: 120
                 text_align: LEFT
                 text_font: font_medium
-                text_color: 0xFFFFFF
+                text_color: 0xE8FFE8
                 text: --:--
             - label:
                 id: topbar_title
@@ -731,7 +732,7 @@ lvgl:
                 width: 400
                 text_align: CENTER
                 text_font: font_medium
-                text_color: 0xFFFFFF
+                text_color: 0xE8FFE8
                 text: Home
             - label:
                 id: topbar_battery
@@ -740,7 +741,7 @@ lvgl:
                 width: 100
                 text_align: RIGHT
                 text_font: font_medium
-                text_color: 0xFFFFFF
+                text_color: 0xE8FFE8
                 text: --%
       # Bottom nav background.
       - obj:
@@ -763,16 +764,16 @@ lvgl:
           bg_opa: TRANSP
           border_width: 0
           items:
-            bg_color: 0x283593
+            bg_color: 0x1A4A1A
             radius: 8
             border_width: 0
-            text_color: 0xFFFFFF
+            text_color: 0xE8FFE8
             text_font: font_medium
             pressed:
-              bg_color: 0x3949AB
+              bg_color: 0x2D7A2D
             checked:
-              bg_color: 0x00BCD4
-              text_color: 0x121212
+              bg_color: 0x14FE17
+              text_color: 0x081208
           rows:
             - buttons:
                 - text: HOME
@@ -823,7 +824,7 @@ lvgl:
             x: 20
             y: 58
             text_font: font_large
-            text_color: 0xFFFFFF
+            text_color: 0xE8FFE8
             text: Hello
 
         - label:
@@ -831,14 +832,14 @@ lvgl:
             x: 20
             y: 108
             text_font: font_medium
-            text_color: 0xB0BEC5
+            text_color: 0x5A7A5A
             text: "Travis: --"
         - label:
             id: home_bobbie
             x: 20
             y: 134
             text_font: font_medium
-            text_color: 0xB0BEC5
+            text_color: 0x5A7A5A
             text: "Bobbie: --"
 
         # Weather card
@@ -854,7 +855,7 @@ lvgl:
                   x: 14
                   y: 10
                   text_font: font_small
-                  text_color: 0xB0BEC5
+                  text_color: 0x5A7A5A
                   text: WEATHER
               - label:
                   id: home_weather_temp
@@ -863,7 +864,7 @@ lvgl:
                   width: 200
                   text_align: LEFT
                   text_font: font_large
-                  text_color: 0xFFFFFF
+                  text_color: 0xE8FFE8
                   text: --°
               - label:
                   id: home_weather_cond
@@ -872,7 +873,7 @@ lvgl:
                   width: 340
                   text_align: LEFT
                   text_font: font_medium
-                  text_color: 0xB0BEC5
+                  text_color: 0x5A7A5A
                   text: —
 
         # Status card
@@ -888,7 +889,7 @@ lvgl:
                   x: 14
                   y: 10
                   text_font: font_small
-                  text_color: 0xB0BEC5
+                  text_color: 0x5A7A5A
                   text: STATUS
               - label:
                   id: home_door_front
@@ -896,7 +897,7 @@ lvgl:
                   y: 34
                   width: 340
                   text_font: font_medium
-                  text_color: 0xB0BEC5
+                  text_color: 0x5A7A5A
                   text: "Front Door: --"
               - label:
                   id: home_door_back
@@ -904,7 +905,7 @@ lvgl:
                   y: 62
                   width: 340
                   text_font: font_medium
-                  text_color: 0xB0BEC5
+                  text_color: 0x5A7A5A
                   text: "Back Door: --"
               - label:
                   id: home_motion_summary
@@ -912,7 +913,7 @@ lvgl:
                   y: 90
                   width: 340
                   text_font: font_medium
-                  text_color: 0xB0BEC5
+                  text_color: 0x5A7A5A
                   text: "Motion armed: --"
 
         # Alert banner (visible only when at least one alert is active).
@@ -922,7 +923,7 @@ lvgl:
             y: 332
             width: 760
             height: 72
-            bg_color: 0xFF9800
+            bg_color: 0xFFAE00
             radius: 8
             pad_all: 0
             border_width: 0
@@ -935,7 +936,7 @@ lvgl:
                   width: 732
                   text_align: CENTER
                   text_font: font_medium
-                  text_color: 0x121212
+                  text_color: 0x081208
                   text: Alerts
 
     # =========================================================================
@@ -955,15 +956,15 @@ lvgl:
             x: 20
             y: 58
             text_font: font_small
-            text_color: 0xB0BEC5
+            text_color: 0x5A7A5A
             text: SCENES
         # Scene grid (2x2). Scenes are retired on this HA instance, so the
         # equivalent scripts are called instead.
         - button:
             styles: scene_btn_style
             pressed:
-              bg_color: 0x00BCD4
-              text_color: 0x121212
+              bg_color: 0x14FE17
+              text_color: 0x081208
             x: 20
             y: 82
             width: 170
@@ -977,8 +978,8 @@ lvgl:
         - button:
             styles: scene_btn_style
             pressed:
-              bg_color: 0x00BCD4
-              text_color: 0x121212
+              bg_color: 0x14FE17
+              text_color: 0x081208
             x: 206
             y: 82
             width: 170
@@ -992,8 +993,8 @@ lvgl:
         - button:
             styles: scene_btn_style
             pressed:
-              bg_color: 0x00BCD4
-              text_color: 0x121212
+              bg_color: 0x14FE17
+              text_color: 0x081208
             x: 20
             y: 154
             width: 170
@@ -1007,8 +1008,8 @@ lvgl:
         - button:
             styles: scene_btn_style
             pressed:
-              bg_color: 0x00BCD4
-              text_color: 0x121212
+              bg_color: 0x14FE17
+              text_color: 0x081208
             x: 206
             y: 154
             width: 170
@@ -1024,7 +1025,7 @@ lvgl:
             x: 410
             y: 58
             text_font: font_small
-            text_color: 0xB0BEC5
+            text_color: 0x5A7A5A
             text: LIGHTS
 
         # Living Room Ceiling Fan: toggle + brightness slider.
@@ -1041,11 +1042,11 @@ lvgl:
                   styles: toggle_btn_style
                   checkable: true
                   checked:
-                    bg_color: 0x4CAF50
-                    text_color: 0x121212
+                    bg_color: 0x14FE17
+                    text_color: 0x081208
                   pressed:
-                    bg_color: 0x2A2A2A
-                    text_color: 0xFFFFFF
+                    bg_color: 0x2D7A2D
+                    text_color: 0xE8FFE8
                   x: 0
                   y: 0
                   width: 370
@@ -1076,14 +1077,14 @@ lvgl:
                   min_value: 0
                   max_value: 100
                   adv_hittest: true
-                  bg_color: 0x2A2A2A
+                  bg_color: 0x0A140A
                   radius: 8
                   border_width: 0
                   indicator:
-                    bg_color: 0x00BCD4
+                    bg_color: 0x14FE17
                     radius: 8
                   knob:
-                    bg_color: 0xFFFFFF
+                    bg_color: 0xE8FFE8
                     radius: 12
                   on_release:
                     - homeassistant.service:
@@ -1106,11 +1107,11 @@ lvgl:
                   styles: toggle_btn_style
                   checkable: true
                   checked:
-                    bg_color: 0x4CAF50
-                    text_color: 0x121212
+                    bg_color: 0x14FE17
+                    text_color: 0x081208
                   pressed:
-                    bg_color: 0x2A2A2A
-                    text_color: 0xFFFFFF
+                    bg_color: 0x2D7A2D
+                    text_color: 0xE8FFE8
                   x: 0
                   y: 0
                   width: 370
@@ -1141,14 +1142,14 @@ lvgl:
                   min_value: 0
                   max_value: 100
                   adv_hittest: true
-                  bg_color: 0x2A2A2A
+                  bg_color: 0x0A140A
                   radius: 8
                   border_width: 0
                   indicator:
-                    bg_color: 0x00BCD4
+                    bg_color: 0x14FE17
                     radius: 8
                   knob:
-                    bg_color: 0xFFFFFF
+                    bg_color: 0xE8FFE8
                     radius: 12
                   on_release:
                     - homeassistant.service:
@@ -1174,7 +1175,7 @@ lvgl:
             x: 20
             y: 58
             text_font: font_small
-            text_color: 0xB0BEC5
+            text_color: 0x5A7A5A
             text: DOORS
         - obj:
             styles: card_style
@@ -1188,7 +1189,7 @@ lvgl:
                   x: 16
                   y: 12
                   text_font: font_small
-                  text_color: 0xB0BEC5
+                  text_color: 0x5A7A5A
                   text: FRONT DOOR
               - label:
                   id: sec_front_state
@@ -1197,13 +1198,13 @@ lvgl:
                   width: 340
                   text_align: LEFT
                   text_font: font_large
-                  text_color: 0xB0BEC5
+                  text_color: 0x5A7A5A
                   text: —
               - label:
                   x: 400
                   y: 12
                   text_font: font_small
-                  text_color: 0xB0BEC5
+                  text_color: 0x5A7A5A
                   text: BACK DOOR
               - label:
                   id: sec_back_state
@@ -1212,24 +1213,24 @@ lvgl:
                   width: 340
                   text_align: LEFT
                   text_font: font_large
-                  text_color: 0xB0BEC5
+                  text_color: 0x5A7A5A
                   text: —
 
         - label:
             x: 20
             y: 194
             text_font: font_small
-            text_color: 0xB0BEC5
+            text_color: 0x5A7A5A
             text: MOTION DETECTION
         - button:
             id: motion_front_btn
             styles: toggle_btn_style
             checked:
-              bg_color: 0x4CAF50
-              text_color: 0x121212
+              bg_color: 0x14FE17
+              text_color: 0x081208
             pressed:
-              bg_color: 0x2A2A2A
-              text_color: 0xFFFFFF
+              bg_color: 0x2D7A2D
+              text_color: 0xE8FFE8
             x: 20
             y: 218
             width: 370
@@ -1256,11 +1257,11 @@ lvgl:
             id: motion_downstairs_btn
             styles: toggle_btn_style
             checked:
-              bg_color: 0x4CAF50
-              text_color: 0x121212
+              bg_color: 0x14FE17
+              text_color: 0x081208
             pressed:
-              bg_color: 0x2A2A2A
-              text_color: 0xFFFFFF
+              bg_color: 0x2D7A2D
+              text_color: 0xE8FFE8
             x: 410
             y: 218
             width: 370
@@ -1288,7 +1289,7 @@ lvgl:
             x: 20
             y: 318
             text_font: font_small
-            text_color: 0xB0BEC5
+            text_color: 0x5A7A5A
             text: LAST ACTIVITY
         - obj:
             styles: card_style
@@ -1302,7 +1303,7 @@ lvgl:
                   x: 14
                   y: 8
                   text_font: font_small
-                  text_color: 0xB0BEC5
+                  text_color: 0x5A7A5A
                   text: Front Door
               - label:
                   id: sec_front_last
@@ -1311,7 +1312,7 @@ lvgl:
                   width: 340
                   text_align: LEFT
                   text_font: font_medium
-                  text_color: 0xFFFFFF
+                  text_color: 0xE8FFE8
                   text: —
         - obj:
             styles: card_style
@@ -1325,7 +1326,7 @@ lvgl:
                   x: 14
                   y: 8
                   text_font: font_small
-                  text_color: 0xB0BEC5
+                  text_color: 0x5A7A5A
                   text: Downstairs Motion
               - label:
                   id: sec_downstairs_last
@@ -1334,5 +1335,5 @@ lvgl:
                   width: 340
                   text_align: LEFT
                   text_font: font_medium
-                  text_color: 0xFFFFFF
+                  text_color: 0xE8FFE8
                   text: —
