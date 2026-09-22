@@ -251,7 +251,7 @@ sensor:
     entity_id: weather.forecast_home
     attribute: temperature
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - lvgl.label.update:
@@ -265,7 +265,7 @@ sensor:
     id: ha_backup_age
     entity_id: sensor.ha_last_backup_age
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - script.execute: update_alert_banner
@@ -274,7 +274,7 @@ sensor:
     id: ha_disk_usage
     entity_id: sensor.ha_disk_usage
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - script.execute: update_alert_banner
@@ -283,7 +283,7 @@ sensor:
     id: ha_nws_alerts
     entity_id: sensor.nws_warnings_watches
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - script.execute: update_alert_banner
@@ -294,7 +294,7 @@ sensor:
     entity_id: light.living_room_ceiling_fan
     attribute: brightness
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - lvgl.slider.update:
@@ -312,7 +312,7 @@ text_sensor:
     entity_id: weather.forecast_home
     attribute: condition
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - lvgl.label.update:
@@ -339,7 +339,7 @@ text_sensor:
     id: ts_person_woteg
     entity_id: person.woteg
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - lvgl.label.update:
@@ -355,7 +355,7 @@ text_sensor:
     id: ts_person_bobbie
     entity_id: person.bobbie
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - lvgl.label.update:
@@ -372,7 +372,7 @@ text_sensor:
     id: ts_ceiling_fan
     entity_id: light.ceiling_fan
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - lvgl.label.update:
@@ -384,7 +384,7 @@ text_sensor:
     id: ts_lr_fan
     entity_id: light.living_room_ceiling_fan
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - lvgl.label.update:
@@ -396,7 +396,7 @@ text_sensor:
     id: ts_fan1
     entity_id: light.third_reality_inc_3rcb01057z_4
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - lvgl.label.update:
@@ -408,7 +408,7 @@ text_sensor:
     id: ts_fan2
     entity_id: light.third_reality_inc_3rcb01057z_5
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - lvgl.label.update:
@@ -420,7 +420,7 @@ text_sensor:
     id: ts_fan3
     entity_id: light.third_reality_inc_3rcb01057z_6
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - lvgl.label.update:
@@ -435,7 +435,7 @@ text_sensor:
     id: ts_front_last
     entity_id: sensor.front_door_last_activity
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - lvgl.label.update:
@@ -452,7 +452,7 @@ text_sensor:
     id: ts_downstairs_last
     entity_id: sensor.downstairs_last_activity
     internal: true
-    publish_initial_state: true
+
     on_value:
       then:
         - lvgl.label.update:
@@ -471,7 +471,7 @@ binary_sensor:
     id: bs_front_door
     entity_id: binary_sensor.living_room_front_door
     internal: true
-    publish_initial_state: true
+
     on_state:
       then:
         - lvgl.label.update:
@@ -495,7 +495,7 @@ binary_sensor:
     id: bs_backdoor
     entity_id: binary_sensor.backdoor
     internal: true
-    publish_initial_state: true
+
     on_state:
       then:
         - lvgl.label.update:
@@ -519,7 +519,7 @@ binary_sensor:
     id: bs_wan
     entity_id: binary_sensor.exos_router_wan_status
     internal: true
-    publish_initial_state: true
+
     on_state:
       then:
         - script.execute: update_alert_banner
@@ -530,7 +530,7 @@ binary_sensor:
     id: bs_ceiling_fan
     entity_id: light.ceiling_fan
     internal: true
-    publish_initial_state: true
+
     on_state:
       then:
         - lvgl.widget.update:
@@ -542,7 +542,7 @@ binary_sensor:
     id: bs_lr_fan
     entity_id: light.living_room_ceiling_fan
     internal: true
-    publish_initial_state: true
+
     on_state:
       then:
         - lvgl.widget.update:
@@ -554,7 +554,7 @@ binary_sensor:
     id: bs_fan1
     entity_id: light.third_reality_inc_3rcb01057z_4
     internal: true
-    publish_initial_state: true
+
     on_state:
       then:
         - lvgl.widget.update:
@@ -566,7 +566,7 @@ binary_sensor:
     id: bs_fan2
     entity_id: light.third_reality_inc_3rcb01057z_5
     internal: true
-    publish_initial_state: true
+
     on_state:
       then:
         - lvgl.widget.update:
@@ -578,7 +578,7 @@ binary_sensor:
     id: bs_fan3
     entity_id: light.third_reality_inc_3rcb01057z_6
     internal: true
-    publish_initial_state: true
+
     on_state:
       then:
         - lvgl.widget.update:
@@ -592,7 +592,7 @@ switch:
     id: sw_front_motion
     entity_id: switch.front_door_motion_detection
     internal: true
-    publish_initial_state: true
+
     on_turn_on:
       then:
         - lvgl.widget.update:
@@ -618,7 +618,7 @@ switch:
     id: sw_downstairs_motion
     entity_id: switch.downstairs_motion_detection
     internal: true
-    publish_initial_state: true
+
     on_turn_on:
       then:
         - lvgl.widget.update:
