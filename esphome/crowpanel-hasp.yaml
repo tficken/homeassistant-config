@@ -62,51 +62,63 @@ wifi:
 image:
   - id: icon_lock
     file: lock_closed.png
-    type: RGBA
+    type: RGB
+    transparency: alpha_channel
     resize: 48x48
   - id: icon_unlock
     file: lock_open.png
-    type: RGBA
+    type: RGB
+    transparency: alpha_channel
     resize: 48x48
   - id: icon_shield
     file: shield.png
-    type: RGBA
+    type: RGB
+    transparency: alpha_channel
     resize: 48x48
   - id: icon_warning
     file: warning.png
-    type: RGBA
+    type: RGB
+    transparency: alpha_channel
     resize: 48x48
   - id: icon_sun
     file: sun.png
-    type: RGBA
+    type: RGB
+    transparency: alpha_channel
     resize: 80x80
   - id: icon_moon
     file: moon.png
-    type: RGBA
+    type: RGB
+    transparency: alpha_channel
     resize: 80x80
   - id: icon_partly_cloudy
     file: partly_cloudy.png
-    type: RGBA
+    type: RGB
+    transparency: alpha_channel
     resize: 80x80
   - id: icon_cloud
     file: cloud.png
-    type: RGBA
+    type: RGB
+    transparency: alpha_channel
     resize: 80x80
   - id: icon_rain
     file: rain.png
-    type: RGBA
+    type: RGB
+    transparency: alpha_channel
     resize: 80x80
   - id: icon_snow
     file: snow.png
-    type: RGBA
+    type: RGB
+    transparency: alpha_channel
     resize: 80x80
   - id: icon_thunder
     file: thunder.png
-    type: RGBA
+    type: RGB
+    transparency: alpha_channel
     resize: 80x80
   - id: icon_fog
     file: fog.png
-    type: RGBA
+    type: RGB
+    transparency: alpha_channel
     resize: 80x80
 
 i2c:
