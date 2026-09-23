@@ -6,8 +6,8 @@
 # panel — do not "fix" display/touch/I2C/backlight/PSRAM/framework values.
 #
 # Before compiling:
-#   1. Fill in the BATTERY ADC placeholder (pin + voltage divider) — see TODOs
-#      in the sensor section.
+#   1. Attach a MAX17043 I2C fuel gauge to the back I2C-OUT header and the
+#      battery connector (see the BATTERY section in the sensor block).
 #   2. Requires secrets: wifi_ssid, wifi_password,
 #      crowpanel_hasp__encryption_key.
 #   3. In Home Assistant, allow this device to make service calls:
@@ -335,60 +335,43 @@ font:
 
 sensor:
   # ---------------------------------------------------------------------------
-  # BATTERY — PLACEHOLDER, NEEDS HARDWARE DETAILS
+  # BATTERY — MAX17043 I2C fuel gauge
   #
-  # A LiPo battery was added to the panel, but the ADC GPIO and the voltage
-  # divider values are not yet known. TWO values must be filled in below:
+  # The CrowPanel v1.4 board has a TP4059 charger but no built-in battery
+  # voltage divider to an ESP32 ADC pin. A MAX17043 fuel gauge is connected
+  # to the same I2C bus as the touch controller and STC8 backlight MCU:
   #
-  #   TODO 1: `pin:`        — the GPIO the battery voltage divider output is
-  #                           wired to. MUST be an ADC1 pin (GPIO1..GPIO10 on
-  #                           the ESP32-S3) because ADC2 cannot be used
-  #                           alongside Wi-Fi. GPIO4 (ADC1_CH3) is a guess and
-  #                           is free on this panel's pin map — change it.
-  #   TODO 2: divider ratio  — the lambda filter on the adc sensor must multiply
-  #                           the measured voltage back up by the divider ratio,
-  #                           e.g. `return x * 2.0f;` for a 100k/100k divider.
+  #   I2C-OUT header on the back of the panel:
+  #     SDA -> GPIO15 (existing i2c_bus)
+  #     SCL -> GPIO16 (existing i2c_bus)
+  #     3V3 -> MAX17043 VCC
+  #     GND -> MAX17043 GND
   #
-  # Percentage mapping (3.0 V -> 0%, 4.2 V -> 100%, clamped) is implemented in
-  # the template sensor `battery_percent` below and needs no changes.
+  #   Battery connector (PH2.0-2P):
+  #     BAT+ -> MAX17043 BAT+
+  #     BAT- -> MAX17043 BAT- (this is also GND on the panel)
+  #
+  # The MAX17043 is at I2C address 0x36 and provides both voltage and a
+  # ModelGauge state-of-charge percentage. The existing Home Assistant
+  # `binary_sensor.panel_charging` continues to use `sensor.panel_battery_voltage`
+  # (voltage > 4.15 V) to infer USB charging.
   # ---------------------------------------------------------------------------
-  - platform: adc
-    pin: GPIO4  # TODO: confirm the actual battery divider pin (must be ADC1)
-    attenuation: 12db
-    id: battery_voltage
-    name: "Panel battery voltage"
-    update_interval: 30s
-    filters:
-      - lambda: |-
-          // TODO: apply the voltage divider ratio here, e.g.:
-          // return x * 2.0f;   // 100k/100k divider
-          return x;
-    on_value:
-      then:
-        - script.execute: update_battery_label
-
-  - platform: template
-    name: "Panel battery"
-    id: battery_percent
-    unit_of_measurement: "%"
-    update_interval: 30s
-    lambda: |-
-      float v = id(battery_voltage).state;
-      if (isnan(v)) {
-        return NAN;
-      }
-      // 3.0 V -> 0%, 4.2 V -> 100%, clamped to 0-100.
-      float pct = (v - 3.0f) / (4.2f - 3.0f) * 100.0f;
-      if (pct < 0.0f) {
-        pct = 0.0f;
-      }
-      if (pct > 100.0f) {
-        pct = 100.0f;
-      }
-      return pct;
-    on_value:
-      then:
-        - script.execute: update_battery_label
+  - platform: max17043
+    id: max17043_id
+    i2c_id: i2c_bus
+    battery_voltage:
+      id: battery_voltage
+      name: "Panel battery voltage"
+      on_value:
+        then:
+          - script.execute: update_battery_label
+    battery_level:
+      id: battery_percent
+      name: "Panel battery"
+      unit_of_measurement: "%"
+      on_value:
+        then:
+          - script.execute: update_battery_label
 
   # ----- Home Assistant imports: numeric values -----
   - platform: homeassistant
