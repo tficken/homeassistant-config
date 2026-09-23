@@ -1203,6 +1203,18 @@ script:
           id: topbar_battery
           hidden: true
       - lvgl.widget.update:
+          id: battery_icon_bg
+          hidden: true
+      - lvgl.widget.update:
+          id: battery_icon_fill
+          hidden: true
+      - lvgl.widget.update:
+          id: battery_icon_nub
+          hidden: true
+      - lvgl.widget.update:
+          id: battery_charging_indicator
+          hidden: true
+      - lvgl.widget.update:
           id: nav_tabs
           hidden: true
       - lvgl.page.show: screensaver_page
@@ -1239,6 +1251,18 @@ script:
       - lvgl.widget.update:
           id: topbar_battery
           hidden: false
+      - lvgl.widget.update:
+          id: battery_icon_bg
+          hidden: false
+      - lvgl.widget.update:
+          id: battery_icon_fill
+          hidden: false
+      - lvgl.widget.update:
+          id: battery_icon_nub
+          hidden: false
+      - lvgl.widget.update:
+          id: battery_charging_indicator
+          hidden: !lambda return !id(bs_panel_charging).state;
       - lvgl.widget.update:
           id: nav_tabs
           hidden: false
