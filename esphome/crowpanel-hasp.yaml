@@ -527,9 +527,9 @@ sensor:
         - lvgl.label.update:
             id: home_weather_pressure
             text:
-              format: "%.0f"
+              format: "%.0f inHg"
               args: ['x']
-              if_nan: "--"
+              if_nan: "-- inHg"
 
   # ---------------------------------------------------------------------------
   # Room climate sensors (temperature + humidity)
@@ -686,44 +686,49 @@ text_sensor:
               return x.empty() ? std::string("—") : x;
         - script.execute: update_weather_icon
 
-  # Forecast high/low are parsed from the forecast attribute (if the weather
-  # integration still exposes it). In newer Home Assistant the forecast is only
-  # available via the weather.get_forecasts service; if these stay at "--°",
-  # create HA Template sensors instead and import those.
+  # Today's forecast high/low come from HA Template sensors that call the
+  # weather.get_forecasts service (the forecast attribute is no longer in the
+  # weather entity state in HA 2024.4+).
   - platform: homeassistant
-    id: ts_weather_forecast
-    entity_id: weather.forecast_home
-    attribute: forecast
+    id: ts_weather_high
+    entity_id: sensor.weather_forecast_high_today
     internal: true
 
     on_value:
       then:
         - lvgl.label.update:
             id: home_weather_high
-            text: !lambda |-
-              size_t pos = x.find("temperature': ");
-              if (pos == std::string::npos) {
-                pos = x.find("temperature\": ");
-              }
-              if (pos == std::string::npos) return std::string("H: --°");
-              pos = x.find_first_of("0123456789.-", pos + 13);
-              if (pos == std::string::npos) return std::string("H: --°");
-              size_t end = x.find_first_not_of("0123456789.-", pos);
-              std::string val = x.substr(pos, end - pos);
-              return std::string("H: ") + val + "°";
+            text:
+              format: "H: %.0f°"
+              args: ['x']
+              if_nan: "H: --°"
+
+  - platform: homeassistant
+    id: ts_weather_low
+    entity_id: sensor.weather_forecast_low_today
+    internal: true
+
+    on_value:
+      then:
         - lvgl.label.update:
             id: home_weather_low
-            text: !lambda |-
-              size_t pos = x.find("templow': ");
-              if (pos == std::string::npos) {
-                pos = x.find("templow\": ");
-              }
-              if (pos == std::string::npos) return std::string("L: --°");
-              pos = x.find_first_of("0123456789.-", pos + 10);
-              if (pos == std::string::npos) return std::string("L: --°");
-              size_t end = x.find_first_not_of("0123456789.-", pos);
-              std::string val = x.substr(pos, end - pos);
-              return std::string("L: ") + val + "°";
+            text:
+              format: "L: %.0f°"
+              args: ['x']
+              if_nan: "L: --°"
+
+  # Charging state comes from a HA Template binary sensor (voltage heuristic).
+  # True when battery voltage is held above 4.15 V on USB power.
+  - platform: homeassistant
+    id: bs_panel_charging
+    entity_id: binary_sensor.panel_charging
+    internal: true
+
+    on_state:
+      then:
+        - lvgl.widget.update:
+            id: battery_charging_indicator
+            hidden: !lambda return !x;
 
   - platform: homeassistant
     id: ts_person_woteg
@@ -1082,7 +1087,7 @@ script:
             }
             return lv_color_hex(0x5A7A5A);
 
-  # Top-bar battery label text + threshold colors
+  # Top-bar battery label text + icon fill + threshold colors
   # (< 15% danger #FF3333, < 30% amber #FFAE00, otherwise #E8FFE8).
   - id: update_battery_label
     mode: single
@@ -1100,6 +1105,48 @@ script:
       - lvgl.widget.update:
           id: topbar_battery
           text_color: !lambda |-
+            float pct = id(battery_percent).state;
+            if (!isnan(pct) && pct < 15.0f) {
+              return lv_color_hex(0xFF3333);
+            }
+            if (!isnan(pct) && pct < 30.0f) {
+              return lv_color_hex(0xFFAE00);
+            }
+            return lv_color_hex(0xE8FFE8);
+      - lvgl.widget.update:
+          id: battery_icon_fill
+          width: !lambda |-
+            float pct = id(battery_percent).state;
+            if (isnan(pct) || pct <= 0.0f) {
+              return 0;
+            }
+            if (pct >= 100.0f) {
+              return 16;
+            }
+            return (int)(16.0f * pct / 100.0f);
+          bg_color: !lambda |-
+            float pct = id(battery_percent).state;
+            if (!isnan(pct) && pct < 15.0f) {
+              return lv_color_hex(0xFF3333);
+            }
+            if (!isnan(pct) && pct < 30.0f) {
+              return lv_color_hex(0xFFAE00);
+            }
+            return lv_color_hex(0xE8FFE8);
+      - lvgl.widget.update:
+          id: battery_icon_bg
+          border_color: !lambda |-
+            float pct = id(battery_percent).state;
+            if (!isnan(pct) && pct < 15.0f) {
+              return lv_color_hex(0xFF3333);
+            }
+            if (!isnan(pct) && pct < 30.0f) {
+              return lv_color_hex(0xFFAE00);
+            }
+            return lv_color_hex(0xE8FFE8);
+      - lvgl.widget.update:
+          id: battery_icon_nub
+          bg_color: !lambda |-
             float pct = id(battery_percent).state;
             if (!isnan(pct) && pct < 15.0f) {
               return lv_color_hex(0xFF3333);
@@ -1276,7 +1323,7 @@ lvgl:
 
   top_layer:
     widgets:
-      # Top bar: clock (left), page title (center), battery (right).
+      # Top bar: clock (left), page title (center), battery icon/% (right).
       - obj:
           styles: bar_style
           x: 0
@@ -1311,11 +1358,53 @@ lvgl:
                 text_font: font_medium
                 text_color: 0xE8FFE8
                 text: Home
+            # Charging bolt (hidden when not charging).
+            - label:
+                id: battery_charging_indicator
+                align: RIGHT_MID
+                x: -150
+                width: 24
+                text_align: LEFT
+                text_font: font_medium
+                text_color: 0xFFAE00
+                text: "+"
+                hidden: true
+            # Battery outline.
+            - obj:
+                id: battery_icon_bg
+                align: RIGHT_MID
+                x: -122
+                width: 22
+                height: 12
+                radius: 2
+                border_width: 1
+                border_color: 0xE8FFE8
+                bg_opa: TRANSP
+            # Battery fill (width updated by update_battery_label).
+            - obj:
+                id: battery_icon_fill
+                align: RIGHT_MID
+                x: -121
+                width: 16
+                height: 10
+                radius: 1
+                border_width: 0
+                bg_color: 0xE8FFE8
+            # Battery positive nub.
+            - obj:
+                id: battery_icon_nub
+                align: RIGHT_MID
+                x: -101
+                width: 2
+                height: 6
+                radius: 0
+                border_width: 0
+                bg_color: 0xE8FFE8
             - label:
                 id: topbar_battery
                 align: RIGHT_MID
                 x: -16
-                width: 100
+                width: 80
                 text_align: RIGHT
                 text_font: font_medium
                 text_color: 0xE8FFE8
@@ -1447,51 +1536,60 @@ lvgl:
             clickable: false
             bg_image_src: weather_bg
             widgets:
-              - label:
+              - image:
+                  id: weather_icon_img
                   x: 14
+                  y: 10
+                  width: 90
+                  height: 90
+                  src: icon_cloud
+              - label:
+                  x: 120
                   y: 10
                   text_font: font_small
                   text_color: 0x5A7A5A
                   text: WEATHER
-              - image:
-                  id: weather_icon_img
-                  x: 250
-                  y: 10
-                  width: 110
-                  height: 110
-                  src: icon_cloud
               - label:
                   id: home_weather_temp
-                  x: 14
-                  y: 32
-                  width: 220
+                  x: 120
+                  y: 30
+                  width: 140
                   text_align: LEFT
                   text_font: font_large
                   text_color: 0xE8FFE8
                   text: --°
               - label:
+                  id: home_weather_pressure
+                  x: 220
+                  y: 36
+                  width: 130
+                  text_align: RIGHT
+                  text_font: font_small
+                  text_color: 0x5A7A5A
+                  text: "-- inHg"
+              - label:
                   id: home_weather_cond
-                  x: 14
-                  y: 76
-                  width: 220
+                  x: 120
+                  y: 70
+                  width: 230
                   text_align: LEFT
                   text_font: font_medium
                   text_color: 0x5A7A5A
                   text: —
               - label:
                   id: home_weather_high
-                  x: 14
-                  y: 102
-                  width: 100
+                  x: 120
+                  y: 98
+                  width: 80
                   text_align: LEFT
                   text_font: font_small
                   text_color: 0xE8FFE8
                   text: "H: --°"
               - label:
                   id: home_weather_low
-                  x: 120
-                  y: 102
-                  width: 100
+                  x: 200
+                  y: 98
+                  width: 80
                   text_align: LEFT
                   text_font: font_small
                   text_color: 0x5A7A5A
@@ -1499,30 +1597,21 @@ lvgl:
               - label:
                   id: home_weather_humidity
                   x: 14
-                  y: 126
-                  width: 106
+                  y: 108
+                  width: 100
                   text_align: LEFT
                   text_font: font_small
                   text_color: 0xE8FFE8
                   text: "Hum: --"
               - label:
                   id: home_weather_wind
-                  x: 130
-                  y: 126
-                  width: 106
-                  text_align: LEFT
-                  text_font: font_small
-                  text_color: 0xE8FFE8
-                  text: "Wind: --"
-              - label:
-                  id: home_weather_pressure
-                  x: 246
-                  y: 126
+                  x: 125
+                  y: 108
                   width: 100
                   text_align: LEFT
                   text_font: font_small
                   text_color: 0xE8FFE8
-                  text: "--"
+                  text: "Wind: --"
 
         # Status card
         - obj:

@@ -167,6 +167,34 @@ light:
 
 # Filter nws_alerts down to warnings and watches only for the AI dashboard banner
 template:
+  - trigger:
+      - platform: time_pattern
+        minutes: /15
+      - platform: homeassistant
+        event: start
+    action:
+      - service: weather.get_forecasts
+        data:
+          type: daily
+        target:
+          entity_id: weather.forecast_home
+        response_variable: forecast_response
+    sensor:
+      # Today's forecast high/low for the CrowPanel weather card. The weather
+      # entity no longer exposes forecast as a state attribute in HA 2024.4+,
+      # so we call weather.get_forecasts and expose the first daily entry.
+      - name: "Weather forecast high today"
+        unique_id: weather_forecast_high_today
+        unit_of_measurement: "°F"
+        state: "{{ forecast_response['weather.forecast_home'].forecast[0].temperature }}"
+        availability: "{{ forecast_response['weather.forecast_home'].forecast | length > 0 }}"
+
+      - name: "Weather forecast low today"
+        unique_id: weather_forecast_low_today
+        unit_of_measurement: "°F"
+        state: "{{ forecast_response['weather.forecast_home'].forecast[0].templow }}"
+        availability: "{{ forecast_response['weather.forecast_home'].forecast | length > 0 }}"
+
   - sensor:
       - name: "NWS warnings watches"
         unique_id: nws_warnings_watches
@@ -177,3 +205,15 @@ template:
              | list | length }}
         availability: >
           {{ state_attr('sensor.nws_alerts_gps_40_8141_96_7503_nws_alerts_alerts', 'Alerts') is not none }}
+
+  # CrowPanel charging heuristic: when the battery is held above 4.15 V it is
+  # either in the constant-voltage topping phase or fully charged on USB power.
+  # This is not perfect (does not detect the early CC phase at lower voltages),
+  # but it works without hardware modifications. If you want true CHG-pin
+  # detection later, solder the TP4059 CHG pin to a free ESP32 GPIO.
+  - binary_sensor:
+      - name: "Panel charging"
+        unique_id: panel_charging
+        state: >
+          {% set v = states('sensor.panel_battery_voltage') | float(none) %}
+          {{ v is not none and v > 4.15 }}
