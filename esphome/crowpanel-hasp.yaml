@@ -516,6 +516,21 @@ sensor:
               args: ['x']
               if_nan: "Wind: --"
 
+  - platform: homeassistant
+    id: ha_weather_pressure
+    entity_id: weather.forecast_home
+    attribute: pressure
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: home_weather_pressure
+            text:
+              format: "%.0f"
+              args: ['x']
+              if_nan: "--"
+
   # ---------------------------------------------------------------------------
   # Room climate sensors (temperature + humidity)
   # ---------------------------------------------------------------------------
@@ -670,6 +685,45 @@ text_sensor:
               if (x == "exceptional") return std::string("Severe weather");
               return x.empty() ? std::string("—") : x;
         - script.execute: update_weather_icon
+
+  # Forecast high/low are parsed from the forecast attribute (if the weather
+  # integration still exposes it). In newer Home Assistant the forecast is only
+  # available via the weather.get_forecasts service; if these stay at "--°",
+  # create HA Template sensors instead and import those.
+  - platform: homeassistant
+    id: ts_weather_forecast
+    entity_id: weather.forecast_home
+    attribute: forecast
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: home_weather_high
+            text: !lambda |-
+              size_t pos = x.find("temperature': ");
+              if (pos == std::string::npos) {
+                pos = x.find("temperature\": ");
+              }
+              if (pos == std::string::npos) return std::string("H: --°");
+              pos = x.find_first_of("0123456789.-", pos + 13);
+              if (pos == std::string::npos) return std::string("H: --°");
+              size_t end = x.find_first_not_of("0123456789.-", pos);
+              std::string val = x.substr(pos, end - pos);
+              return std::string("H: ") + val + "°";
+        - lvgl.label.update:
+            id: home_weather_low
+            text: !lambda |-
+              size_t pos = x.find("templow': ");
+              if (pos == std::string::npos) {
+                pos = x.find("templow\": ");
+              }
+              if (pos == std::string::npos) return std::string("L: --°");
+              pos = x.find_first_of("0123456789.-", pos + 10);
+              if (pos == std::string::npos) return std::string("L: --°");
+              size_t end = x.find_first_not_of("0123456789.-", pos);
+              std::string val = x.substr(pos, end - pos);
+              return std::string("L: ") + val + "°";
 
   - platform: homeassistant
     id: ts_person_woteg
@@ -1401,16 +1455,16 @@ lvgl:
                   text: WEATHER
               - image:
                   id: weather_icon_img
-                  x: 270
+                  x: 250
                   y: 10
-                  width: 80
-                  height: 80
+                  width: 110
+                  height: 110
                   src: icon_cloud
               - label:
                   id: home_weather_temp
                   x: 14
-                  y: 34
-                  width: 200
+                  y: 32
+                  width: 220
                   text_align: LEFT
                   text_font: font_large
                   text_color: 0xE8FFE8
@@ -1418,30 +1472,57 @@ lvgl:
               - label:
                   id: home_weather_cond
                   x: 14
-                  y: 88
-                  width: 340
+                  y: 76
+                  width: 220
                   text_align: LEFT
                   text_font: font_medium
                   text_color: 0x5A7A5A
                   text: —
               - label:
+                  id: home_weather_high
+                  x: 14
+                  y: 102
+                  width: 100
+                  text_align: LEFT
+                  text_font: font_small
+                  text_color: 0xE8FFE8
+                  text: "H: --°"
+              - label:
+                  id: home_weather_low
+                  x: 120
+                  y: 102
+                  width: 100
+                  text_align: LEFT
+                  text_font: font_small
+                  text_color: 0x5A7A5A
+                  text: "L: --°"
+              - label:
                   id: home_weather_humidity
                   x: 14
-                  y: 120
-                  width: 156
+                  y: 126
+                  width: 106
                   text_align: LEFT
                   text_font: font_small
                   text_color: 0xE8FFE8
                   text: "Hum: --"
               - label:
                   id: home_weather_wind
-                  x: 200
-                  y: 120
-                  width: 156
-                  text_align: RIGHT
+                  x: 130
+                  y: 126
+                  width: 106
+                  text_align: LEFT
                   text_font: font_small
                   text_color: 0xE8FFE8
                   text: "Wind: --"
+              - label:
+                  id: home_weather_pressure
+                  x: 246
+                  y: 126
+                  width: 100
+                  text_align: LEFT
+                  text_font: font_small
+                  text_color: 0xE8FFE8
+                  text: "--"
 
         # Status card
         - obj:
