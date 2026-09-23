@@ -277,6 +277,17 @@ time:
                 char buf[12];
                 t.strftime(buf, sizeof(buf), "%I:%M %p");
                 return std::string(buf);
+          # Screensaver date
+          - lvgl.label.update:
+              id: screensaver_date
+              text: !lambda |-
+                auto t = id(panel_time).now();
+                if (!t.is_valid()) {
+                  return std::string("--- --");
+                }
+                char buf[16];
+                t.strftime(buf, sizeof(buf), "%a %b %d");
+                return std::string(buf);
           # Time-of-day greeting on the Home page
           - lvgl.label.update:
               id: home_greeting
@@ -314,6 +325,12 @@ font:
       family: Roboto
     id: font_large
     size: 36
+    bpp: 4
+  - file:
+      type: gfonts
+      family: Roboto
+    id: font_huge
+    size: 72
     bpp: 4
 
 sensor:
@@ -1062,6 +1079,16 @@ script:
             char buf[12];
             t.strftime(buf, sizeof(buf), "%I:%M %p");
             return std::string(buf);
+      - lvgl.label.update:
+          id: screensaver_date
+          text: !lambda |-
+            auto t = id(panel_time).now();
+            if (!t.is_valid()) {
+              return std::string("--- --");
+            }
+            char buf[16];
+            t.strftime(buf, sizeof(buf), "%a %b %d");
+            return std::string(buf);
       - lvgl.widget.update:
           id: topbar_clock
           hidden: true
@@ -1082,7 +1109,7 @@ script:
       # has not been reliably dimming on this panel.
       - output.set_level:
           id: backlight_output
-          level: 25%
+          level: 10%
 
   - id: wake_screen
     mode: single
@@ -1509,17 +1536,17 @@ lvgl:
                   id: climate_living_temp
                   x: 10
                   y: 28
-                  width: 155
+                  width: 80
                   text_align: LEFT
                   text_font: font_medium
                   text_color: 0xE8FFE8
                   text: --°
               - label:
                   id: climate_living_hum
-                  x: 10
-                  y: 48
-                  width: 155
-                  text_align: LEFT
+                  x: 95
+                  y: 28
+                  width: 70
+                  text_align: RIGHT
                   text_font: font_small
                   text_color: 0x5A7A5A
                   text: --%
@@ -1542,17 +1569,17 @@ lvgl:
                   id: climate_bedroom_temp
                   x: 10
                   y: 28
-                  width: 155
+                  width: 80
                   text_align: LEFT
                   text_font: font_medium
                   text_color: 0xE8FFE8
                   text: --°
               - label:
                   id: climate_bedroom_hum
-                  x: 10
-                  y: 48
-                  width: 155
-                  text_align: LEFT
+                  x: 95
+                  y: 28
+                  width: 70
+                  text_align: RIGHT
                   text_font: font_small
                   text_color: 0x5A7A5A
                   text: --%
@@ -1575,17 +1602,17 @@ lvgl:
                   id: climate_office_temp
                   x: 10
                   y: 28
-                  width: 155
+                  width: 80
                   text_align: LEFT
                   text_font: font_medium
                   text_color: 0xE8FFE8
                   text: --°
               - label:
                   id: climate_office_hum
-                  x: 10
-                  y: 48
-                  width: 155
-                  text_align: LEFT
+                  x: 95
+                  y: 28
+                  width: 70
+                  text_align: RIGHT
                   text_font: font_small
                   text_color: 0x5A7A5A
                   text: --%
@@ -1608,17 +1635,17 @@ lvgl:
                   id: climate_basement_temp
                   x: 10
                   y: 28
-                  width: 155
+                  width: 80
                   text_align: LEFT
                   text_font: font_medium
                   text_color: 0xE8FFE8
                   text: --°
               - label:
                   id: climate_basement_hum
-                  x: 10
-                  y: 48
-                  width: 155
-                  text_align: LEFT
+                  x: 95
+                  y: 28
+                  width: 70
+                  text_align: RIGHT
                   text_font: font_small
                   text_color: 0x5A7A5A
                   text: --%
@@ -2208,9 +2235,17 @@ lvgl:
         - label:
             id: screensaver_clock
             align: CENTER
-            text_font: font_large
+            y: -60
+            text_font: font_huge
             text_color: 0xE8FFE8
             text: --:--
+        - label:
+            id: screensaver_date
+            align: CENTER
+            y: 30
+            text_font: font_medium
+            text_color: 0x5A7A5A
+            text: "--- --"
 
         # Invisible full-screen touch target to wake the panel.
         - button:
