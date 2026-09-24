@@ -288,6 +288,25 @@ time:
                 char buf[16];
                 t.strftime(buf, sizeof(buf), "%a %b %d");
                 return std::string(buf);
+          # Slow pixel-shift the screensaver clock every minute to reduce
+          # the (small) risk of IPS image retention / burn-in.
+          - if:
+              condition:
+                lambda: |-
+                  auto t = id(panel_time).now();
+                  return id(screensaver_active) && t.is_valid() && t.second == 0;
+              then:
+                - lvgl.widget.update:
+                    id: screensaver_clock
+                    align: CENTER
+                    x: !lambda |-
+                      auto t = id(panel_time).now();
+                      int offsets[] = {-6, -3, 3, 6};
+                      return offsets[t.minute % 4];
+                    y: !lambda |-
+                      auto t = id(panel_time).now();
+                      int offsets[] = {-66, -63, -57, -54};
+                      return offsets[t.minute % 4];
           # Time-of-day greeting on the Home page
           - lvgl.label.update:
               id: home_greeting
@@ -802,6 +821,21 @@ text_sensor:
               }
               return x.empty() ? std::string("—") : x;
 
+  # Wi-Fi signal strength for the top bar.
+  - platform: wifi_signal
+    id: wifi_signal_dbm
+    name: "Panel WiFi signal"
+    update_interval: 60s
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: topbar_wifi
+            text: !lambda |-
+              char buf[16];
+              snprintf(buf, sizeof(buf), "%d dBm", (int)x);
+              return std::string(buf);
+
 binary_sensor:
   # ----- Home Assistant imports: binary states -----
   - platform: homeassistant
@@ -949,6 +983,7 @@ switch:
             id: motion_front_icon
             src: icon_warning
         - script.execute: update_motion_summary
+        - script.execute: update_master_motion_button
 
   - platform: homeassistant
     id: sw_downstairs_motion
@@ -981,6 +1016,7 @@ switch:
             id: motion_downstairs_icon
             src: icon_warning
         - script.execute: update_motion_summary
+        - script.execute: update_master_motion_button
 
 script:
   # Maps the HA weather condition to one of the embedded weather icons and
@@ -1069,6 +1105,50 @@ script:
               return lv_color_hex(0xFFAE00);
             }
             return lv_color_hex(0x5A7A5A);
+
+  # Master arm/disarm button on the Security page.
+  - id: update_master_motion_button
+    mode: single
+    then:
+      - lvgl.label.update:
+          id: master_motion_state
+          text: !lambda |-
+            bool front = id(sw_front_motion).state;
+            bool down = id(sw_downstairs_motion).state;
+            return (front && down) ? std::string("Disarm All Motion") : std::string("Arm All Motion");
+      - lvgl.image.update:
+          id: master_motion_icon
+          src: !lambda |-
+            bool front = id(sw_front_motion).state;
+            bool down = id(sw_downstairs_motion).state;
+            return (front && down) ? id(icon_shield) : id(icon_warning);
+      - lvgl.widget.update:
+          id: master_motion_btn
+          bg_color: !lambda |-
+            bool front = id(sw_front_motion).state;
+            bool down = id(sw_downstairs_motion).state;
+            return (front && down) ? lv_color_hex(0x1A4A1A) : lv_color_hex(0xC62828);
+
+  - id: toggle_all_motion
+    mode: single
+    then:
+      - if:
+          condition:
+            lambda: return !id(sw_front_motion).state || !id(sw_downstairs_motion).state;
+          then:
+            - homeassistant.service:
+                service: switch.turn_on
+                data:
+                  entity_id:
+                    - switch.front_door_motion_detection
+                    - switch.downstairs_motion_detection
+          else:
+            - homeassistant.service:
+                service: switch.turn_off
+                data:
+                  entity_id:
+                    - switch.front_door_motion_detection
+                    - switch.downstairs_motion_detection
 
   # Top-bar battery label text + icon fill + threshold colors
   # (< 15% danger #FF3333, < 30% amber #FFAE00, otherwise #E8FFE8).
@@ -1174,28 +1254,10 @@ script:
             t.strftime(buf, sizeof(buf), "%a %b %d");
             return std::string(buf);
       - lvgl.widget.update:
-          id: topbar_clock
+          id: top_bar
           hidden: true
       - lvgl.widget.update:
-          id: topbar_date
-          hidden: true
-      - lvgl.widget.update:
-          id: topbar_title
-          hidden: true
-      - lvgl.widget.update:
-          id: topbar_battery
-          hidden: true
-      - lvgl.widget.update:
-          id: battery_icon_bg
-          hidden: true
-      - lvgl.widget.update:
-          id: battery_icon_fill
-          hidden: true
-      - lvgl.widget.update:
-          id: battery_icon_nub
-          hidden: true
-      - lvgl.widget.update:
-          id: battery_charging_indicator
+          id: bottom_nav
           hidden: true
       - lvgl.widget.update:
           id: nav_tabs
@@ -1223,32 +1285,17 @@ script:
           level: 100%
       - lvgl.page.show: home_page
       - lvgl.widget.update:
-          id: topbar_clock
+          id: top_bar
           hidden: false
       - lvgl.widget.update:
-          id: topbar_date
+          id: bottom_nav
           hidden: false
       - lvgl.widget.update:
-          id: topbar_title
-          hidden: false
-      - lvgl.widget.update:
-          id: topbar_battery
-          hidden: false
-      - lvgl.widget.update:
-          id: battery_icon_bg
-          hidden: false
-      - lvgl.widget.update:
-          id: battery_icon_fill
-          hidden: false
-      - lvgl.widget.update:
-          id: battery_icon_nub
+          id: nav_tabs
           hidden: false
       - lvgl.widget.update:
           id: battery_charging_indicator
           hidden: !lambda return !id(bs_panel_charging).state;
-      - lvgl.widget.update:
-          id: nav_tabs
-          hidden: false
 
   - id: go_home
     mode: single
@@ -1260,13 +1307,23 @@ script:
             - lvgl.page.show: home_page
 
 lvgl:
-  # Idle handling: screensaver after 60s of no touch, auto-return Home after 5min.
+  # Idle handling: screensaver after 60s at night, 5min during the day.
+  # Auto-return Home after 5min of no touch when not in screensaver.
   on_idle:
     - timeout: 60s
       then:
-        - script.execute: enter_screensaver
+        - if:
+            condition:
+              lambda: return id(ts_sun).state == "below_horizon";
+            then:
+              - script.execute: enter_screensaver
     - timeout: 5min
       then:
+        - if:
+            condition:
+              lambda: return id(ts_sun).state == "above_horizon";
+            then:
+              - script.execute: enter_screensaver
         - script.execute: go_home
 
   # ----- Design tokens -----  (match the AI dashboard green-phosphor theme)
@@ -1282,6 +1339,13 @@ lvgl:
           position: 0
         - color: 0x030503
           position: 255
+    - id: card_gradient
+      direction: ver
+      stops:
+        - color: 0x205420
+          position: 0
+        - color: 0x143E14
+          position: 255
 
   style_definitions:
     - id: page_bg_style
@@ -1295,7 +1359,7 @@ lvgl:
       pad_all: 0
       border_width: 0
     - id: card_style
-      bg_color: 0x1A4A1A
+      bg_grad: card_gradient
       radius: 8
       pad_all: 0
       border_width: 0
@@ -1305,17 +1369,27 @@ lvgl:
       shadow_offset_x: 0
       shadow_offset_y: 4
     - id: scene_btn_style
-      bg_color: 0x1A4A1A
+      bg_grad: card_gradient
       radius: 8
       pad_all: 0
       border_width: 0
       text_color: 0xE8FFE8
+      shadow_color: 0x000000
+      shadow_opa: 40%
+      shadow_width: 8
+      shadow_offset_x: 0
+      shadow_offset_y: 3
     - id: toggle_btn_style
-      bg_color: 0x1A4A1A
+      bg_grad: card_gradient
       radius: 8
       pad_all: 0
       border_width: 0
       text_color: 0xE8FFE8
+      shadow_color: 0x000000
+      shadow_opa: 40%
+      shadow_width: 8
+      shadow_offset_x: 0
+      shadow_offset_y: 3
 
   # Shared top bar + bottom nav, drawn on LVGL's always-on-top layer so they
   # appear on every page without duplicating widgets.
@@ -1330,8 +1404,9 @@ lvgl:
 
   top_layer:
     widgets:
-      # Top bar: clock (left), page title (center), battery icon/% (right).
+      # Top bar: clock/date (left), page title (center), Wi-Fi / battery (right).
       - obj:
+          id: top_bar
           styles: bar_style
           x: 0
           y: 0
@@ -1365,6 +1440,16 @@ lvgl:
                 text_font: font_medium
                 text_color: 0xE8FFE8
                 text: Home
+            # Wi-Fi signal (updates from wifi_signal sensor).
+            - label:
+                id: topbar_wifi
+                align: RIGHT_MID
+                x: -185
+                width: 85
+                text_align: RIGHT
+                text_font: font_small
+                text_color: 0x5A7A5A
+                text: "WiFi: --"
             # Charging bolt (hidden when not charging).
             - label:
                 id: battery_charging_indicator
@@ -1418,6 +1503,7 @@ lvgl:
                 text: --%
       # Bottom nav background.
       - obj:
+          id: bottom_nav
           styles: bar_style
           x: 0
           y: 430
@@ -1546,19 +1632,19 @@ lvgl:
               - image:
                   id: weather_icon_img
                   x: 14
-                  y: 10
+                  y: 20
                   width: 90
                   height: 90
                   src: icon_cloud
               - label:
-                  x: 120
-                  y: 10
+                  x: 110
+                  y: 12
                   text_font: font_small
                   text_color: 0x5A7A5A
                   text: WEATHER
               - label:
                   id: home_weather_temp
-                  x: 120
+                  x: 110
                   y: 30
                   width: 140
                   text_align: LEFT
@@ -1567,54 +1653,54 @@ lvgl:
                   text: --°
               - label:
                   id: home_weather_pressure
-                  x: 220
-                  y: 36
-                  width: 130
+                  x: 260
+                  y: 14
+                  width: 100
                   text_align: RIGHT
                   text_font: font_small
                   text_color: 0x5A7A5A
                   text: "-- inHg"
               - label:
                   id: home_weather_cond
-                  x: 120
-                  y: 70
-                  width: 230
+                  x: 110
+                  y: 68
+                  width: 250
                   text_align: LEFT
                   text_font: font_medium
                   text_color: 0x5A7A5A
                   text: —
               - label:
                   id: home_weather_high
-                  x: 120
-                  y: 98
-                  width: 80
+                  x: 110
+                  y: 100
+                  width: 60
                   text_align: LEFT
                   text_font: font_small
                   text_color: 0xE8FFE8
                   text: "H: --°"
               - label:
                   id: home_weather_low
-                  x: 200
-                  y: 98
-                  width: 80
+                  x: 180
+                  y: 100
+                  width: 60
                   text_align: LEFT
                   text_font: font_small
                   text_color: 0x5A7A5A
                   text: "L: --°"
               - label:
                   id: home_weather_humidity
-                  x: 14
-                  y: 108
-                  width: 100
+                  x: 110
+                  y: 124
+                  width: 80
                   text_align: LEFT
                   text_font: font_small
                   text_color: 0xE8FFE8
                   text: "Hum: --"
               - label:
                   id: home_weather_wind
-                  x: 125
-                  y: 108
-                  width: 100
+                  x: 210
+                  y: 124
+                  width: 150
                   text_align: LEFT
                   text_font: font_small
                   text_color: 0xE8FFE8
@@ -2195,31 +2281,61 @@ lvgl:
             height: 480
             clickable: false
 
-        - label:
+        # Master arm/disarm toggle for both motion zones.
+        - button:
+            id: master_motion_btn
+            styles: toggle_btn_style
+            pressed:
+              bg_color: 0x2D7A2D
+              text_color: 0xE8FFE8
+              transform_scale: 0.98
+              transform_pivot_x: 380
+              transform_pivot_y: 32
             x: 20
             y: 58
+            width: 760
+            height: 64
+            on_click:
+              - script.execute: toggle_all_motion
+            widgets:
+              - image:
+                  id: master_motion_icon
+                  align: LEFT_MID
+                  x: 20
+                  width: 40
+                  height: 40
+                  src: icon_warning
+              - label:
+                  id: master_motion_state
+                  align: CENTER
+                  text_font: font_large
+                  text: Arm All Motion
+
+        - label:
+            x: 20
+            y: 130
             text_font: font_small
             text_color: 0x5A7A5A
             text: DOORS
         - obj:
             styles: card_style
             x: 20
-            y: 82
-            width: 760
-            height: 96
+            y: 152
+            width: 370
+            height: 84
             clickable: false
             widgets:
               - label:
-                  x: 16
-                  y: 12
+                  x: 14
+                  y: 8
                   text_font: font_small
                   text_color: 0x5A7A5A
                   text: FRONT DOOR
               - label:
                   id: sec_front_state
-                  x: 16
-                  y: 36
-                  width: 272
+                  x: 14
+                  y: 30
+                  width: 200
                   text_align: LEFT
                   text_font: font_large
                   text_color: 0x5A7A5A
@@ -2227,39 +2343,47 @@ lvgl:
               - image:
                   id: sec_front_icon
                   x: 304
-                  y: 24
+                  y: 18
                   width: 48
                   height: 48
                   src: icon_lock
+        - obj:
+            styles: card_style
+            x: 410
+            y: 152
+            width: 370
+            height: 84
+            clickable: false
+            widgets:
               - label:
-                  x: 400
-                  y: 12
+                  x: 14
+                  y: 8
                   text_font: font_small
                   text_color: 0x5A7A5A
                   text: BACK DOOR
               - label:
                   id: sec_back_state
-                  x: 400
-                  y: 36
-                  width: 272
+                  x: 14
+                  y: 30
+                  width: 200
                   text_align: LEFT
                   text_font: font_large
                   text_color: 0x5A7A5A
                   text: —
               - image:
                   id: sec_back_icon
-                  x: 692
-                  y: 24
+                  x: 304
+                  y: 18
                   width: 48
                   height: 48
                   src: icon_lock
 
         - label:
             x: 20
-            y: 194
+            y: 246
             text_font: font_small
             text_color: 0x5A7A5A
-            text: MOTION DETECTION
+            text: MOTION ZONES
         - button:
             id: motion_front_btn
             styles: toggle_btn_style
@@ -2271,11 +2395,11 @@ lvgl:
               text_color: 0xE8FFE8
               transform_scale: 0.98
               transform_pivot_x: 185
-              transform_pivot_y: 42
+              transform_pivot_y: 35
             x: 20
-            y: 218
+            y: 268
             width: 370
-            height: 84
+            height: 70
             checkable: true
             on_click:
               - homeassistant.service:
@@ -2286,7 +2410,7 @@ lvgl:
               - image:
                   id: motion_front_icon
                   x: 14
-                  y: 18
+                  y: 11
                   width: 48
                   height: 48
                   src: icon_shield
@@ -2294,7 +2418,7 @@ lvgl:
                   align: LEFT_MID
                   x: 74
                   text_font: font_medium
-                  text: Front Door Motion
+                  text: Front Door
               - label:
                   id: motion_front_state
                   align: RIGHT_MID
@@ -2312,11 +2436,11 @@ lvgl:
               text_color: 0xE8FFE8
               transform_scale: 0.98
               transform_pivot_x: 185
-              transform_pivot_y: 42
+              transform_pivot_y: 35
             x: 410
-            y: 218
+            y: 268
             width: 370
-            height: 84
+            height: 70
             checkable: true
             on_click:
               - homeassistant.service:
@@ -2327,7 +2451,7 @@ lvgl:
               - image:
                   id: motion_downstairs_icon
                   x: 14
-                  y: 18
+                  y: 11
                   width: 48
                   height: 48
                   src: icon_shield
@@ -2335,7 +2459,7 @@ lvgl:
                   align: LEFT_MID
                   x: 74
                   text_font: font_medium
-                  text: Downstairs Motion
+                  text: Downstairs
               - label:
                   id: motion_downstairs_state
                   align: RIGHT_MID
@@ -2345,28 +2469,28 @@ lvgl:
 
         - label:
             x: 20
-            y: 318
+            y: 348
             text_font: font_small
             text_color: 0x5A7A5A
             text: LAST ACTIVITY
         - obj:
             styles: card_style
             x: 20
-            y: 342
+            y: 370
             width: 370
-            height: 64
+            height: 58
             clickable: false
             widgets:
               - label:
                   x: 14
-                  y: 8
+                  y: 6
                   text_font: font_small
                   text_color: 0x5A7A5A
                   text: Front Door
               - label:
                   id: sec_front_last
                   x: 14
-                  y: 30
+                  y: 26
                   width: 340
                   text_align: LEFT
                   text_font: font_medium
@@ -2375,21 +2499,21 @@ lvgl:
         - obj:
             styles: card_style
             x: 410
-            y: 342
+            y: 370
             width: 370
-            height: 64
+            height: 58
             clickable: false
             widgets:
               - label:
                   x: 14
-                  y: 8
+                  y: 6
                   text_font: font_small
                   text_color: 0x5A7A5A
                   text: Downstairs Motion
               - label:
                   id: sec_downstairs_last
                   x: 14
-                  y: 30
+                  y: 26
                   width: 340
                   text_align: LEFT
                   text_font: font_medium
@@ -2402,7 +2526,7 @@ lvgl:
     - id: screensaver_page
       widgets:
         - obj:
-            styles: page_bg_style
+            bg_color: 0x000000
             x: 0
             y: 0
             width: 800
