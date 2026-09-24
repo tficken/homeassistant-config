@@ -67,62 +67,74 @@ globals:
 # update_weather_icon script and the door/motion state triggers swap the
 # widgets' src between these IDs at runtime; no network fetch is needed.
 image:
-  - id: icon_lock
+  - platform: file
+    id: icon_lock
     file: lock_closed.png
     type: RGB
     transparency: alpha_channel
     resize: 48x48
-  - id: icon_unlock
+  - platform: file
+    id: icon_unlock
     file: lock_open.png
     type: RGB
     transparency: alpha_channel
     resize: 48x48
-  - id: icon_shield
+  - platform: file
+    id: icon_shield
     file: shield.png
     type: RGB
     transparency: alpha_channel
     resize: 48x48
-  - id: icon_warning
+  - platform: file
+    id: icon_warning
     file: warning.png
     type: RGB
     transparency: alpha_channel
     resize: 48x48
-  - id: icon_sun
+  - platform: file
+    id: icon_sun
     file: sun.png
     type: RGB
     transparency: alpha_channel
     resize: 80x80
-  - id: icon_moon
+  - platform: file
+    id: icon_moon
     file: moon.png
     type: RGB
     transparency: alpha_channel
     resize: 80x80
-  - id: icon_partly_cloudy
+  - platform: file
+    id: icon_partly_cloudy
     file: partly_cloudy.png
     type: RGB
     transparency: alpha_channel
     resize: 80x80
-  - id: icon_cloud
+  - platform: file
+    id: icon_cloud
     file: cloud.png
     type: RGB
     transparency: alpha_channel
     resize: 80x80
-  - id: icon_rain
+  - platform: file
+    id: icon_rain
     file: rain.png
     type: RGB
     transparency: alpha_channel
     resize: 80x80
-  - id: icon_snow
+  - platform: file
+    id: icon_snow
     file: snow.png
     type: RGB
     transparency: alpha_channel
     resize: 80x80
-  - id: icon_thunder
+  - platform: file
+    id: icon_thunder
     file: thunder.png
     type: RGB
     transparency: alpha_channel
     resize: 80x80
-  - id: icon_fog
+  - platform: file
+    id: icon_fog
     file: fog.png
     type: RGB
     transparency: alpha_channel
@@ -130,34 +142,40 @@ image:
 
   # Scene / light tile icons (rendered from MDI glyphs, 64 px source,
   # resized at the point of use).
-  - id: icon_scene_all_off
+  - platform: file
+    id: icon_scene_all_off
     file: icon_scene_all_off.png
     type: RGB
     transparency: alpha_channel
     resize: 32x32
-  - id: icon_scene_relax
+  - platform: file
+    id: icon_scene_relax
     file: icon_scene_relax.png
     type: RGB
     transparency: alpha_channel
     resize: 32x32
-  - id: icon_scene_movie
+  - platform: file
+    id: icon_scene_movie
     file: icon_scene_movie.png
     type: RGB
     transparency: alpha_channel
     resize: 32x32
-  - id: icon_scene_goodnight
+  - platform: file
+    id: icon_scene_goodnight
     file: icon_scene_goodnight.png
     type: RGB
     transparency: alpha_channel
     resize: 32x32
-  - id: icon_light_fan
+  - platform: file
+    id: icon_light_fan
     file: icon_light_fan.png
     type: RGB
     transparency: alpha_channel
     resize: 32x32
 
   # Background image for the Home-page weather card.
-  - id: weather_bg
+  - platform: file
+    id: weather_bg
     file: weather_bg.png
     type: RGB
     resize: 370x150
@@ -1139,16 +1157,12 @@ script:
             - homeassistant.service:
                 service: switch.turn_on
                 data:
-                  entity_id:
-                    - switch.front_door_motion_detection
-                    - switch.downstairs_motion_detection
+                  entity_id: "switch.front_door_motion_detection, switch.downstairs_motion_detection"
           else:
             - homeassistant.service:
                 service: switch.turn_off
                 data:
-                  entity_id:
-                    - switch.front_door_motion_detection
-                    - switch.downstairs_motion_detection
+                  entity_id: "switch.front_door_motion_detection, switch.downstairs_motion_detection"
 
   # Top-bar battery label text + icon fill + threshold colors
   # (< 15% danger #FF3333, < 30% amber #FFAE00, otherwise #E8FFE8).
