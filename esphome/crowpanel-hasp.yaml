@@ -679,6 +679,21 @@ sensor:
               args: ['x']
               if_nan: "--%"
 
+  # Wi-Fi signal strength for the top bar.
+  - platform: wifi_signal
+    id: wifi_signal_dbm
+    name: "Panel WiFi signal"
+    update_interval: 60s
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: topbar_wifi
+            text: !lambda |-
+              char buf[16];
+              snprintf(buf, sizeof(buf), "%d dBm", (int)x);
+              return std::string(buf);
+
 text_sensor:
   # ----- Home Assistant imports: text states -----
   # Sun state drives the day/night suffix of the OWM weather icon.
@@ -820,21 +835,6 @@ text_sensor:
                 return out;
               }
               return x.empty() ? std::string("—") : x;
-
-  # Wi-Fi signal strength for the top bar.
-  - platform: wifi_signal
-    id: wifi_signal_dbm
-    name: "Panel WiFi signal"
-    update_interval: 60s
-
-    on_value:
-      then:
-        - lvgl.label.update:
-            id: topbar_wifi
-            text: !lambda |-
-              char buf[16];
-              snprintf(buf, sizeof(buf), "%d dBm", (int)x);
-              return std::string(buf);
 
 binary_sensor:
   # ----- Home Assistant imports: binary states -----
