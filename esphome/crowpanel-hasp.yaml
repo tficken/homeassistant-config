@@ -700,19 +700,6 @@ text_sensor:
               args: ['x']
               if_nan: "L: --°"
 
-  # Charging state comes from a HA Template binary sensor (voltage heuristic).
-  # True when battery voltage is held above 4.15 V on USB power.
-  - platform: homeassistant
-    id: bs_panel_charging
-    entity_id: binary_sensor.panel_charging
-    internal: true
-
-    on_state:
-      then:
-        - lvgl.widget.update:
-            id: battery_charging_indicator
-            hidden: !lambda return !x;
-
   - platform: homeassistant
     id: ts_person_woteg
     entity_id: person.woteg
@@ -915,6 +902,19 @@ binary_sensor:
             id: lr_fan_btn
             state:
               checked: !lambda return x;
+
+  # Charging state comes from a HA Template binary sensor (voltage heuristic).
+  # True when battery voltage is held above 4.15 V on USB power.
+  - platform: homeassistant
+    id: bs_panel_charging
+    entity_id: binary_sensor.panel_charging
+    internal: true
+
+    on_state:
+      then:
+        - lvgl.widget.update:
+            id: battery_charging_indicator
+            hidden: !lambda return !x;
 
 switch:
   # Ring motion-detection switches (imported for state + toggle actions).
