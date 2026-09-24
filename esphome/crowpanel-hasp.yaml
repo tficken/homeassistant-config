@@ -514,6 +514,37 @@ sensor:
               args: ['x']
               if_nan: "-- inHg"
 
+  # Today's forecast high/low come from HA Template sensors that call the
+  # weather.get_forecasts service (the forecast attribute is no longer in the
+  # weather entity state in HA 2024.4+).
+  - platform: homeassistant
+    id: ha_weather_high
+    entity_id: sensor.weather_forecast_high_today
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: home_weather_high
+            text:
+              format: "H: %.0f°"
+              args: ['x']
+              if_nan: "H: --°"
+
+  - platform: homeassistant
+    id: ha_weather_low
+    entity_id: sensor.weather_forecast_low_today
+    internal: true
+
+    on_value:
+      then:
+        - lvgl.label.update:
+            id: home_weather_low
+            text:
+              format: "L: %.0f°"
+              args: ['x']
+              if_nan: "L: --°"
+
   # ---------------------------------------------------------------------------
   # Room climate sensors (temperature + humidity)
   # ---------------------------------------------------------------------------
@@ -668,37 +699,6 @@ text_sensor:
               if (x == "exceptional") return std::string("Severe weather");
               return x.empty() ? std::string("—") : x;
         - script.execute: update_weather_icon
-
-  # Today's forecast high/low come from HA Template sensors that call the
-  # weather.get_forecasts service (the forecast attribute is no longer in the
-  # weather entity state in HA 2024.4+).
-  - platform: homeassistant
-    id: ts_weather_high
-    entity_id: sensor.weather_forecast_high_today
-    internal: true
-
-    on_value:
-      then:
-        - lvgl.label.update:
-            id: home_weather_high
-            text:
-              format: "H: %.0f°"
-              args: ['x']
-              if_nan: "H: --°"
-
-  - platform: homeassistant
-    id: ts_weather_low
-    entity_id: sensor.weather_forecast_low_today
-    internal: true
-
-    on_value:
-      then:
-        - lvgl.label.update:
-            id: home_weather_low
-            text:
-              format: "L: %.0f°"
-              args: ['x']
-              if_nan: "L: --°"
 
   - platform: homeassistant
     id: ts_person_woteg
