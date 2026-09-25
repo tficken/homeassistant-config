@@ -20,7 +20,7 @@ Personal Home Assistant configuration running on Home Assistant OS `2026.8.3`. T
 
 **`alexa_media`** — Alexa Media Player integration (via HACS). Enables announcements and TTS on Amazon Echo devices through `notify.alexa_media_*` services.
 
-**`openhasp`** — openHASP integration (via HACS) driving a physical wall plate over MQTT; plate layout defined in `openhasp/wall_panel.yaml`.
+**`openhasp`** — openHASP integration (via HACS), previously used for a physical wall plate; the panel now runs ESPHome + LVGL directly (`esphome/crowpanel-hasp.yaml`).
 
 **`hacs`** — Home Assistant Community Store for managing community components.
 
@@ -36,7 +36,7 @@ Event-driven automations written in YAML with Jinja2 templating:
 - **Battery monitoring**: Multi-device battery check across 5 sensors using Jinja2 list comprehension and conditional messaging
 - **Disk health**: Threshold-based alerting when HA disk usage exceeds 85%, with mobile push notification
 - **Automated backups**: Weekly full backup via shell command + Python script; nightly cleanup of backups older than 14 days; both phone me if they fail
-- **Wall panel**: MQTT-based backlight control with day/night brightness scheduling and startup page-push on HA boot
+- **Wall panel**: ESPHome/LVGL-based CrowPanel 7" touch dashboard with day/night screensaver, backlight dimming, battery monitoring, and direct Home Assistant service calls
 - **PagerDuty alerting**: High-urgency incidents flash the office ceiling fan red 3 times (restoring its prior state) and trigger a short Echo announcement ("New PagerDuty Alert") that restores the speaker's prior volume afterwards; low-urgency incidents stay silent
 - **Door/window announcements**: Door or window opening is announced over Alexa devices; phone notification is sent only when no one is home
 - **Ring snapshot archive**: Motion and doorbell events save timestamped camera snapshots for the dashboard's per-camera history viewer
@@ -48,8 +48,7 @@ Event-driven automations written in YAML with Jinja2 templating:
 - **Database tuning**: Recorder configured to exclude high-frequency diagnostic entities (printer temperatures, fan speeds, camera feeds, router packet counters) to reduce SD card wear and control DB growth
 - **Command-line sensors**: Shell-based disk usage sensor with 5-minute polling
 - **Log level management**: Per-integration log suppression for noisy components (Bambu MQTT, Bluetooth, Litter Robot transport)
-- **OpenHASP**: YAML-managed physical wall panel dashboard with MQTT control surface
-- **Custom Lovelace dashboard**: Separate iPad wall panel layout managed in YAML
+- **CrowPanel wall dashboard**: ESPHome + LVGL physical touch panel (`esphome/crowpanel-hasp.yaml`) with three-page Home / Lights / Security layout
 - **Alexa exposure**: Home Assistant Cloud filter exposes useful entities to Alexa while excluding diagnostic/noisy sensors
 
 ---
@@ -70,7 +69,7 @@ This repo includes `AGENTS.md` — a structured guide I maintain so that AI codi
 | Add-ons | ring-mqtt (Ring RTSP/snapshot bridge), Mosquitto |
 | Validation tooling | Portable Node.js (`.tools/`), yamllint, flake8 |
 | Protocols | MQTT, WebSocket, HTTP, Zigbee |
-| Hardware | Bambu Lab P1S × 2, OpenHASP wall panel, Zigbee sensors, Z-Wave devices |
+| Hardware | Bambu Lab P1S × 2, Elecrow CrowPanel 7" ESP32-S3 wall panel, Zigbee sensors, Z-Wave devices |
 | Monitoring | PagerDuty integration, mobile push, persistent notifications |
 | Voice assistants | Alexa via Home Assistant Cloud + Alexa Media Player |
 | AI tooling | Extended OpenAI Conversation, Kimi Code, Claude Code, agent-guided development |
