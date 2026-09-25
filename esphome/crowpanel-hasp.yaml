@@ -284,20 +284,32 @@ time:
                 char buf[16];
                 t.strftime(buf, sizeof(buf), "%a %b %d");
                 return std::string(buf);
-          # Top-bar Wi-Fi signal (diagnostic digit; see if label updates at all).
+          # Top-bar Wi-Fi signal bars.
           - lvgl.label.update:
               id: topbar_wifi
               text: !lambda |-
                 float raw = id(wifi_signal_dbm).state;
                 if (isnan(raw)) {
-                  return std::string("-");
+                  return std::string("----");
                 }
                 int dbm = (int)raw;
-                if (dbm >= -50) return std::string("4");
-                if (dbm >= -60) return std::string("3");
-                if (dbm >= -70) return std::string("2");
-                if (dbm >= -80) return std::string("1");
-                return std::string("0");
+                int bars;
+                if (dbm >= -50) {
+                  bars = 4;
+                } else if (dbm >= -60) {
+                  bars = 3;
+                } else if (dbm >= -70) {
+                  bars = 2;
+                } else if (dbm >= -80) {
+                  bars = 1;
+                } else {
+                  bars = 0;
+                }
+                std::string out;
+                for (int i = 0; i < 4; i++) {
+                  out += (i < bars) ? "=" : "-";
+                }
+                return out;
           # Screensaver clock
           - lvgl.label.update:
               id: screensaver_clock
@@ -711,15 +723,11 @@ sensor:
               args: ['x']
               if_nan: "--%"
 
-  # Wi-Fi signal strength for the top bar.
+  # Wi-Fi signal strength for the top bar (read by time.on_time lambda).
   - platform: wifi_signal
     id: wifi_signal_dbm
     name: "Panel WiFi signal"
     update_interval: 10s
-
-    on_value:
-      then:
-        - script.execute: update_wifi_bars
 
 text_sensor:
   # ----- Home Assistant imports: text states -----
@@ -1064,39 +1072,6 @@ script:
               if (cond == "snowy" || cond == "snowy-rainy" || cond == "hail") return id(icon_snow);
               if (cond == "lightning" || cond == "lightning-rainy" || cond == "exceptional") return id(icon_thunder);
               return id(icon_cloud);
-
-  # Updates the top-bar Wi-Fi signal bars from the wifi_signal sensor.
-  # Called from the sensor's on_value and from time.on_time (the sensor's
-  # on_value has been observed to run before the top_layer label is ready).
-  - id: update_wifi_bars
-    mode: single
-    then:
-      - lvgl.label.update:
-          id: topbar_wifi
-          text: !lambda |-
-            float raw = id(wifi_signal_dbm).state;
-            if (isnan(raw)) {
-              return std::string("----");
-            }
-            int dbm = (int)raw;
-            int bars;
-            if (dbm >= -50) {
-              bars = 4;
-            } else if (dbm >= -60) {
-              bars = 3;
-            } else if (dbm >= -70) {
-              bars = 2;
-            } else if (dbm >= -80) {
-              bars = 1;
-            } else {
-              bars = 0;
-            }
-            ESP_LOGD("wifi_bars", "dbm=%d bars=%d", dbm, bars);
-            std::string out;
-            for (int i = 0; i < 4; i++) {
-              out += (i < bars) ? "=" : "-";
-            }
-            return out;
 
   # Recomputes the alert banner from all four alert inputs; called from each
   # input's on_value/on_state. Starts hidden; first real evaluation happens as
