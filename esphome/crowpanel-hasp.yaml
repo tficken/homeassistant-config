@@ -284,9 +284,20 @@ time:
                 char buf[16];
                 t.strftime(buf, sizeof(buf), "%a %b %d");
                 return std::string(buf);
-          # Top-bar Wi-Fi signal bars (time path is reliable; sensor on_value
-          # can fire before the top_layer label is ready during boot).
-          - script.execute: update_wifi_bars
+          # Top-bar Wi-Fi signal (diagnostic digit; see if label updates at all).
+          - lvgl.label.update:
+              id: topbar_wifi
+              text: !lambda |-
+                float raw = id(wifi_signal_dbm).state;
+                if (isnan(raw)) {
+                  return std::string("-");
+                }
+                int dbm = (int)raw;
+                if (dbm >= -50) return std::string("4");
+                if (dbm >= -60) return std::string("3");
+                if (dbm >= -70) return std::string("2");
+                if (dbm >= -80) return std::string("1");
+                return std::string("0");
           # Screensaver clock
           - lvgl.label.update:
               id: screensaver_clock
