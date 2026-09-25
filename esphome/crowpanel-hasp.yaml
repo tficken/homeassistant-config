@@ -701,7 +701,7 @@ sensor:
   - platform: wifi_signal
     id: wifi_signal_dbm
     name: "Panel WiFi signal"
-    update_interval: 60s
+    update_interval: 10s
 
     on_value:
       then:
@@ -721,6 +721,7 @@ sensor:
               } else {
                 bars = 0;
               }
+              ESP_LOGD("wifi_bars", "dbm=%d bars=%d", dbm, bars);
               std::string out;
               for (int i = 0; i < 4; i++) {
                 out += (i < bars) ? "=" : "-";
