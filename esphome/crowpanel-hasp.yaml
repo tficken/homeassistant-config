@@ -708,9 +708,24 @@ sensor:
         - lvgl.label.update:
             id: topbar_wifi
             text: !lambda |-
-              char buf[16];
-              snprintf(buf, sizeof(buf), "%d dBm", (int)x);
-              return std::string(buf);
+              int dbm = (int)x;
+              int bars;
+              if (dbm >= -50) {
+                bars = 4;
+              } else if (dbm >= -60) {
+                bars = 3;
+              } else if (dbm >= -70) {
+                bars = 2;
+              } else if (dbm >= -80) {
+                bars = 1;
+              } else {
+                bars = 0;
+              }
+              std::string out;
+              for (int i = 0; i < 4; i++) {
+                out += (i < bars) ? "█" : "▯";
+              }
+              return out;
 
 text_sensor:
   # ----- Home Assistant imports: text states -----
@@ -1463,7 +1478,7 @@ lvgl:
                 text_align: RIGHT
                 text_font: font_small
                 text_color: 0x5A7A5A
-                text: "WiFi: --"
+                text: "▯▯▯▯"
             # Charging bolt (hidden when not charging).
             - label:
                 id: battery_charging_indicator
@@ -2545,6 +2560,9 @@ lvgl:
             y: 0
             width: 800
             height: 480
+            pad_all: 0
+            border_width: 0
+            radius: 0
             clickable: false
 
         - label:
