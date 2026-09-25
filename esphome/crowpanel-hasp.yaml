@@ -723,7 +723,7 @@ sensor:
               }
               std::string out;
               for (int i = 0; i < 4; i++) {
-                out += (i < bars) ? "█" : "▯";
+                out += (i < bars) ? "=" : "-";
               }
               return out;
 
@@ -1292,6 +1292,11 @@ script:
           id: nav_tabs
           hidden: true
       - lvgl.page.show: screensaver_page
+      # Make the shared background layer black so no green gradient peeks
+      # around the edges of the screensaver page.
+      - lvgl.widget.update:
+          id: bg_layer
+          bg_color: 0x000000
       # Drive the backlight output directly; the light.turn_on brightness path
       # has not been reliably dimming on this panel.
       - output.set_level:
@@ -1313,6 +1318,10 @@ script:
           id: backlight_output
           level: 100%
       - lvgl.page.show: home_page
+      # Restore the shared background gradient.
+      - lvgl.widget.update:
+          id: bg_layer
+          bg_grad: bg_gradient
       - lvgl.widget.update:
           id: top_bar
           hidden: false
@@ -1425,6 +1434,7 @@ lvgl:
   bottom_layer:
     widgets:
       - obj:
+          id: bg_layer
           width: 800
           height: 480
           border_width: 0
@@ -1478,7 +1488,7 @@ lvgl:
                 text_align: RIGHT
                 text_font: font_small
                 text_color: 0x5A7A5A
-                text: "▯▯▯▯"
+                text: "----"
             # Charging bolt (hidden when not charging).
             - label:
                 id: battery_charging_indicator
@@ -2563,6 +2573,7 @@ lvgl:
             pad_all: 0
             border_width: 0
             radius: 0
+            bg_opa: COVER
             clickable: false
 
         - label:
@@ -2570,14 +2581,14 @@ lvgl:
             align: CENTER
             y: -60
             text_font: font_huge
-            text_color: 0xE8FFE8
+            text_color: 0x440000
             text: --:--
         - label:
             id: screensaver_date
             align: CENTER
             y: 30
             text_font: font_medium
-            text_color: 0x5A7A5A
+            text_color: 0x440000
             text: "--- --"
 
         # Invisible full-screen touch target to wake the panel.
