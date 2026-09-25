@@ -741,7 +741,6 @@ text_sensor:
   - platform: homeassistant
     id: ts_weather_condition
     entity_id: weather.forecast_home
-    attribute: condition
     internal: true
 
     on_value:
@@ -761,7 +760,7 @@ text_sensor:
               if (x == "hail") return std::string("Hail");
               if (x == "lightning") return std::string("Thunderstorms");
               if (x == "lightning-rainy") return std::string("Storms & rain");
-              if (x == "wind") return std::string("Windy");
+              if (x == "windy") return std::string("Windy");
               if (x == "wind-variant") return std::string("Windy");
               if (x == "exceptional") return std::string("Severe weather");
               return x.empty() ? std::string("—") : x;
@@ -1066,7 +1065,7 @@ script:
               if (cond == "clear-night") return id(icon_moon);
               if (cond == "partlycloudy") return id(icon_partly_cloudy);
               if (cond == "cloudy") return id(icon_cloud);
-              if (cond == "fog" || cond == "wind" || cond == "wind-variant") return id(icon_fog);
+              if (cond == "fog" || cond == "windy" || cond == "wind-variant") return id(icon_fog);
               if (cond == "rainy" || cond == "pouring") return id(icon_rain);
               if (cond == "snowy" || cond == "snowy-rainy" || cond == "hail") return id(icon_snow);
               if (cond == "lightning" || cond == "lightning-rainy" || cond == "exceptional") return id(icon_thunder);
