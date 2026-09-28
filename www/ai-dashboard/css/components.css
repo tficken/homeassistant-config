@@ -54,6 +54,38 @@
   box-shadow: 0 0 10px var(--amber);
 }
 .status-led.danger { background: var(--danger); box-shadow: 0 0 10px var(--danger); }
+.alert-banner {
+  width: 100%;
+  background: rgba(255, 174, 0, 0.12);
+  border: 1px solid var(--amber);
+  color: var(--amber);
+  font-family: var(--font-mono);
+  padding: 10px 14px;
+  letter-spacing: 0.05em;
+  overflow: hidden;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.alert-banner-item {
+  display: inline-block;
+  margin-right: 18px;
+}
+.alert-banner-track {
+  display: inline-block;
+  will-change: transform;
+}
+.alert-banner-scroll .alert-banner-track {
+  animation: alertMarquee var(--marquee-duration, 20s) linear infinite;
+}
+@keyframes alertMarquee {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .alert-banner-scroll .alert-banner-track {
+    animation: none;
+  }
+}
 .bottom-btn {
   flex: 1;
   height: 100%;

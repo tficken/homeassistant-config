@@ -20,8 +20,11 @@ export function renderStatusLed(state) {
 
 export function renderAlertBanner(alerts) {
   if (!alerts || !alerts.length) return "";
-  const items = alerts.slice(0, 3).map(a => `<span style="margin-right:18px;">! ${escapeHtml(a)}</span>`).join("");
-  return `<div style="width:100%;background:rgba(255,174,0,0.12);border:1px solid var(--amber);color:var(--amber);font-family:var(--font-mono);padding:10px 14px;letter-spacing:0.05em;">${items}</div>`;
+  const itemHtml = alerts.map(a => `<span class="alert-banner-item">! ${escapeHtml(a)}</span>`).join("");
+  const scroll = alerts.length > 1;
+  const trackHtml = scroll ? `${itemHtml}${itemHtml}` : itemHtml;
+  const duration = Math.max(10, Math.round(alerts.reduce((sum, a) => sum + a.length + 3, 0) / 6));
+  return `<div class="alert-banner${scroll ? " alert-banner-scroll" : ""}"><div class="alert-banner-track" style="--marquee-duration:${duration}s;">${trackHtml}</div></div>`;
 }
 
 export function renderSceneButton(entityId) {

@@ -1,7 +1,7 @@
 {
   "theme": {
     "backgroundImage": "",
-    "accentColor": "#2dd4bf"
+    "accentColor": "#00ff00"
   },
   "panels": {
     "home": [
@@ -262,6 +262,17 @@
       "entity": "binary_sensor.exos_router_wan_status",
       "equals": "off",
       "label": "Internet down"
+    },
+    {
+      "entity": "sensor.nws_warnings_watches",
+      "above": 0,
+      "attribute": {
+        "entity": "sensor.nws_alerts_gps_40_8141_96_7503_nws_alerts_alerts",
+        "name": "Alerts",
+        "key": "Event",
+        "filter": "(Warning|Watch)$"
+      },
+      "label": "Weather alert: {value}"
     }
   ],
   "presenceLabels": {
