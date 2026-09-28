@@ -1,4 +1,6 @@
 // Settings editor tab for config-driven alert rules.
+// Circular with editor.js (buildSettings, entityOptionTags, setSettingsStatus)
+// and screens/home.js (getAlerts) — function references at runtime only.
 import { state } from '../state.js';
 import { escapeHtml } from '../utils.js';
 import { buildSettings, entityOptionTags, setSettingsStatus } from './editor.js';
@@ -22,30 +24,6 @@ function conditionValue(rule) {
   return '';
 }
 
-export function validateAlerts() {
-  const rules = state.config.alerts || [];
-  for (let i = 0; i < rules.length; i++) {
-    const r = rules[i];
-    if (!r.entity) return `Alert rule ${i + 1} is missing an entity.`;
-    const hasAbove = typeof r.above === 'number';
-    const hasBelow = typeof r.below === 'number';
-    const hasEquals = typeof r.equals === 'string' && r.equals !== '';
-    const condCount = (hasAbove ? 1 : 0) + (hasBelow ? 1 : 0) + (hasEquals ? 1 : 0);
-    if (condCount !== 1) return `Alert rule ${i + 1} must have exactly one condition.`;
-    if (r.attribute && (!r.attribute.entity || !r.attribute.name)) {
-      return `Alert rule ${i + 1} attribute expansion needs a source entity and attribute name.`;
-    }
-    if (r.attribute && typeof r.attribute.filter === 'string' && r.attribute.filter) {
-      try {
-        new RegExp(r.attribute.filter);
-      } catch {
-        return `Alert rule ${i + 1} has an invalid filter regex.`;
-      }
-    }
-  }
-  return '';
-}
-
 export function renderAlertsTab() {
   ensureAlerts();
   const rules = state.config.alerts;
@@ -64,7 +42,7 @@ export function renderAlertsTab() {
     return `
       <div class="settings-section alert-rule-card" data-idx="${idx}" style="margin-bottom:14px;padding:12px;border:1px solid var(--border);">
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
-          <select class="alert-entity" style="flex:1;"><option value="">-- entity --</option>${entityOptionTags()}${(rule.entity && !state.states[rule.entity]) ? `<option value="${rule.entity}" selected>${escapeHtml(rule.entity)} (missing)</option>` : ''}</select>
+          <select class="alert-entity" style="flex:1;"><option value="">-- entity --</option>${entityOptionTags()}</select>
           <button class="btn alert-up" ${idx === 0 ? 'disabled' : ''}>↑</button>
           <button class="btn alert-down" ${idx === rules.length - 1 ? 'disabled' : ''}>↓</button>
           <button class="btn alert-delete" style="color:var(--danger);">✕</button>
@@ -83,7 +61,7 @@ export function renderAlertsTab() {
         <details style="margin-bottom:4px;" ${hasAttr ? 'open' : ''}>
           <summary style="font-size:0.8rem;color:var(--text-muted);cursor:pointer;">Attribute list expansion (NWS-style)</summary>
           <div style="margin-top:8px;display:flex;flex-direction:column;gap:8px;">
-            <select class="alert-attr-entity"><option value="">-- source entity --</option>${entityOptionTags()}${(rule.attribute && rule.attribute.entity && !state.states[rule.attribute.entity]) ? `<option value="${rule.attribute.entity}" selected>${escapeHtml(rule.attribute.entity)} (missing)</option>` : ''}</select>
+            <select class="alert-attr-entity"><option value="">-- source entity --</option>${entityOptionTags()}</select>
             <input class="alert-attr-name" type="text" value="${escapeHtml((hasAttr && rule.attribute.name) || '')}" placeholder="Attribute name (e.g. Alerts)">
             <input class="alert-attr-key" type="text" value="${escapeHtml((hasAttr && rule.attribute.key) || '')}" placeholder="Item key (e.g. Event), optional">
             <input class="alert-attr-filter" type="text" value="${escapeHtml((hasAttr && rule.attribute.filter) || '')}" placeholder="Filter regex (e.g. (Warning|Watch)$), optional">
@@ -129,6 +107,23 @@ function readRule(card) {
     if (attrFilter) rule.attribute.filter = attrFilter;
   }
   return rule;
+}
+
+export function validateAlerts() {
+  const rules = state.config.alerts || [];
+  for (let i = 0; i < rules.length; i++) {
+    const r = rules[i];
+    if (!r.entity) return `Alert rule ${i + 1} is missing an entity.`;
+    const hasAbove = typeof r.above === 'number';
+    const hasBelow = typeof r.below === 'number';
+    const hasEquals = typeof r.equals === 'string';
+    const condCount = (hasAbove ? 1 : 0) + (hasBelow ? 1 : 0) + (hasEquals ? 1 : 0);
+    if (condCount !== 1) return `Alert rule ${i + 1} must have exactly one condition.`;
+    if (r.attribute && (!r.attribute.entity || !r.attribute.name)) {
+      return `Alert rule ${i + 1} attribute expansion needs a source entity and attribute name.`;
+    }
+  }
+  return '';
 }
 
 export function wireAlertsTab() {

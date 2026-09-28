@@ -1,4 +1,6 @@
 // Settings editor tab for event-triggered camera popups.
+// Circular with editor.js (buildSettings, entityOptionTags, setSettingsStatus)
+// and components/event-popup.js (showEventPopup) — function references at runtime only.
 import { state } from '../state.js';
 import { escapeHtml, friendlyName } from '../utils.js';
 import { buildSettings, entityOptionTags, setSettingsStatus } from './editor.js';
@@ -15,16 +17,6 @@ function renderMultiSelect(selected, domainFilter) {
     const sel = selected.includes(s.entity_id) ? ' selected' : '';
     return `<option value="${s.entity_id}"${sel}>${escapeHtml(friendlyName(s.entity_id))} (${s.entity_id})</option>`;
   }).join('');
-}
-
-export function validatePopups() {
-  const popups = state.config.eventPopups || [];
-  for (let i = 0; i < popups.length; i++) {
-    const p = popups[i];
-    if (!p.events || !p.events.length) return `Popup rule ${i + 1} needs at least one event entity.`;
-    if (!p.camera) return `Popup rule ${i + 1} needs a camera entity.`;
-  }
-  return '';
 }
 
 export function renderEventPopupsTab() {
@@ -44,7 +36,7 @@ export function renderEventPopupsTab() {
       </div>
       <div style="margin-bottom:10px;">
         <label style="display:block;font-size:0.8rem;color:var(--text-muted);margin-bottom:4px;">Camera entity</label>
-        <select class="popup-camera"><option value="">-- camera --</option>${entityOptionTags(['camera'])}${(popup.camera && !state.states[popup.camera]) ? `<option value="${popup.camera}" selected>${escapeHtml(popup.camera)} (missing)</option>` : ''}</select>
+        <select class="popup-camera"><option value="">-- camera --</option>${entityOptionTags(['camera'])}</select>
       </div>
       <div style="display:flex;gap:10px;margin-bottom:10px;">
         <input class="popup-title" type="text" value="${escapeHtml(popup.title || '')}" placeholder="Title" style="flex:1;">
@@ -76,6 +68,16 @@ function readPopup(card) {
     title,
     timeout: isNaN(timeout) || timeout <= 0 ? 30 : timeout,
   };
+}
+
+export function validatePopups() {
+  const popups = state.config.eventPopups || [];
+  for (let i = 0; i < popups.length; i++) {
+    const p = popups[i];
+    if (!p.events || !p.events.length) return `Popup rule ${i + 1} needs at least one event entity.`;
+    if (!p.camera) return `Popup rule ${i + 1} needs a camera entity.`;
+  }
+  return '';
 }
 
 export function wireEventPopupsTab() {
