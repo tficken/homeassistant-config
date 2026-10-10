@@ -91,18 +91,19 @@ document.addEventListener("visibilitychange", () => {
 });
 window.addEventListener("pageshow", ev => { if (ev.persisted) forceReconnect(); });
 
-export function connectProxy() {
+// Shared socket lifecycle for both transports (dashboard proxy and direct HA
+// websocket): builds the WebSocket, wires the status LED, reconnect backoff,
+// error handling, the pong bookkeeping, and the state_changed fan-out. The
+// caller supplies the URL, the reconnect entry point, the on-open behavior
+// (auth vs none), and a handler for connection-specific messages (full-state
+// result, auth_ok, ...). `reconnect` is the same entry point `connect()`
+// dispatches to, so backoff resumes on the right transport.
+function openSocket({ url, reconnect, onOpen, onMessage }) {
   setStatus("connecting");
-  const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ai-dashboard/ws";
-  state.ws = new WebSocket(url);
-  state.ws.onopen = () => {
-    setStatus("connected");
-    startPingWatchdog();
-    // The proxy pushes the full state list ({id: 1, type: "result"}) on connect
-    // and forwards every state_changed event unprompted, so the client sends
-    // neither get_states nor subscribe_events here.
-  };
-  state.ws.onmessage = async (ev) => {
+  const ws = new WebSocket(url);
+  state.ws = ws;
+  ws.onopen = onOpen;
+  ws.onmessage = async (ev) => {
     let msg;
     try {
       msg = JSON.parse(ev.data);
@@ -111,68 +112,66 @@ export function connectProxy() {
       return;
     }
     if (msg.type === "pong") { state.awaitingPong = false; state.pongSeen = true; return; }
-    if (msg.type === "result" && msg.id === 1 && msg.success) {
-      state.states = {};
-      for (const s of msg.result) state.states[s.entity_id] = s;
-      await fetchRegistry();
-      await refreshForecast();
-      await primeLastEventCache();
-      renderAll();
-    }
+    await onMessage(msg);
     if (msg.type === "event" && msg.event && msg.event.event_type === "state_changed") {
       const s = msg.event.data.new_state;
       if (s) { trackLastEvent(state.states[s.entity_id], s); handleEventStateChange(s); state.states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
     }
   };
-  state.ws.onclose = () => {
+  ws.onclose = () => {
     stopPingWatchdog();
     setStatus("disconnected");
     clearTimeout(state.reconnectTimer);
-    state.reconnectTimer = setTimeout(connectProxy, Math.min(state.reconnectDelay, 30000));
+    state.reconnectTimer = setTimeout(reconnect, Math.min(state.reconnectDelay, 30000));
     state.reconnectDelay *= 2;
   };
-  state.ws.onerror = () => { setStatus("disconnected"); state.ws.close(); };
+  ws.onerror = () => { setStatus("disconnected"); ws.close(); };
+}
+
+export function connectProxy() {
+  openSocket({
+    url: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/ai-dashboard/ws",
+    reconnect: connectProxy,
+    onOpen: () => {
+      setStatus("connected");
+      startPingWatchdog();
+      // The proxy pushes the full state list ({id: 1, type: "result"}) on connect
+      // and forwards every state_changed event unprompted, so the client sends
+      // neither get_states nor subscribe_events here.
+    },
+    onMessage: async (msg) => {
+      if (msg.type === "result" && msg.id === 1 && msg.success) {
+        state.states = {};
+        for (const s of msg.result) state.states[s.entity_id] = s;
+        await fetchRegistry();
+        await refreshForecast();
+        await primeLastEventCache();
+        renderAll();
+      }
+    },
+  });
 }
 
 export function connect() {
   if (window.HA_INTEGRATION_PROXY) return connectProxy();
-  setStatus("connecting");
-  const url = (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/websocket";
-  state.ws = new WebSocket(url);
-  state.ws.onopen = () => state.ws.send(JSON.stringify({ type: "auth", access_token: state.token }));
-  state.ws.onmessage = async (ev) => {
-    let msg;
-    try {
-      msg = JSON.parse(ev.data);
-    } catch (e) {
-      console.warn("dropping malformed WS frame", e);
-      return;
-    }
-    if (msg.type === "pong") { state.awaitingPong = false; state.pongSeen = true; return; }
-    if (msg.type === "auth_ok") {
-      setStatus("connected");
-      startPingWatchdog();
-      state.ws.send(JSON.stringify({ id: 1, type: "get_states" }));
-      state.ws.send(JSON.stringify({ id: 2, type: "subscribe_events", event_type: "state_changed" }));
-      await fetchRegistry();
-    }
-    if (msg.type === "result" && msg.id === 1 && msg.success) {
-      state.states = {};
-      for (const s of msg.result) state.states[s.entity_id] = s;
-      await refreshForecast();
-      renderAll();
-    }
-    if (msg.type === "event" && msg.event && msg.event.event_type === "state_changed") {
-      const s = msg.event.data.new_state;
-      if (s) { trackLastEvent(state.states[s.entity_id], s); handleEventStateChange(s); state.states[s.entity_id] = s; updateCard(s); scheduleSnapshotRefresh(s.entity_id); }
-    }
-  };
-  state.ws.onclose = () => {
-    stopPingWatchdog();
-    setStatus("disconnected");
-    clearTimeout(state.reconnectTimer);
-    state.reconnectTimer = setTimeout(connect, Math.min(state.reconnectDelay, 30000));
-    state.reconnectDelay *= 2;
-  };
-  state.ws.onerror = () => { setStatus("disconnected"); state.ws.close(); };
+  openSocket({
+    url: (location.protocol === "https:" ? "wss://" : "ws://") + location.host + "/api/websocket",
+    reconnect: connect,
+    onOpen: () => state.ws.send(JSON.stringify({ type: "auth", access_token: state.token })),
+    onMessage: async (msg) => {
+      if (msg.type === "auth_ok") {
+        setStatus("connected");
+        startPingWatchdog();
+        state.ws.send(JSON.stringify({ id: 1, type: "get_states" }));
+        state.ws.send(JSON.stringify({ id: 2, type: "subscribe_events", event_type: "state_changed" }));
+        await fetchRegistry();
+      }
+      if (msg.type === "result" && msg.id === 1 && msg.success) {
+        state.states = {};
+        for (const s of msg.result) state.states[s.entity_id] = s;
+        await refreshForecast();
+        renderAll();
+      }
+    },
+  });
 }

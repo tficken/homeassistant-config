@@ -11,7 +11,7 @@ import { renderTerminalPanel } from '../components/panels.js';
 import { renderLightCard, renderSwitchCard, renderMetricCard, renderMediaCard } from '../components/cards.js';
 import { lightModalEntity, renderLightModal } from '../components/light-modal.js';
 import { printerModalPrefix, renderPrinterModal } from '../components/printer-modal.js';
-import { renderHomeScreen, getPresenceEntities, renderDoors } from './home.js';
+import { renderHomeScreen, getPresenceEntities, renderDoors, updateHomeAlertBanner } from './home.js';
 import { renderControlScreen } from './control.js';
 import { renderSecurityScreen } from './security.js';
 import { renderStatusScreen } from './status.js';
@@ -169,6 +169,22 @@ export function updateEntityCardInPlace(entityId) {
   const domain = entityId.split(".")[0];
   if (state.currentScreen === "home") {
     if (domain === "calendar") return false; // on-call panel appears/disappears: structural
+    // Security/system sections have no home panel; entityBelongsToScreen maps
+    // them to home only to feed the alert banner. Patch the banner in place
+    // so their routine churn (CPU, memory, router speeds, batteries, motion)
+    // doesn't rebuild the whole screen.
+    const sec = (state.config.sections.security && state.config.sections.security.entities) || [];
+    const sys = (state.config.sections.system && state.config.sections.system.entities) || [];
+    if (sec.includes(entityId) || sys.includes(entityId)) {
+      updateHomeAlertBanner(screenEl);
+      // If the entity is also rendered as a home card (door/light/room/presence
+      // section or the weather entity), fall through so the card updates too.
+      const onHomePanel = ["doors", "lights", "roomMonitors", "home"].some(s => {
+        const list = (state.config.sections[s] && state.config.sections[s].entities) || [];
+        return list.includes(entityId);
+      }) || entityId === (state.config.entities.weather || "");
+      if (!onHomePanel) return true;
+    }
     const doors = (state.config.sections.doors && state.config.sections.doors.entities) || [];
     if (doors.includes(entityId)) {
       const panel = document.getElementById("doors-panel");

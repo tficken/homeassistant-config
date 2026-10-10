@@ -31,17 +31,6 @@ export function entityArea(entityId) {
   return (window.HA_AREAS && window.HA_AREAS[entityId]) || "";
 }
 
-export function iconFor(entityId, state) {
-  const domain = entityId.split(".")[0];
-  const s = (state || "").toLowerCase();
-  const map = DOMAIN_ICONS[domain];
-  if (typeof map === "object") {
-    if (["on","playing","open","home","heat","cool","auto","active","true"].includes(s)) return map.on || map.off;
-    return map.off || map.on;
-  }
-  return map || "●";
-}
-
 export function isActive(state) {
   return ["on","playing","open","home","heat","cool","auto","active","true","cleaning","docked","idle"].includes((state || "").toLowerCase());
 }
@@ -54,16 +43,6 @@ export function isUnavailable(state) {
 
 export function renderOfflineBadge() {
   return `<span class="offline-badge">OFFLINE</span>`;
-}
-
-export function isActionable(domain) {
-  return ["light","switch","fan","scene","script","button","input_boolean","cover","lock","media_player","siren"].includes(domain);
-}
-
-export function formatState(state) {
-  if (!state) return "unknown";
-  const unit = state.attributes && state.attributes.unit_of_measurement ? state.attributes.unit_of_measurement : "";
-  return `${state.state} ${unit}`.trim();
 }
 
 export function weatherIcon(condition) {

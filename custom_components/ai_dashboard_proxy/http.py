@@ -1,14 +1,12 @@
 """HTTP/WebSocket handlers for the AI Dashboard Proxy."""
 from __future__ import annotations
 
-import asyncio
 import ipaddress
 import json
 import logging
 import mimetypes
 import os
 import re
-import traceback
 from datetime import timedelta
 from typing import Any
 
@@ -106,6 +104,12 @@ async def dashboard_handler(request: web.Request) -> web.StreamResponse:
         if not real_requested.startswith(real_root + os.sep) and real_requested != real_root:
             return web.Response(status=403, text="Forbidden")
 
+        # Config backups written by config_save_handler are not dashboard
+        # assets. 404 (not 403) so the route doesn't confirm the backup
+        # naming scheme to clients.
+        if re.fullmatch(r"config\.json\.bak\..+", os.path.basename(real_requested)):
+            return web.Response(status=404, text="Not found")
+
         if not os.path.isfile(real_requested):
             return web.Response(status=404, text="Not found")
 
@@ -181,11 +185,9 @@ async def dashboard_handler(request: web.Request) -> web.StreamResponse:
             content_type=content_type,
             headers={"Accept-Ranges": "bytes"},
         )
-    except Exception as e:
-        return web.Response(
-            status=500,
-            text=f"Dashboard proxy error: {e}\n{traceback.format_exc()}",
-        )
+    except Exception:
+        _LOGGER.exception("Dashboard proxy error")
+        return web.Response(status=500, text="Dashboard proxy error")
 
 
 async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
@@ -194,8 +196,9 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         secret = request.app.get("ai_dashboard_secret")
         if not _is_authorized(request, secret):
             return web.Response(status=401, text="Unauthorized")
-    except Exception as e:
-        return web.Response(status=500, text=f"Auth check failed: {e}\n{traceback.format_exc()}")
+    except Exception:
+        _LOGGER.exception("WebSocket auth check failed")
+        return web.Response(status=500, text="Auth check failed")
 
     hass: HomeAssistant = request.app["hass"]
     ws = web.WebSocketResponse(heartbeat=30)
@@ -206,7 +209,10 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         new_state = event.data.get("new_state")
         if new_state is None or ws.closed:
             return
-        future = asyncio.run_coroutine_threadsafe(
+        # Bus callbacks run on the event-loop thread, so schedule the send
+        # directly on the loop instead of hopping through
+        # run_coroutine_threadsafe.
+        task = hass.async_create_task(
             ws.send_json(
                 {
                     "type": "event",
@@ -216,20 +222,18 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
                     },
                 },
                 dumps=json_dumps,
-            ),
-            hass.loop,
+            )
         )
 
-        def _silence_future(fut: Any) -> None:
+        def _silence_task(fut: Any) -> None:
             # Retrieve the result so send failures on closing sockets do not
-            # surface as "Future exception was never retrieved" log noise.
-            # concurrent.futures.CancelledError is a subclass of Exception.
+            # surface as "Task exception was never retrieved" log noise.
             try:
                 fut.result()
             except Exception:
                 pass
 
-        future.add_done_callback(_silence_future)
+        task.add_done_callback(_silence_task)
 
     unsub = hass.bus.async_listen(EVENT_STATE_CHANGED, forward_event)
 
@@ -342,11 +346,9 @@ async def cam_stream_handler(request: web.Request) -> web.StreamResponse:
         if resp is None:
             return web.Response(status=502, text=f"Camera {entity_id} cannot stream right now")
         return resp
-    except Exception as e:
-        return web.Response(
-            status=500,
-            text=f"Camera stream proxy error: {e}\n{traceback.format_exc()}",
-        )
+    except Exception:
+        _LOGGER.exception("Camera stream proxy error")
+        return web.Response(status=500, text="Camera stream proxy error")
 
 
 async def forecast_handler(request: web.Request) -> web.StreamResponse:
@@ -380,11 +382,9 @@ async def forecast_handler(request: web.Request) -> web.StreamResponse:
             )
 
         return web.json_response(service_response or {})
-    except Exception as e:
-        return web.Response(
-            status=500,
-            text=f"Dashboard proxy error: {e}\n{traceback.format_exc()}",
-        )
+    except Exception:
+        _LOGGER.exception("Forecast proxy error")
+        return web.Response(status=500, text="Forecast proxy error")
 
 
 async def history_handler(request: web.Request) -> web.StreamResponse:
@@ -436,19 +436,16 @@ async def history_handler(request: web.Request) -> web.StreamResponse:
             ]
 
         return web.json_response(result)
-    except Exception as e:
-        return web.Response(
-            status=500,
-            text=f"Dashboard proxy error: {e}\n{traceback.format_exc()}",
-        )
+    except Exception:
+        _LOGGER.exception("History proxy error")
+        return web.Response(status=500, text="History proxy error")
 
 
-CONFIG_KEYS = {"theme", "layout", "entities", "sections", "sectionOrder", "dock", "presenceLabels", "labels", "panels", "sizes", "colWidths", "alerts", "eventPopups"}
+CONFIG_KEYS = {"theme", "layout", "entities", "sections", "dock", "presenceLabels", "labels", "panels", "sizes", "colWidths", "alerts", "eventPopups", "idle"}
 
 ALLOWED_SERVICE_DOMAINS = {
     "light",
     "switch",
-    "scene",
     "script",
     "media_player",
     "vacuum",
@@ -521,11 +518,9 @@ async def config_save_handler(request: web.Request) -> web.StreamResponse:
 
         await hass.async_add_executor_job(write_file)
         return web.json_response({"success": True})
-    except Exception as e:
-        return web.Response(
-            status=500,
-            text=f"Config save failed: {e}\n{traceback.format_exc()}",
-        )
+    except Exception:
+        _LOGGER.exception("Config save failed")
+        return web.Response(status=500, text="Config save failed")
 
 
 async def snapshots_handler(request: web.Request) -> web.StreamResponse:
@@ -590,11 +585,9 @@ async def snapshots_handler(request: web.Request) -> web.StreamResponse:
                 ],
             }
         )
-    except Exception as e:
-        return web.Response(
-            status=500,
-            text=f"Snapshots list failed: {e}\n{traceback.format_exc()}",
-        )
+    except Exception:
+        _LOGGER.exception("Snapshots list failed")
+        return web.Response(status=500, text="Snapshots list failed")
 
 
 async def async_setup_http(hass: HomeAssistant, secret: str | None) -> None:

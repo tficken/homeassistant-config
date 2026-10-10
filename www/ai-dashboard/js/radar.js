@@ -31,8 +31,19 @@ export async function initRadarMap() {
   if (state.radarAnimInterval) { clearInterval(state.radarAnimInterval); state.radarAnimInterval = null; }
   const seq = ++radarInitSeq;
   try {
-    const res = await fetch("https://api.rainviewer.com/public/weather-maps.json", { cache: "no-store" });
-    const data = await res.json();
+    // Timeout + res.ok check: a hung or failed RainViewer fetch otherwise
+    // leaves "INITIALIZING RADAR..." up forever. Failures degrade to the
+    // RADAR OFFLINE path in the catch below.
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 10000);
+    let data;
+    try {
+      const res = await fetch("https://api.rainviewer.com/public/weather-maps.json", { cache: "no-store", signal: ctrl.signal });
+      if (!res.ok) throw new Error(`RainViewer HTTP ${res.status}`);
+      data = await res.json();
+    } finally {
+      clearTimeout(timeout);
+    }
     if (seq !== radarInitSeq) return; // superseded by a newer re-render mid-fetch
     const frames = data.radar && data.radar.past;
     if (!frames || !frames.length) throw new Error("no radar frames");

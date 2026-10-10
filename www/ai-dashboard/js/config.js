@@ -144,7 +144,7 @@ export const DEFAULT_CONFIG = {
   },
   sections: {
     home: { title: "Home", icon: "🏠", entities: ["person.woteg", "person.bobbie", "weather.forecast_home"] },
-    scenes: { title: "Scenes", icon: "🎨", entities: ["scene.all_lights_off", "scene.relax_mode", "scene.movie_mode", "scene.focus_mode", "scene.living_room_focus_mode", "scene.living_room_relax_mode", "scene.living_room_all_lights_off"] },
+    scenes: { title: "Scenes", icon: "🎨", entities: ["script.all_lights_off", "script.relax_mode", "script.movie_mode", "script.focus_mode", "script.living_room_lights_on", "script.living_room_relax_mode", "script.living_room_lights_off", "script.living_room_movie_mode"] },
     scripts: { title: "Scripts", icon: "▶️", entities: ["script.goodnight", "script.focus_mode", "script.movie_mode", "script.relax_mode", "script.pause_all_media", "script.living_room_lights_on", "script.living_room_lights_off", "script.travis_office_lights_on", "script.travis_office_lights_off", "script.goodnight_door_check", "script.goodnight_dim_lights", "script.goodnight_enable_security"] },
     quickControls: { title: "Quick Controls", icon: "🎛️", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan", "light.p1s_01p00a412300832_chamber_light", "light.travis_office_p1s_uno_chamber_light"] },
     lights: { title: "Lights", icon: "💡", entities: ["light.ceiling_fan", "light.living_room_ceiling_fan"] },
@@ -153,7 +153,7 @@ export const DEFAULT_CONFIG = {
     doors: { title: "Doors", icon: "🚪", entities: ["binary_sensor.living_room_front_door", "binary_sensor.backdoor"] },
     roomMonitors: { title: "Room Monitors", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2"] },
     environment: { title: "Environment", icon: "🌡️", entities: ["sensor.hobeian_zg_204zx_temperature", "sensor.hobeian_zg_204zx_humidity", "sensor.hobeian_zg_204zx_illuminance", "sensor.hobeian_zg_204zx_temperature_2", "sensor.hobeian_zg_204zx_humidity_2", "sensor.hobeian_zg_204zx_illuminance_2"] },
-    presence: { title: "Presence", icon: "👤", entities: ["binary_sensor.hobeian_zg_204zx", "binary_sensor.hobeian_zg_204zx_2"] },
+    presence: { title: "Presence", icon: "👤", entities: [] },
     system: { title: "System", icon: "⚙️", entities: ["sensor.home_assistant_core_cpu_percent", "sensor.home_assistant_core_memory_percent", "sensor.ha_disk_usage", "vacuum.geordi_la_forge", "vacuum.pooper_litter_box", "update.home_assistant_core_update", "update.home_assistant_operating_system_update", "update.home_assistant_supervisor_update"] }
   },
   dock: { items: [{ icon: "⚙️", action: "settings", label: "Settings" }] },

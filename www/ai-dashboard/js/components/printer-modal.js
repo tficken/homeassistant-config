@@ -106,6 +106,27 @@ export function renderPrinterModal() {
     <div class="printer-modal-progress-track"><div class="printer-modal-progress-bar" style="width:${Math.min(100, Math.max(0, progress))}%;"></div></div>
   </div>` : "";
 
+  const sideHtml = `
+      <div class="printer-modal-status${statusId && state.states[statusId] && isActive(state.states[statusId].state) ? " active" : ""}">${statusId && state.states[statusId] ? escapeHtml(String(state.states[statusId].state).toUpperCase()) : "--"}</div>
+      ${progressHtml}
+      <div>${stats.join("")}</div>
+      ${amsHtml}
+      ${controlsHtml}`;
+
+  if (el) {
+    // Patch the stats column in place when the structure is unchanged:
+    // rebuilding the modal's innerHTML would tear down and reopen the MJPEG
+    // chamber camera <img> on every printer sensor update (several times a
+    // minute while printing). The camera column is left untouched. The prefix
+    // check guards against a stale camera if a different printer's modal is
+    // opened without closing this one first.
+    const side = el.querySelector(".printer-modal-side");
+    if (side && el.dataset.prefix === prefix && !!el.querySelector(".printer-modal-cam") === !!camId) {
+      side.innerHTML = sideHtml;
+      return;
+    }
+  }
+
   const html = `<div class="modal-backdrop printer-modal-backdrop" onclick="closePrinterModal()">
     <div class="modal-panel printer-modal-panel" onclick="event.stopPropagation()">
       <div class="modal-header">
@@ -114,13 +135,7 @@ export function renderPrinterModal() {
       </div>
       <div class="modal-body printer-modal-body${camId ? " with-cam" : ""}">
         ${camId ? `<div>${camHtml}</div>` : ""}
-        <div class="printer-modal-side">
-          <div class="printer-modal-status${statusId && state.states[statusId] && isActive(state.states[statusId].state) ? " active" : ""}">${statusId && state.states[statusId] ? escapeHtml(String(state.states[statusId].state).toUpperCase()) : "--"}</div>
-          ${progressHtml}
-          <div>${stats.join("")}</div>
-          ${amsHtml}
-          ${controlsHtml}
-        </div>
+        <div class="printer-modal-side">${sideHtml}</div>
       </div>
     </div>
   </div>`;
@@ -129,5 +144,6 @@ export function renderPrinterModal() {
     el.id = "printer-modal-overlay";
     document.body.appendChild(el);
   }
+  el.dataset.prefix = prefix;
   el.innerHTML = html;
 }

@@ -61,6 +61,17 @@
       banner.style.display = 'block';
     }
   }, true);
+  // A throw inside async init() surfaces as an unhandledrejection, not an
+  // error event — without this the tablet sits on CONNECTING with no banner.
+  window.addEventListener('unhandledrejection', (e) => {
+    if (window.__dashBooted) return;
+    const banner = document.getElementById('conn-banner');
+    if (banner) {
+      const reason = e.reason && (e.reason.message || String(e.reason));
+      banner.textContent = 'DASHBOARD LOAD ERROR: ' + (reason || 'boot failed');
+      banner.style.display = 'block';
+    }
+  });
 </script>
 <script type="module" src="js/main.js"></script>
 </body>

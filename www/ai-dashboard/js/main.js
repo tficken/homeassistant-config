@@ -48,16 +48,26 @@ async function init() {
   }, SNAPSHOT_CHECK_MS);
   // Restart live camera streams periodically: a stalled MJPEG <img> shows the
   // last frame forever without firing onerror, and browsers expose no stall
-  // event. Scoped to the active screen; the ts= cache-buster forces a fresh
-  // connection. Snapshot cameras are untouched (they have their own refresh).
+  // event. Scan the active screen plus open modals rooted at document.body
+  // (the printer modal's chamber cam uses .printer-modal-cam, not
+  // .camera-feed, and was previously invisible to this watchdog). The ts=
+  // cache-buster forces a fresh connection. Snapshot cameras are untouched
+  // (they have their own refresh).
   setInterval(() => {
+    const roots = [];
     const screenEl = document.getElementById(state.currentScreen + "-screen");
-    if (!screenEl) return;
-    screenEl.querySelectorAll("img.camera-feed:not([data-snapshot-camera])").forEach(img => {
-      if (!/(camera_proxy_stream|cam_stream)\//.test(img.src)) return;
-      const base = img.src.replace(/([?&])ts=\d+/, "").replace(/[?&]$/, "");
-      img.src = `${base}${base.includes("?") ? "&" : "?"}ts=${Date.now()}`;
-    });
+    if (screenEl) roots.push(screenEl);
+    for (const id of ["printer-modal-overlay", "event-popup"]) {
+      const modal = document.getElementById(id);
+      if (modal) roots.push(modal);
+    }
+    for (const root of roots) {
+      root.querySelectorAll("img.camera-feed:not([data-snapshot-camera]), img.printer-modal-cam").forEach(img => {
+        if (!/(camera_proxy_stream|cam_stream)\//.test(img.src)) return;
+        const base = img.src.replace(/([?&])ts=\d+/, "").replace(/[?&]$/, "");
+        img.src = `${base}${base.includes("?") ? "&" : "?"}ts=${Date.now()}`;
+      });
+    }
   }, 10 * 60 * 1000);
   // Signals the load-error trap in index.html that boot completed — runtime
   // errors after this point must not be mislabeled as module-load failures.

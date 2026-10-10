@@ -202,10 +202,7 @@
     "presence": {
       "title": "Presence",
       "icon": "👤",
-      "entities": [
-        "binary_sensor.hobeian_zg_204zx",
-        "binary_sensor.hobeian_zg_204zx_2"
-      ]
+      "entities": []
     },
     "system": {
       "title": "System",

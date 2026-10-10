@@ -6,7 +6,6 @@ import { escapeHtml } from '../utils.js';
 import { renderCameraFeed } from '../cameras.js';
 
 const POPUP_ID = "event-popup";
-const LATEST_SEEN_KEY = "_eventPopupLatestSeen";
 
 function parseEventTime(st) {
   if (!st) return 0;

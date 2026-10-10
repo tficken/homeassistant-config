@@ -314,12 +314,41 @@ export function buildHomePanels() {
   };
 }
 
+// Patch the alert banner in place. Security/system entities map to the home
+// screen only to keep this banner fresh; updating it directly lets their
+// routine sensor churn skip a full renderHomeScreen().
+export function updateHomeAlertBanner(screenEl) {
+  if (!screenEl) return;
+  const html = renderAlertBanner(getAlerts());
+  const existing = screenEl.querySelector(":scope > .alert-banner");
+  if (existing) {
+    if (html) existing.outerHTML = html;
+    else existing.remove();
+  } else if (html) {
+    screenEl.insertAdjacentHTML("afterbegin", html);
+  }
+}
+
 export function renderHomeScreen() {
+  const homeEl = document.getElementById("home-screen");
+  // Keep a live radar map across full re-renders: the innerHTML rewrite below
+  // detaches #radar-map, so re-insert the existing element into the fresh DOM
+  // instead of letting initRadarMap() tear down and rebuild Leaflet (with a
+  // RainViewer re-fetch) on every sensor update.
+  const liveRadarEl = state.radarMap && state.radarMapEl ? state.radarMapEl : null;
   const b = buildHomePanels();
   const main = `${renderAlertBanner(getAlerts())}${assembleColumns(b.panels,
     effectivePanels("home"),
     b.gridStyle, b.colStyles, effectiveSizes("home"))}`;
-  document.getElementById("home-screen").innerHTML = main;
+  homeEl.innerHTML = main;
+  if (liveRadarEl) {
+    const placeholder = document.getElementById("radar-map");
+    if (placeholder && placeholder !== liveRadarEl) {
+      placeholder.replaceWith(liveRadarEl);
+      // The element was detached during the swap; let Leaflet re-measure.
+      setTimeout(() => { if (state.radarMap) state.radarMap.invalidateSize(); }, 150);
+    }
+  }
   initRadarMap();
   measureClock();
   state.lastRecentDoorKey = recentDoorIds().join(",");

@@ -40,6 +40,11 @@ export function snapshotImgUrl(srcEntity) {
   if (st && st.attributes && st.attributes.entity_picture) {
     base = st.attributes.entity_picture;
   } else if (window.HA_INTEGRATION_PROXY) {
+    // Fallback only: camera entities almost always carry entity_picture (the
+    // branch above), so this is reached briefly before states populate or for
+    // non-standard cameras lacking one. It 401s without an HA session (proxy
+    // clients have no long-lived token), but no better unauthenticated URL
+    // exists for a plain still.
     base = `/api/camera_proxy/${srcEntity}`;
   } else {
     base = `/api/camera_proxy/${srcEntity}?token=${encodeURIComponent(state.token)}`;

@@ -4,7 +4,7 @@
 
 The two halves of the system:
 
-- **Frontend**: `index.html` (thin shell — markup plus a module-load error trap that surfaces a visible error if any `js/` module fails to load; no inline app JS) + `css/` (`tokens.css`, `base.css`, `components.css`, `screens.css`, `editor.css`, linked in that order) + `js/` ES modules: `state.js` (store), `config.js`, `api.js`, `connection.js`, `utils.js`, `components/` (panels, cards, light-modal, printer-modal, snapshot-viewer), `screens/` (home, control, security, status, index), `settings/`, `cameras.js`, `radar.js`, `globals.js` (window shim for inline handlers — any new inline handler entry point must be added there), `main.js` (init + intervals). Plus `config.json` (persisted user config), `vendor/leaflet/` (vendored radar map library — no CDN dependency; Google Fonts still loads from CDN), `snapshots/` (camera event archive, git-ignored).
+- **Frontend**: `index.html` (thin shell — markup plus a module-load error trap that surfaces a visible error if any `js/` module fails to load; no inline app JS) + `css/` (`tokens.css`, `base.css`, `components.css`, `screens.css`, `editor.css`, linked in that order) + `js/` ES modules: `state.js` (store), `config.js`, `api.js`, `connection.js`, `utils.js`, `components/` (panels, cards, light-modal, printer-modal, snapshot-viewer, event-popup, night-mode), `screens/` (home, control, security, status, index), `settings/`, `cameras.js`, `radar.js`, `globals.js` (window shim for inline handlers — any new inline handler entry point must be added there), `main.js` (init + intervals). Plus `config.json` (persisted user config), `vendor/leaflet/` (vendored radar map library — no CDN dependency; Google Fonts still loads from CDN), `snapshots/` (camera event archive, git-ignored).
 - **Backend**: `custom_components/ai_dashboard_proxy/` (self-written, not HACS-managed). **Any change to its Python requires a Home Assistant restart** — a browser refresh is not enough.
 
 ---
@@ -59,7 +59,7 @@ The Layout tab's measured overflow badge reflects current content only — it ca
 
 - Serves dashboard assets with registry-derived area names injected.
 - `/ai-dashboard/ws` — WebSocket proxying HA state events and service calls.
-  - Service calls are restricted to `ALLOWED_SERVICE_DOMAINS` (light, switch, scene, script, media_player, vacuum, siren, lock, cover, fan, climate, input_boolean). A dashboard feature calling any other domain is rejected with `domain_not_allowed` until the domain is added there.
+  - Service calls are restricted to `ALLOWED_SERVICE_DOMAINS` (light, switch, script, media_player, vacuum, siren, lock, cover, fan, climate, input_boolean, button). A dashboard feature calling any other domain is rejected with `domain_not_allowed` until the domain is added there.
   - Answers `{type:"ping"}` with `{type:"pong"}` — the dashboard client runs an app-level ping watchdog plus a visibilitychange/pageshow force-reconnect to recover half-open sockets after a wall tablet wakes from sleep.
 - `POST /ai-dashboard/api/forecast` — weather forecast, server-side so the dashboard needs no HA token.
 - `POST /ai-dashboard/api/history` — recorder state history for sparklines, via `homeassistant.components.recorder.history.get_significant_states` run in the recorder executor.
