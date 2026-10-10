@@ -20,7 +20,6 @@ cloud:
         - light
         - lock
         - media_player
-        - scene
         - script
         - sensor
         - switch
@@ -56,7 +55,6 @@ recorder:
   purge_keep_days: 30
   exclude:
     domains:
-      - updater
       - sun
       - weather
     entity_globs:
@@ -130,15 +128,18 @@ logger:
     homeassistant.components.bluetooth: warning
 
 input_boolean:
-  voice_mute:
-    name: Voice mute
-    icon: mdi:microphone-off
-    initial: false
-
   night_mode:
     name: Night mode
     icon: mdi:weather-night
     initial: false
+
+input_number:
+  master_bedroom_echo_dot_volume:
+    name: Master bedroom Echo Dot previous volume
+    min: 0
+    max: 1
+    step: 0.01
+    initial: 0.4
 
 # Remove backups older than 14 days via the Supervisor API.
 # The backup.remove service used by the previous automation does not exist.
@@ -201,6 +202,15 @@ template:
              | default([])
              | selectattr('Event', 'search', '(Warning|Watch)$')
              | list | length }}
+        availability: >
+          {{ state_attr('sensor.nws_alerts_gps_40_8141_96_7503_nws_alerts_alerts', 'Alerts') is not none }}
+
+      - name: "NWS warning watch events"
+        unique_id: nws_warning_watch_events
+        state: >
+          {% set alerts = state_attr('sensor.nws_alerts_gps_40_8141_96_7503_nws_alerts_alerts', 'Alerts') | default([]) %}
+          {% set events = alerts | selectattr('Event', 'search', '(Warning|Watch)$') | map(attribute='Event') | list %}
+          {{ events | join(', ') if events | length > 0 else 'None' }}
         availability: >
           {{ state_attr('sensor.nws_alerts_gps_40_8141_96_7503_nws_alerts_alerts', 'Alerts') is not none }}
 

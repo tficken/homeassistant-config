@@ -28,7 +28,9 @@ goodnight:
       target:
         entity_id: media_player.master_bedroom_echo_dot
       data:
-        media_content_id: "https://files.noise-foundation.com/brown-noise-528-8h-v2.mp3"
+        # Local copy (www/media/brown-noise.mp3, git-ignored) of
+        # https://files.noise-foundation.com/brown-noise-528-8h-v2.mp3
+        media_content_id: "/local/media/brown-noise.mp3"
         media_content_type: audio/mpeg
       continue_on_error: true
     - action: script.goodnight_enable_security
@@ -39,13 +41,6 @@ goodnight:
       continue_on_error: true
   mode: single
   icon: mdi:weather-night
-
-restart_ha:
-  alias: Restart Home Assistant
-  sequence:
-    - action: homeassistant.restart
-  mode: single
-  icon: mdi:restart
 
 movie_mode:
   alias: Movie mode
@@ -251,3 +246,56 @@ goodnight_enable_security:
         entity_id: input_boolean.night_mode
   mode: single
   icon: mdi:shield-home
+
+echo_dot_announce:
+  alias: Echo Dot announce
+  description: Save the master bedroom Echo Dot volume, announce a message at the given volume, then restore the previous volume after a delay
+  fields:
+    message:
+      description: Message to announce
+      required: true
+      selector:
+        text:
+    volume:
+      description: Volume to announce at (0-1)
+      required: false
+      default: 0.7
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.05
+    delay_seconds:
+      description: Seconds to wait before restoring the previous volume
+      required: false
+      default: 8
+      selector:
+        number:
+          min: 0
+          max: 60
+          unit_of_measurement: seconds
+  sequence:
+    - variables:
+        prev_volume: "{{ state_attr('media_player.master_bedroom_echo_dot', 'volume_level') }}"
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.master_bedroom_echo_dot
+      data:
+        volume_level: "{{ volume | float(0.7) }}"
+    - action: notify.alexa_media_master_bedroom_echo_dot
+      data:
+        message: "{{ message }}"
+        data:
+          type: announce
+      continue_on_error: true
+    - delay:
+        seconds: "{{ delay_seconds | int(8) }}"
+    - condition: template
+      value_template: "{{ prev_volume is not none }}"
+    - action: media_player.volume_set
+      target:
+        entity_id: media_player.master_bedroom_echo_dot
+      data:
+        volume_level: "{{ prev_volume }}"
+  mode: single
+  icon: mdi:bullhorn
