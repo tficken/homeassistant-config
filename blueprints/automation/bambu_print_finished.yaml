@@ -1,0 +1,67 @@
+blueprint:
+  name: Bambu print finished notification
+  description: >-
+    Send a persistent notification and a mobile-app notification when a Bambu
+    printer's print status moves from printing to finished/idle.
+  domain: automation
+  homeassistant:
+    min_version: 2024.10.0
+  input:
+    printer_name:
+      name: Printer display name
+      description: Short name used in notification titles and messages.
+      default: P1S
+      selector:
+        text:
+    print_status_entity:
+      name: Print status sensor
+      default: sensor.p1s_01p00a412300832_print_status
+      selector:
+        entity:
+          filter:
+            domain: sensor
+    notification_id:
+      name: Persistent notification ID
+      default: bambu_p1s_print_finished
+      selector:
+        text:
+    notify_service:
+      name: Mobile notify action
+      description: notify.* action used for the mobile push notification.
+      default: notify.mobile_app_traviss_iphone
+      selector:
+        text:
+
+mode: single
+
+variables:
+  printer_name: !input printer_name
+
+triggers:
+  - trigger: state
+    entity_id: !input print_status_entity
+    to:
+      - finish
+      - finished
+      - completed
+      - idle
+      - success
+
+conditions:
+  - condition: template
+    value_template: >
+      {{ trigger.from_state is not none and
+         trigger.to_state is not none and
+         (trigger.from_state.state | lower) in ['running', 'printing', 'pause', 'paused'] and
+         (trigger.to_state.state | lower) in ['finish', 'finished', 'completed', 'idle', 'success'] }}
+
+actions:
+  - action: persistent_notification.create
+    data:
+      title: "{{ printer_name }} print finished"
+      message: "{{ printer_name }} print status changed to {{ trigger.to_state.state }}."
+      notification_id: !input notification_id
+  - action: !input notify_service
+    data:
+      title: "{{ printer_name }} print finished"
+      message: "{{ printer_name }} print status changed to {{ trigger.to_state.state }}."

@@ -1,0 +1,111 @@
+blueprint:
+  name: Ring snapshot archive
+  description: >-
+    Record a 10s video clip to the AI dashboard history archive when a Ring
+    motion/ding binary sensor turns on. Spins up the ring-mqtt live stream,
+    waits for it to report ready (notifying if it never does), records the
+    clip, then shuts the stream back down.
+  domain: automation
+  homeassistant:
+    min_version: 2024.10.0
+  input:
+    trigger_entities:
+      name: Motion/ding trigger entities
+      description: Binary sensors that start a clip recording when they turn on.
+      default:
+        - binary_sensor.front_door_motion
+        - binary_sensor.front_door_ding
+      selector:
+        entity:
+          multiple: true
+          filter:
+            domain: binary_sensor
+    live_stream_switch:
+      name: Live stream switch
+      description: ring-mqtt switch that enables the on-demand RTSP stream.
+      default: switch.front_door_live_stream
+      selector:
+        entity:
+          filter:
+            domain: switch
+    camera_entity:
+      name: RTSP camera
+      description: Camera entity backed by the ring-mqtt RTSP feed.
+      default: camera.front_door_rtsp_live
+      selector:
+        entity:
+          filter:
+            domain: camera
+    snapshot_key:
+      name: Snapshot key
+      description: Subdirectory under www/ai-dashboard/snapshots/ where clips are written.
+      default: front_door
+      selector:
+        text:
+    stream_timeout_notification_id:
+      name: Stream-timeout notification ID
+      description: notification_id used for the persistent notification when the stream never reports ready.
+      default: ring_archive_front_door_stream_timeout
+      selector:
+        text:
+    stream_timeout_message:
+      name: Stream-timeout notification message
+      description: Message for the persistent notification when the stream never reports ready.
+      default: The front door stream did not report ready within 20s after motion/ding; the archived clip may be missing or incomplete.
+      selector:
+        text:
+          multiline: true
+
+mode: queued
+max: 5
+
+variables:
+  live_stream_switch: !input live_stream_switch
+  camera_entity: !input camera_entity
+  snapshot_key: !input snapshot_key
+
+triggers:
+  - trigger: state
+    entity_id: !input trigger_entities
+    to: "on"
+
+conditions: []
+
+actions:
+  # ring-mqtt's RTSP path only exists while the live-stream switch is on:
+  # spin it up, record a clip, then shut it back down (Ring kills streams
+  # after ~10 min and suppresses events while streaming anyway)
+  - action: switch.turn_on
+    target:
+      entity_id: !input live_stream_switch
+    continue_on_error: true
+  # Wait for go2rtc to actually establish the stream (ring-mqtt flips the
+  # live-stream switch on only once the stream is active) instead of a
+  # blind delay; notify if the stream never comes up so a missing clip is
+  # visible rather than silent.
+  - wait_template: >
+      {{ states(camera_entity) in ['streaming', 'recording']
+         or is_state(live_stream_switch, 'on') }}
+    timeout: "00:00:20"
+    continue_on_timeout: true
+  - if:
+      - condition: template
+        value_template: "{{ wait.completed is not true }}"
+    then:
+      - action: persistent_notification.create
+        data:
+          title: Ring clip may have failed
+          message: !input stream_timeout_message
+          notification_id: !input stream_timeout_notification_id
+        continue_on_error: true
+  - action: camera.record
+    target:
+      entity_id: !input camera_entity
+    data:
+      filename: "/config/www/ai-dashboard/snapshots/{{ snapshot_key }}/{{ now().strftime('%Y-%m-%d_%H-%M-%S') }}.mp4"
+      duration: 10
+    continue_on_error: true
+  - action: switch.turn_off
+    target:
+      entity_id: !input live_stream_switch
+    continue_on_error: true

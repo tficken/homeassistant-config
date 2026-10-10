@@ -100,134 +100,52 @@
 - id: bambu_p1s_print_finished
   alias: Bambu P1S print finished
   description: Notify when the P1S print status moves from printing to finished/idle
-  triggers:
-    - trigger: state
-      entity_id: sensor.p1s_01p00a412300832_print_status
-      to:
-        - finish
-        - finished
-        - completed
-        - idle
-        - success
-  conditions:
-    - condition: template
-      value_template: >
-        {{ trigger.from_state is not none and
-           trigger.to_state is not none and
-           (trigger.from_state.state | lower) in ['running', 'printing', 'pause', 'paused'] and
-           (trigger.to_state.state | lower) in ['finish', 'finished', 'completed', 'idle', 'success'] }}
-  actions:
-    - action: persistent_notification.create
-      data:
-        title: "P1S print finished"
-        message: "P1S print status changed to {{ trigger.to_state.state }}."
-        notification_id: bambu_p1s_print_finished
-    - action: notify.mobile_app_traviss_iphone
-      data:
-        title: "P1S print finished"
-        message: "P1S print status changed to {{ trigger.to_state.state }}."
-  mode: single
+  use_blueprint:
+    path: bambu_print_finished.yaml
+    input:
+      printer_name: P1S
+      print_status_entity: sensor.p1s_01p00a412300832_print_status
+      notification_id: bambu_p1s_print_finished
+      notify_service: notify.mobile_app_traviss_iphone
 
 - id: bambu_p1s_print_error
   alias: Bambu P1S print error
   description: Notify when the P1S reports a print or HMS error
-  triggers:
-    - trigger: state
-      entity_id:
-        - sensor.p1s_01p00a412300832_print_status
-      to:
-        - failed
-        - error
-        - fault
-    - trigger: state
-      entity_id:
+  use_blueprint:
+    path: bambu_print_error.yaml
+    input:
+      printer_name: P1S
+      print_status_entity: sensor.p1s_01p00a412300832_print_status
+      error_binary_sensors:
         - binary_sensor.p1s_01p00a412300832_print_error
         - binary_sensor.p1s_01p00a412300832_hms_errors
-      to: "on"
-  conditions:
-    - condition: template
-      value_template: >
-        {{ trigger.to_state is not none and
-           ((trigger.to_state.state | lower) in ['failed', 'error', 'fault'] or
-            (trigger.to_state.state | lower) == 'on' and
-            trigger.entity_id.startswith('binary_sensor.')) }}
-  actions:
-    - action: persistent_notification.create
-      data:
-        title: "P1S print error"
-        message: "P1S reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
-        notification_id: bambu_p1s_print_error
-    - action: notify.mobile_app_traviss_iphone
-      data:
-        title: "P1S print error"
-        message: "P1S reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
-  mode: single
+      notification_id: bambu_p1s_print_error
+      notify_service: notify.mobile_app_traviss_iphone
 
 - id: bambu_p1s_uno_print_finished
   alias: Bambu P1S UNO print finished
   description: Notify when the P1S UNO print status moves from printing to finished/idle
-  triggers:
-    - trigger: state
-      entity_id: sensor.travis_office_p1s_uno_print_status
-      to:
-        - finish
-        - finished
-        - completed
-        - idle
-        - success
-  conditions:
-    - condition: template
-      value_template: >
-        {{ trigger.from_state is not none and
-           trigger.to_state is not none and
-           (trigger.from_state.state | lower) in ['running', 'printing', 'pause', 'paused'] and
-           (trigger.to_state.state | lower) in ['finish', 'finished', 'completed', 'idle', 'success'] }}
-  actions:
-    - action: persistent_notification.create
-      data:
-        title: "P1S UNO print finished"
-        message: "P1S UNO print status changed to {{ trigger.to_state.state }}."
-        notification_id: bambu_p1s_uno_print_finished
-    - action: notify.mobile_app_traviss_iphone
-      data:
-        title: "P1S UNO print finished"
-        message: "P1S UNO print status changed to {{ trigger.to_state.state }}."
-  mode: single
+  use_blueprint:
+    path: bambu_print_finished.yaml
+    input:
+      printer_name: P1S UNO
+      print_status_entity: sensor.travis_office_p1s_uno_print_status
+      notification_id: bambu_p1s_uno_print_finished
+      notify_service: notify.mobile_app_traviss_iphone
 
 - id: bambu_p1s_uno_print_error
   alias: Bambu P1S UNO print error
   description: Notify when the P1S UNO reports a print or HMS error
-  triggers:
-    - trigger: state
-      entity_id:
-        - sensor.travis_office_p1s_uno_print_status
-      to:
-        - failed
-        - error
-        - fault
-    - trigger: state
-      entity_id:
+  use_blueprint:
+    path: bambu_print_error.yaml
+    input:
+      printer_name: P1S UNO
+      print_status_entity: sensor.travis_office_p1s_uno_print_status
+      error_binary_sensors:
         - binary_sensor.travis_office_p1s_uno_print_error
         - binary_sensor.travis_office_p1s_uno_hms_errors
-      to: "on"
-  conditions:
-    - condition: template
-      value_template: >
-        {{ trigger.to_state is not none and
-           ((trigger.to_state.state | lower) in ['failed', 'error', 'fault'] or
-            (trigger.to_state.state | lower) == 'on' and
-            trigger.entity_id.startswith('binary_sensor.')) }}
-  actions:
-    - action: persistent_notification.create
-      data:
-        title: "P1S UNO print error"
-        message: "P1S UNO reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
-        notification_id: bambu_p1s_uno_print_error
-    - action: notify.mobile_app_traviss_iphone
-      data:
-        title: "P1S UNO print error"
-        message: "P1S UNO reported an error ({{ trigger.entity_id }}: {{ trigger.to_state.state }})."
-  mode: single
+      notification_id: bambu_p1s_uno_print_error
+      notify_service: notify.mobile_app_traviss_iphone
 
 - id: wall_panel_day_backlight
   alias: Wall panel day backlight
@@ -360,97 +278,31 @@
 - id: ring_snapshot_archive_front_door
   alias: Ring snapshot archive - front door
   description: Record a 10s video clip to the AI dashboard history archive on front door motion or ding
-  triggers:
-    - trigger: state
-      entity_id:
+  use_blueprint:
+    path: ring_snapshot_archive.yaml
+    input:
+      trigger_entities:
         - binary_sensor.front_door_motion
         - binary_sensor.front_door_ding
-      to: "on"
-  conditions: []
-  actions:
-    # ring-mqtt's RTSP path only exists while the live-stream switch is on:
-    # spin it up, record a clip, then shut it back down (Ring kills streams
-    # after ~10 min and suppresses events while streaming anyway)
-    - action: switch.turn_on
-      target:
-        entity_id: switch.front_door_live_stream
-      continue_on_error: true
-    # Wait for go2rtc to actually establish the stream (ring-mqtt flips the
-    # live-stream switch on only once the stream is active) instead of a
-    # blind delay; notify if the stream never comes up so a missing clip is
-    # visible rather than silent.
-    - wait_template: >
-        {{ states('camera.front_door_rtsp_live') in ['streaming', 'recording']
-           or is_state('switch.front_door_live_stream', 'on') }}
-      timeout: "00:00:20"
-      continue_on_timeout: true
-    - if:
-        - condition: template
-          value_template: "{{ wait.completed is not true }}"
-      then:
-        - action: persistent_notification.create
-          data:
-            title: Ring clip may have failed
-            message: "The front door stream did not report ready within 20s after motion/ding; the archived clip may be missing or incomplete."
-            notification_id: ring_archive_front_door_stream_timeout
-          continue_on_error: true
-    - action: camera.record
-      target:
-        entity_id: camera.front_door_rtsp_live
-      data:
-        filename: "/config/www/ai-dashboard/snapshots/front_door/{{ now().strftime('%Y-%m-%d_%H-%M-%S') }}.mp4"
-        duration: 10
-      continue_on_error: true
-    - action: switch.turn_off
-      target:
-        entity_id: switch.front_door_live_stream
-      continue_on_error: true
-  mode: queued
-  max: 5
+      live_stream_switch: switch.front_door_live_stream
+      camera_entity: camera.front_door_rtsp_live
+      snapshot_key: front_door
+      stream_timeout_notification_id: ring_archive_front_door_stream_timeout
+      stream_timeout_message: "The front door stream did not report ready within 20s after motion/ding; the archived clip may be missing or incomplete."
 
 - id: ring_snapshot_archive_backyard
   alias: Ring snapshot archive - backyard
   description: Record a 10s video clip to the AI dashboard history archive on backyard motion
-  triggers:
-    - trigger: state
-      entity_id:
+  use_blueprint:
+    path: ring_snapshot_archive.yaml
+    input:
+      trigger_entities:
         - binary_sensor.downstairs_motion
-      to: "on"
-  conditions: []
-  actions:
-    # Same on-demand RTSP spin-up as the front door
-    - action: switch.turn_on
-      target:
-        entity_id: switch.downstairs_live_stream
-      continue_on_error: true
-    - wait_template: >
-        {{ states('camera.backyard_live_stream') in ['streaming', 'recording']
-           or is_state('switch.downstairs_live_stream', 'on') }}
-      timeout: "00:00:20"
-      continue_on_timeout: true
-    - if:
-        - condition: template
-          value_template: "{{ wait.completed is not true }}"
-      then:
-        - action: persistent_notification.create
-          data:
-            title: Ring clip may have failed
-            message: "The backyard stream did not report ready within 20s after motion; the archived clip may be missing or incomplete."
-            notification_id: ring_archive_backyard_stream_timeout
-          continue_on_error: true
-    - action: camera.record
-      target:
-        entity_id: camera.backyard_live_stream
-      data:
-        filename: "/config/www/ai-dashboard/snapshots/backyard/{{ now().strftime('%Y-%m-%d_%H-%M-%S') }}.mp4"
-        duration: 10
-      continue_on_error: true
-    - action: switch.turn_off
-      target:
-        entity_id: switch.downstairs_live_stream
-      continue_on_error: true
-  mode: queued
-  max: 5
+      live_stream_switch: switch.downstairs_live_stream
+      camera_entity: camera.backyard_live_stream
+      snapshot_key: backyard
+      stream_timeout_notification_id: ring_archive_backyard_stream_timeout
+      stream_timeout_message: "The backyard stream did not report ready within 20s after motion; the archived clip may be missing or incomplete."
 
 - id: stale_backup_alert
   alias: Stale backup alert
