@@ -54,7 +54,7 @@ All images use `platform: file` with `type: RGB` and `transparency: alpha_channe
 
 ### Flashing
 
-1. Open `wall-panel.yaml` in the ESPHome Device Builder / Dashboard.
+1. Open `crowpanel-hasp.yaml` in the ESPHome Device Builder / Dashboard.
 2. Make sure the PNG assets above are in the same directory as the YAML.
 3. Install / flash to the panel over USB-C.
 4. In Home Assistant, go to **Settings > Devices & services > ESPHome > CrowPanel HASP > Configure** and enable **"Allow the device to make Home Assistant service calls"**.
@@ -68,6 +68,7 @@ The panel imports these entities from HA. If any are unavailable, the correspond
 - `sensor.ha_last_backup_age`
 - `sensor.ha_disk_usage`
 - `sensor.nws_warnings_watches`
+- `sensor.nws_warning_watch_events`
 - `person.woteg` / `person.bobbie`
 - `binary_sensor.living_room_front_door` / `binary_sensor.backdoor`
 - `switch.front_door_motion_detection` / `switch.downstairs_motion_detection`

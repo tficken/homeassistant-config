@@ -43,7 +43,7 @@ psram:
   speed: 80MHz
 
 logger:
-  level: DEBUG
+  level: INFO
 
 api:
   encryption:
@@ -55,6 +55,9 @@ ota:
 wifi:
   ssid: !secret wifi_ssid
   password: !secret wifi_password
+  ap: {}
+
+captive_portal:
 
 # State flag so screensaver/wake scripts don't fight each other.
 globals:
@@ -106,6 +109,12 @@ image:
   - platform: file
     id: icon_partly_cloudy
     file: partly_cloudy.png
+    type: RGB
+    transparency: alpha_channel
+    resize: 80x80
+  - platform: file
+    id: icon_partly_cloudy_night
+    file: partly_cloudy_night.png
     type: RGB
     transparency: alpha_channel
     resize: 80x80
@@ -769,6 +778,15 @@ text_sensor:
         - script.execute: update_weather_icon
 
   - platform: homeassistant
+    id: ts_nws_alerts
+    entity_id: sensor.nws_warning_watch_events
+    internal: true
+
+    on_value:
+      then:
+        - script.execute: update_alert_banner
+
+  - platform: homeassistant
     id: ts_person_woteg
     entity_id: person.woteg
     internal: true
@@ -1063,9 +1081,10 @@ script:
           id: weather_icon_img
           src: !lambda |-
               std::string cond = id(ts_weather_condition).state;
+              bool night = id(ts_sun).state == "below_horizon";
               if (cond == "sunny") return id(icon_sun);
               if (cond == "clear-night") return id(icon_moon);
-              if (cond == "partlycloudy") return id(icon_partly_cloudy);
+              if (cond == "partlycloudy") return night ? id(icon_partly_cloudy_night) : id(icon_partly_cloudy);
               if (cond == "cloudy") return id(icon_cloud);
               if (cond == "fog" || cond == "windy" || cond == "wind-variant") return id(icon_fog);
               if (cond == "rainy" || cond == "pouring") return id(icon_rain);
@@ -1101,7 +1120,14 @@ script:
               msg += " WAN down,";
             }
             if (id(ha_nws_alerts).state > 0.0f) {
-              msg += " NWS alerts,";
+              std::string nws_text = id(ts_nws_alerts).state;
+              if (nws_text.empty() || nws_text == "None" || nws_text == "unknown" || nws_text == "unavailable") {
+                msg += " NWS alerts,";
+              } else {
+                msg += " ";
+                msg += nws_text;
+                msg += ",";
+              }
             }
             if (msg.back() == ',') {
               msg.pop_back();

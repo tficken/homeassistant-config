@@ -31,7 +31,7 @@ The intended reader of this file is an AI coding agent that has no prior context
 - **Frontend/Theming**: Lovelace themes (`themes/`), community cards (`www/community/`), and frontend extensions (`custom_components/uix/`).
 - **Databases**: `home-assistant_v2.db*` (recorder/history), `zigbee.db*` (Zigbee coordinator).
 - **Secrets**: `secrets.yaml` stores sensitive placeholders. It must never be committed or shared.
-- **Backups**: Weekly full backups via `shell_command.create_weekly_backup` (automation `weekly_backup`), pruned past 14 days locally; off-site copies are handled by Nabu Casa cloud backup. `sensor.ha_last_backup_age` (command_line, from `scripts/last_backup_age.py`) tracks the newest backup's age and the `stale_backup_alert` automation notifies when it exceeds 8 days — this catches the backup never running, which `create_weekly_backup.py`'s own failure notification cannot.
+- **Backups**: Weekly full backups via `shell_command.create_weekly_backup` (automation `weekly_backup`), pruned past 14 days or beyond the newest 10 locally; off-site copies are handled by Nabu Casa cloud backup. `sensor.ha_last_backup_age` (command_line, from `scripts/last_backup_age.py`) tracks the newest backup's age and the `stale_backup_alert` automation notifies when it exceeds 8 days — this catches the backup never running, which `create_weekly_backup.py`'s own failure notification cannot.
 
 ---
 
@@ -55,7 +55,8 @@ The intended reader of this file is an AI coding agent that has no prior context
 │   ├── community/              # HACS-downloaded community cards
 │   └── media/                  # User media files
 ├── docs/                       # Notes (ring-cameras.md, device notes) + superpowers specs/plans
-├── openhasp/                   # openHASP plate definition (wall_panel.yaml)
+├── esphome/                    # ESPHome device configs (CrowPanel HASP wall panel firmware; see its README.md)
+├── archive/openhasp/           # Retired openHASP wall plate definition (wall_panel.yaml; superseded by the CrowPanel)
 ├── scripts/                    # Maintenance and validation scripts (backups, HA YAML validation)
 └── dashboard-backup-*.json     # Backups of UI-managed dashboards
 ```
@@ -138,14 +139,14 @@ For the full current entity list, parse `.storage/core.entity_registry`.
 
 Each integration is a standard HA package with a `manifest.json`, `__init__.py`, and platform modules — consult each `manifest.json` for the authoritative version, dependencies, and requirements rather than trusting docs.
 
-**Warning**: HACS-managed integrations (`alexa_media`, `bambu_lab`, `extended_openai_conversation`, `hacs`, `openhasp`, `pagerduty`, `uix`) and HACS-downloaded Lovelace cards (`www/community/`) and the theme (`themes/google_dark_theme/`) are **excluded from git**. HACS replaces these directories on update. See `docs/hacs-inventory.md` for the restore checklist. Never store your own files inside HACS-managed directories.
+**Warning**: HACS-managed integrations (`alexa_media`, `bambu_lab`, `extended_openai_conversation`, `hacs`, `nws_alerts`, `openhasp`, `pagerduty`, `uix`) and HACS-downloaded Lovelace cards (`www/community/`) and the theme (`themes/google_dark_theme/`) are **excluded from git**. HACS replaces these directories on update. See `docs/hacs-inventory.md` for the restore checklist. Never store your own files inside HACS-managed directories.
 
 - **`ai_dashboard_proxy`** (self-written): Serves `/ai-dashboard/` and handles HA auth server-side for the dashboard. Documented in `www/ai-dashboard/AGENTS.md`. **Any Python change requires a Home Assistant restart.**
 - **`alexa_media`** (HACS): Announcements/TTS on Echo/Fire TV. Key usage: Echo announcements use `notify.alexa_media_<device_name>` with `data: {type: announce}`. The `media_player.everywhere` group and Fire TV devices are unreliable for announcements; prefer individual Echo devices.
 - **`bambu_lab`** (HACS): Bambu Lab 3D printers. Contains the embedded `pybambu/` library.
 - **`extended_openai_conversation`** (HACS): OpenAI-backed conversation agent for chat/voice control.
 - **`hacs`** (HACS): Home Assistant Community Store itself.
-- **`openhasp`** (HACS): Physical wall plate; plate layout is defined in `openhasp/wall_panel.yaml` (config lives outside the integration dir) and pushed over MQTT.
+- **`openhasp`** (HACS): Physical wall plate (retired — superseded by the ESPHome CrowPanel panel in `esphome/`); plate layout is defined in `archive/openhasp/wall_panel.yaml` (config lives outside the integration dir) and pushed over MQTT.
 - **`pagerduty`**: Incidents and on-call data (sensor, calendar, notify); drives the high-urgency Echo alert automations.
 - **`uix`** (HACS): UI eXtension for Lovelace/frontend.
 

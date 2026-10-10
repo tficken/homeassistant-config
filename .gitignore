@@ -29,6 +29,7 @@ config.code-workspace
 /custom_components/bambu_lab/
 /custom_components/extended_openai_conversation/
 /custom_components/hacs/
+/custom_components/nws_alerts/
 /custom_components/openhasp/
 /custom_components/pagerduty/
 /custom_components/uix/
