@@ -223,7 +223,12 @@ light:
     restore_mode: ALWAYS_ON
 
 display:
-  - platform: rpi_dpi_rgb
+  # rpi_dpi_rgb is deprecated upstream; mipi_rgb with model RPI is the direct
+  # replacement for RGB-only panels with no SPI controller. The hsync/vsync
+  # timings below were implicit rpi_dpi_rgb defaults; mipi_rgb's RPI model
+  # defaults them to 0, so they are explicit here to preserve proven timing.
+  - platform: mipi_rgb
+    model: RPI
     id: my_display
     color_order: RGB
     invert_colors: true
@@ -237,6 +242,12 @@ display:
     vsync_pin: 41
     pclk_pin: 39
     pclk_frequency: 18MHz
+    hsync_pulse_width: 10
+    hsync_back_porch: 10
+    hsync_front_porch: 20
+    vsync_pulse_width: 10
+    vsync_back_porch: 10
+    vsync_front_porch: 10
     data_pins:
       red:
         - 7
