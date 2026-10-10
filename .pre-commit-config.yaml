@@ -30,6 +30,13 @@ repos:
         pass_filenames: false
         always_run: true
 
+      - id: compileall-scripts
+        name: compile scripts
+        entry: python -m compileall scripts -q
+        language: system
+        pass_filenames: false
+        always_run: true
+
       - id: check-staged-ignored
         name: Check staged files are not git-ignored
         entry: python scripts/check_staged_ignored.py
