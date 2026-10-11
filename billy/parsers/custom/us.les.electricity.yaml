@@ -13,8 +13,6 @@ metadata:
   quality: experimental
   min_billy_version: 0.6.0
 
-# Privacy-first: evaluated only against IMAP metadata; the body is fetched
-# only when the sender/subject match.
 prefilter:
   email:
     from:
@@ -50,8 +48,6 @@ fields:
   currency:
     value: USD
 
-  # Patterns verified against a real LES bill email:
-  # "Your payment of $462.40 for LES account ********1612 is due on 10/19/2026."
   amount:
     required: true
     candidates:
@@ -76,8 +72,6 @@ fields:
         - '%m/%d/%Y'
         - '%B %d, %Y'
 
-  # Optional — used for dedup when present. LES bill emails carry no invoice
-  # number; the account is masked ("LES account ********1612").
   customer_code:
     candidates:
       - source: email

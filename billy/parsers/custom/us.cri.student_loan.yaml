@@ -1,0 +1,80 @@
+schema: 1
+id: us.cri.student_loan
+version: 1
+
+metadata:
+  name: CRI student loan (studentaid.gov)
+  country: US
+  language: en
+  provider: CRI
+  bill_type: loan
+  homepage: https://cri.studentaid.gov/
+  status: experimental
+  quality: experimental
+  min_billy_version: 0.6.0
+
+prefilter:
+  email:
+    from:
+      - CRINoReply@cri.studentaid.gov
+    subject_contains:
+      - billing statement
+
+# Same sender also mails tax-document notices — the subject regex anchors on
+# "billing statement is now available".
+detection:
+  threshold: 70
+  rules:
+    - source: email.from
+      equals: CRINoReply@cri.studentaid.gov
+      weight: 60
+    - source: email.subject
+      regex: '(?i)^Your\s+student\s+loan\s+billing\s+statement\s+is\s+now\s+available'
+      weight: 35
+    - source: email.body
+      regex: '(?i)monthly\s+billing\s+statement\s+is\s+now\s+available'
+      weight: 20
+
+documents:
+  email:
+    enabled: true
+  attachments: []
+
+fields:
+  provider:
+    value: CRI
+
+  bill_type:
+    value: loan
+
+  currency:
+    value: USD
+
+  # Body: "Due Date: 10/25/2026" / "Amount Due: $18.79" (auto-debit note
+  # follows; the amount is what will be debited).
+  amount:
+    required: true
+    candidates:
+      - source: email
+        regex: '(?i)Amount\s+Due:\s*\$\s*(?P<value>[0-9,]+\.[0-9]{2})'
+    transform:
+      type: decimal
+      locale: en_US
+
+  due_date:
+    required: true
+    candidates:
+      - source: email
+        regex: '(?i)Due\s+Date:\s*(?P<value>\d{1,2}/\d{1,2}/\d{4})'
+    transform:
+      type: date
+      locale: en_US
+      formats:
+        - '%m/%d/%Y'
+
+  customer_code:
+    candidates:
+      - source: email
+        regex: '(?i)Account:\s*(?P<value>[A-Z0-9X]+)'
+    transform:
+      type: text

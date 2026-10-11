@@ -1,0 +1,90 @@
+schema: 1
+id: us.discover.credit_card
+version: 1
+
+metadata:
+  name: Discover card
+  country: US
+  language: en
+  provider: Discover
+  bill_type: credit_card
+  homepage: https://www.discover.com/
+  status: experimental
+  quality: experimental
+  min_billy_version: 0.6.0
+
+prefilter:
+  email:
+    from:
+      - discover@services.discover.com
+    subject_contains:
+      - new statement
+
+detection:
+  threshold: 70
+  rules:
+    - source: email.from
+      equals: discover@services.discover.com
+      weight: 60
+    - source: email.subject
+      regex: '(?i)^You\s+have\s+a\s+new\s+statement\s+online'
+      weight: 35
+    - source: email.body
+      regex: '(?i)paperless\s+statement\s+is\s+ready'
+      weight: 20
+
+documents:
+  email:
+    enabled: true
+  attachments: []
+
+fields:
+  provider:
+    value: Discover
+
+  bill_type:
+    value: credit_card
+
+  currency:
+    value: USD
+
+  # Required outflow: "Your minimum payment of $35.00 is due on ...".
+  # Falls back to "Statement Balance: $580.64" if the minimum line is absent.
+  amount:
+    required: true
+    candidates:
+      - source: email
+        regex: '(?i)minimum\s+payment\s+of\s+\$\s*(?P<value>[0-9,]+\.[0-9]{2})'
+      - source: email
+        regex: '(?i)Statement\s+Balance:\s*\$\s*(?P<value>[0-9,]+\.[0-9]{2})'
+    transform:
+      type: decimal
+      locale: en_US
+
+  due_date:
+    required: true
+    candidates:
+      - source: email
+        regex: '(?i)is\s+due\s+on\s+(?P<value>[A-Z][a-z]+\s+\d{1,2},\s+\d{4})'
+    transform:
+      type: date
+      locale: en_US
+      formats:
+        - '%B %d, %Y'
+
+  issue_date:
+    candidates:
+      - source: email
+        regex: '(?i)Statement\s+Date:\s*(?P<value>[A-Z][a-z]+\s+\d{1,2},\s+\d{4})'
+    transform:
+      type: date
+      locale: en_US
+      formats:
+        - '%B %d, %Y'
+
+  customer_code:
+    candidates:
+      - source: email
+        regex: '(?i)Last\s+4\s+#:\s*(?P<value>\d{4})'
+    transform:
+      type: text

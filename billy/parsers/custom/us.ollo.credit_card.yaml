@@ -1,0 +1,83 @@
+schema: 1
+id: us.ollo.credit_card
+version: 1
+
+metadata:
+  name: Ollo card
+  country: US
+  language: en
+  provider: Ollo
+  bill_type: credit_card
+  homepage: https://www.ollocard.com/
+  status: experimental
+  quality: experimental
+  min_billy_version: 0.6.0
+
+prefilter:
+  email:
+    from:
+      - noreply@alert.ollocard.com
+    subject_contains:
+      - statement is here
+
+# Same sender also mails "Your Ollo payment is due soon" and "Your payment
+# has posted" — the subject regex anchors on "statement is here" to pick only
+# the monthly statement.
+detection:
+  threshold: 70
+  rules:
+    - source: email.from
+      equals: noreply@alert.ollocard.com
+      weight: 60
+    - source: email.subject
+      regex: '(?i)^Your\s+statement\s+is\s+here'
+      weight: 35
+    - source: email.body
+      regex: '(?i)latest\s+Ollo\s+account\s+statement'
+      weight: 20
+
+documents:
+  email:
+    enabled: true
+  attachments: []
+
+fields:
+  provider:
+    value: Ollo
+
+  bill_type:
+    value: credit_card
+
+  currency:
+    value: USD
+
+  # Body layout is tab-separated: "Minimum Amount Due\t$47.00".
+  # Falls back to Statement Balance if the minimum line is absent.
+  amount:
+    required: true
+    candidates:
+      - source: email
+        regex: '(?i)Minimum\s+Amount\s+Due\s*\$\s*(?P<value>[0-9,]+\.[0-9]{2})'
+      - source: email
+        regex: '(?i)Statement\s+Balance\s*\$\s*(?P<value>[0-9,]+\.[0-9]{2})'
+    transform:
+      type: decimal
+      locale: en_US
+
+  due_date:
+    required: true
+    candidates:
+      - source: email
+        regex: '(?i)Payment\s+Due\s+Date\s*(?P<value>\d{1,2}/\d{1,2}/\d{4})'
+    transform:
+      type: date
+      locale: en_US
+      formats:
+        - '%m/%d/%Y'
+
+  customer_code:
+    candidates:
+      - source: email
+        regex: '(?i)Account\s+ending\s+(?P<value>\d{4})'
+    transform:
+      type: text
