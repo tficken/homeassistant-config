@@ -32,7 +32,7 @@ detection:
       regex: '(?i)^Your\s+LES\s+Bill\s+is\s+Available'
       weight: 35
     - source: email.body
-      regex: '(?i)\bLincoln\s+Electric\s+System\b'
+      regex: '(?i)\bLES\s+account\b'
       weight: 20
 
 documents:
@@ -50,15 +50,15 @@ fields:
   currency:
     value: USD
 
-  # Multiple candidate patterns per field — first match wins. Adjust these
-  # against the real email body wording.
+  # Patterns verified against a real LES bill email:
+  # "Your payment of $462.40 for LES account ********1612 is due on 10/19/2026."
   amount:
     required: true
     candidates:
       - source: email
-        regex: '(?i)Amount\s+Due[:\s]*\$\s*(?P<value>[0-9,]+\.[0-9]{2})'
+        regex: '(?i)payment\s+of\s+\$\s*(?P<value>[0-9,]+\.[0-9]{2})'
       - source: email
-        regex: '(?i)\$\s*(?P<value>[0-9,]+\.[0-9]{2})\s+(?:is\s+)?due'
+        regex: '(?i)Amount\s+Due[:\s]*\$\s*(?P<value>[0-9,]+\.[0-9]{2})'
     transform:
       type: decimal
       locale: en_US
@@ -66,11 +66,9 @@ fields:
   due_date:
     candidates:
       - source: email
+        regex: '(?i)is\s+due\s+on\s+(?P<value>\d{1,2}/\d{1,2}/\d{4})'
+      - source: email
         regex: '(?i)Due\s+Date[:\s]*(?P<value>\d{1,2}/\d{1,2}/\d{4})'
-      - source: email
-        regex: '(?i)due\s+(?:by\s+)?(?:on\s+)?(?P<value>[A-Z][a-z]+\s+\d{1,2},\s+\d{4})'
-      - source: email
-        regex: '(?i)due\s+(?:by\s+)?(?:on\s+)?(?P<value>\d{1,2}/\d{1,2}/\d{4})'
     transform:
       type: date
       locale: en_US
@@ -78,18 +76,11 @@ fields:
         - '%m/%d/%Y'
         - '%B %d, %Y'
 
-  # Optional — used for dedup when present. LES emails usually carry the
-  # account number; a per-bill invoice number may not exist in the body.
-  invoice_number:
-    candidates:
-      - source: email
-        regex: '(?i)(?:Invoice|Statement)\s*(?:Number|#|No\.?)[:\s]*(?P<value>[A-Z0-9-]+)'
-    transform:
-      type: text
-
+  # Optional — used for dedup when present. LES bill emails carry no invoice
+  # number; the account is masked ("LES account ********1612").
   customer_code:
     candidates:
       - source: email
-        regex: '(?i)Account\s*(?:Number|#|No\.?)[:\s]*(?P<value>[0-9-]+)'
+        regex: '(?i)LES\s+account\s+(?P<value>[*0-9]+)'
     transform:
       type: text
