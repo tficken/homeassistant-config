@@ -270,6 +270,21 @@
         "filter": "(Warning|Watch)$"
       },
       "label": "Weather alert: {value}"
+    },
+    {
+      "entity": "binary_sensor.bills_covered",
+      "equals": "off",
+      "label": "Bills at risk — check bank balance"
+    },
+    {
+      "entity": "sensor.bills_coverage_amount",
+      "below": 0,
+      "label": "Bill shortfall ${state}"
+    },
+    {
+      "entity": "binary_sensor.west_gate_bank_checking_2075_possible_error",
+      "equals": "on",
+      "label": "Bank sync stale — balance unverified"
     }
   ],
   "presenceLabels": {
