@@ -84,8 +84,8 @@ async def async_load_entity_areas(hass: HomeAssistant) -> dict[str, str]:
         return {}
 
 
-async def dashboard_handler(request: web.Request) -> web.StreamResponse:
-    """Serve the static dashboard files with the proxy flag injected."""
+async def _serve_static(request: web.Request, www_subdir: str, inject: bool) -> web.StreamResponse:
+    """Serve static files from www/<www_subdir> with auth + traversal guard."""
     try:
         secret = request.app.get("ai_dashboard_secret")
         if not _is_authorized(request, secret):
@@ -96,7 +96,7 @@ async def dashboard_handler(request: web.Request) -> web.StreamResponse:
         if path.endswith("/"):
             path += "index.html"
 
-        www_root = os.path.join(hass.config.config_dir, "www", "ai-dashboard")
+        www_root = os.path.join(hass.config.config_dir, "www", www_subdir)
         requested = os.path.join(www_root, path)
         real_root = os.path.realpath(www_root)
         real_requested = os.path.realpath(requested)
@@ -132,7 +132,7 @@ async def dashboard_handler(request: web.Request) -> web.StreamResponse:
 
         body = await hass.async_add_executor_job(read_file)
 
-        if path == "index.html":
+        if path == "index.html" and inject:
             proxy_script = b'<script>window.HA_INTEGRATION_PROXY=true;</script>\n'
             ha_config = {
                 "latitude": hass.config.latitude,
@@ -188,6 +188,16 @@ async def dashboard_handler(request: web.Request) -> web.StreamResponse:
     except Exception:
         _LOGGER.exception("Dashboard proxy error")
         return web.Response(status=500, text="Dashboard proxy error")
+
+
+async def dashboard_handler(request: web.Request) -> web.StreamResponse:
+    """Serve the AI dashboard with the proxy flag injected."""
+    return await _serve_static(request, "ai-dashboard", inject=True)
+
+
+async def budget_handler(request: web.Request) -> web.StreamResponse:
+    """Serve the standalone budget page (no injections needed)."""
+    return await _serve_static(request, "budget", inject=False)
 
 
 async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
@@ -610,3 +620,8 @@ async def async_setup_http(hass: HomeAssistant, secret: str | None) -> None:
     app.router.add_post("/ai-dashboard/api/history", history_handler)
     app.router.add_post("/ai-dashboard/api/config", config_save_handler)
     app.router.add_get("/ai-dashboard/{path:.*}", dashboard_handler)
+    # Standalone budget page: same LAN/secret auth, read-only use of the
+    # shared WebSocket (states + events; service allowlist still applies).
+    app.router.add_get("/budget/ws", websocket_handler)
+    app.router.add_get("/budget", budget_handler)
+    app.router.add_get("/budget/{path:.*}", budget_handler)

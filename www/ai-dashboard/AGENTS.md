@@ -66,6 +66,7 @@ The Layout tab's measured overflow badge reflects current content only — it ca
 - `POST /ai-dashboard/api/config` — persists config to `config.json` with a timestamped backup and atomic write.
 - `GET /ai-dashboard/cam_stream/{entity_id}` — authenticated MJPEG camera stream passthrough (`/api/camera_proxy_stream` 403s for remote browser sessions).
 - `GET /ai-dashboard/api/snapshots?camera=<key>` — lists the motion/ding archive (see below).
+- `/budget/` + `/budget/{path}` — serves the standalone budget page from `www/budget/` (same auth, no index injections). `/budget/ws` reuses the same WebSocket handler (the budget page is read-only; the service allowlist still applies to any call it might make).
 
 ### Auth model
 

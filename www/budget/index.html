@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Budget</title>
+<link rel="stylesheet" href="/budget/css/budget.css">
+</head>
+<body>
+<header class="topbar">
+  <h1>Budget</h1>
+  <div id="freshness" class="freshness">connecting…</div>
+</header>
+
+<main>
+  <section class="hero card">
+    <div class="hero-label">Safe to spend until payday</div>
+    <div id="safe-amount" class="hero-amount">—</div>
+    <div id="payday-line" class="hero-sub">—</div>
+  </section>
+
+  <section class="card">
+    <h2>Money runway <span class="hint">next 30 days</span></h2>
+    <div id="runway" class="runway"></div>
+    <div id="runway-legend" class="runway-legend"></div>
+  </section>
+
+  <section class="card">
+    <h2>Upcoming bills</h2>
+    <div id="bills" class="bills"></div>
+  </section>
+</main>
+
+<footer id="foot" class="foot">—</footer>
+
+<script type="module" src="/budget/js/budget.js"></script>
+</body>
+</html>

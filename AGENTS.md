@@ -91,6 +91,7 @@ The intended reader of this file is an AI coding agent that has no prior context
 - **`www/ai-dashboard/`**: Custom retro-terminal wall dashboard served at `/ai-dashboard/` — the primary wall-tablet UI. **See `www/ai-dashboard/AGENTS.md` for architecture, the Settings editor, layout model, proxy endpoints, and its dev workflow.**
 - **Original UI dashboard**: Backed up as `dashboard-backup-*.json` from `.storage/lovelace.dashboard_dashboard`.
 - **Budget dashboard**: YAML-managed `budget-dashboard.yaml` (registered in `configuration.yaml` under `lovelace: dashboards:`) — Billy widget cards plus bill-coverage tiles.
+- **Budget page**: `www/budget/` — standalone modern-finance page at `/budget/` (safe-to-spend hero, payday countdown, 30-day money-runway, upcoming bills list). Served by `ai_dashboard_proxy` alongside the AI dashboard; read-only, live via `/budget/ws`. **Any Python change to the proxy requires a Home Assistant restart.**
 - **Retired**: the YAML-managed `ipad-wall-panel.yaml` Lovelace dashboard was removed in favor of the AI dashboard (recoverable from git history if ever needed).
 
 ### Lovelace Conventions (for any Lovelace work)
