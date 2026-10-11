@@ -8,6 +8,7 @@ This file lists all HACS-managed integrations, Lovelace cards, and downloaded th
 |------|------|------------|-------------------|
 | Alexa Media Player | `custom_components/alexa_media` | <https://github.com/alandtse/alexa_media_player> | v5.16.0 |
 | Bambu Lab | `custom_components/bambu_lab` | <https://github.com/greghesp/ha-bambulab> | v2.2.26 |
+| Billy | `custom_components/bill_tracker` | <https://github.com/robin994/billy> | v0.13.8 |
 | Extended OpenAI Conversation | `custom_components/extended_openai_conversation` | <https://github.com/jekalmin/extended_openai_conversation> | v2.0.2 |
 | HACS | `custom_components/hacs` | <https://github.com/hacs/integration> | v2.0.5 |
 | NWS Alerts | `custom_components/nws_alerts` | <https://github.com/finity69x2/nws_alerts> | v6.7.3 |

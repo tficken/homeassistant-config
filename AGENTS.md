@@ -90,6 +90,7 @@ The intended reader of this file is an AI coding agent that has no prior context
 
 - **`www/ai-dashboard/`**: Custom retro-terminal wall dashboard served at `/ai-dashboard/` — the primary wall-tablet UI. **See `www/ai-dashboard/AGENTS.md` for architecture, the Settings editor, layout model, proxy endpoints, and its dev workflow.**
 - **Original UI dashboard**: Backed up as `dashboard-backup-*.json` from `.storage/lovelace.dashboard_dashboard`.
+- **Budget dashboard**: YAML-managed `budget-dashboard.yaml` (registered in `configuration.yaml` under `lovelace: dashboards:`) — Billy widget cards plus bill-coverage tiles.
 - **Retired**: the YAML-managed `ipad-wall-panel.yaml` Lovelace dashboard was removed in favor of the AI dashboard (recoverable from git history if ever needed).
 
 ### Lovelace Conventions (for any Lovelace work)
@@ -130,6 +131,7 @@ Common device families in this instance (entity IDs follow these prefixes):
 - **Weather**: `weather.forecast_home`
 - **Network**: `sensor.exos_router_*`, `binary_sensor.exos_router_wan_status`
 - **Host / add-on diagnostics**: `sensor.home_assistant_core_*`, `sensor.home_assistant_host_*`, `sensor.home_assistant_supervisor_*`, `sensor.*_cpu_percent`, `sensor.*_memory_percent`, `sensor.ha_disk_usage`, `sensor.ha_last_backup_age`
+- **Finance**: `sensor.bills_due_next_30_days` (command_line, from `scripts/billy_due_next_30_days.py`), `sensor.bills_coverage_amount`, `binary_sensor.bills_covered`, `sensor.billy_total_bills` (Billy), SimpleFIN checking: `sensor.west_gate_bank_checking_2075_balance` / `sensor.west_gate_bank_checking_2075_data_age` / `binary_sensor.west_gate_bank_checking_2075_possible_error`
 
 For the full current entity list, parse `.storage/core.entity_registry`.
 
@@ -139,11 +141,12 @@ For the full current entity list, parse `.storage/core.entity_registry`.
 
 Each integration is a standard HA package with a `manifest.json`, `__init__.py`, and platform modules — consult each `manifest.json` for the authoritative version, dependencies, and requirements rather than trusting docs.
 
-**Warning**: HACS-managed integrations (`alexa_media`, `bambu_lab`, `extended_openai_conversation`, `hacs`, `nws_alerts`, `openhasp`, `pagerduty`, `uix`) and HACS-downloaded Lovelace cards (`www/community/`) and the theme (`themes/google_dark_theme/`) are **excluded from git**. HACS replaces these directories on update. See `docs/hacs-inventory.md` for the restore checklist. Never store your own files inside HACS-managed directories.
+**Warning**: HACS-managed integrations (`alexa_media`, `bambu_lab`, `bill_tracker`, `extended_openai_conversation`, `hacs`, `nws_alerts`, `openhasp`, `pagerduty`, `uix`) and HACS-downloaded Lovelace cards (`www/community/`) and the theme (`themes/google_dark_theme/`) are **excluded from git**. HACS replaces these directories on update. See `docs/hacs-inventory.md` for the restore checklist. Never store your own files inside HACS-managed directories.
 
 - **`ai_dashboard_proxy`** (self-written): Serves `/ai-dashboard/` and handles HA auth server-side for the dashboard. Documented in `www/ai-dashboard/AGENTS.md`. **Any Python change requires a Home Assistant restart.**
 - **`alexa_media`** (HACS): Announcements/TTS on Echo/Fire TV. Key usage: Echo announcements use `notify.alexa_media_<device_name>` with `data: {type: announce}`. The `media_player.everywhere` group and Fire TV devices are unreliable for announcements; prefer individual Echo devices.
 - **`bambu_lab`** (HACS): Bambu Lab 3D printers. Contains the embedded `pybambu/` library.
+- **`bill_tracker`** (HACS): Billy bill manager — recurring bills, splits/reimbursements between payers. Sidebar app at `/billy`; data lives in `.storage/bill_tracker.expenses` (read-only for `scripts/billy_due_next_30_days.py`, which sums bills due in the next 30 days). Bank balances come from **SimpleFIN**, a core integration (only the bill-paying checking account is connected).
 - **`extended_openai_conversation`** (HACS): OpenAI-backed conversation agent for chat/voice control.
 - **`hacs`** (HACS): Home Assistant Community Store itself.
 - **`openhasp`** (HACS): Physical wall plate (retired — superseded by the ESPHome CrowPanel panel in `esphome/`); plate layout is defined in `archive/openhasp/wall_panel.yaml` (config lives outside the integration dir) and pushed over MQTT.
