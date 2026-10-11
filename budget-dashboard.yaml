@@ -1,0 +1,46 @@
+title: Budget
+views:
+  - type: sections
+    title: Overview
+    path: overview
+    max_columns: 3
+    theme: Google Dark Theme
+    sections:
+      - type: grid
+        cards:
+          - type: custom:billy-summary-card
+            title: Billy
+          - type: custom:billy-upcoming-card
+            title: Due in the next 30 days
+            days: 30
+            limit: 10
+          - type: custom:billy-recurring-card
+            title: Recurring
+            limit: 10
+            active_only: true
+      - type: grid
+        cards:
+          - type: custom:billy-spending-card
+            title: Spending
+            months: 12
+            forecast_months: 3
+            show_recurring: true
+          - type: custom:billy-breakdown-card
+            title: This month
+            limit: 8
+            show_recurring: true
+          - type: custom:billy-balances-card
+            title: Who owes whom
+            limit: 6
+            show_paypal: true
+      - type: grid
+        cards:
+          - type: tile
+            entity: sensor.bills_coverage_amount
+            name: Coverage (balance minus 30d)
+          - type: tile
+            entity: binary_sensor.bills_covered
+            name: Bills covered
+          - type: tile
+            entity: sensor.west_gate_bank_checking_2075_balance
+            name: Checking balance

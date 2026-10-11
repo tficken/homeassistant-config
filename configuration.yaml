@@ -50,6 +50,16 @@ cloud:
 frontend:
   themes: !include_dir_merge_named themes
 
+lovelace:
+  mode: storage
+  dashboards:
+    budget-dashboard:
+      mode: yaml
+      title: Budget
+      icon: mdi:currency-usd
+      show_in_sidebar: true
+      filename: budget-dashboard.yaml
+
 # Limit DB growth and SD-card wear
 recorder:
   purge_keep_days: 30
