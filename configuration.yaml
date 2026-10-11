@@ -97,6 +97,15 @@ command_line:
       unit_of_measurement: "days"
       value_template: "{{ value | float(9999) }}"
       scan_interval: 3600
+  # Sum of Billy bills + recurring charges due in the next 30 days — backs the
+  # bills-coverage binary sensor and the AI dashboard shortfall banner.
+  - sensor:
+      name: "Bills due next 30 days"
+      unique_id: bills_due_next_30_days
+      command: "python3 /config/scripts/billy_due_next_30_days.py"
+      unit_of_measurement: "$"
+      value_template: "{{ value | float }}"
+      scan_interval: 3600
 
 # True live view for the backyard Ring cam: ring-mqtt (add-on) bridges the
 # Ring cloud WebRTC session to RTSP; this camera transcodes it to MJPEG for
@@ -225,3 +234,27 @@ template:
         state: >
           {% set v = states('sensor.panel_battery_voltage') | float(none) %}
           {{ v is not none and v > 4.15 }}
+
+  # Bill coverage: does the checking account cover everything due in the next
+  # 30 days? Stale SimpleFIN data counts as NOT covered — a dead bank sync must
+  # never silently suppress the warning.
+  - sensor:
+      - name: "Bills coverage amount"
+        unique_id: bills_coverage_amount
+        unit_of_measurement: "$"
+        state: >
+          {{ (states('sensor.west_gate_bank_checking_2075_balance') | float(0)
+              - states('sensor.bills_due_next_30_days') | float(0)) | round(2) }}
+        availability: >
+          {{ states('sensor.west_gate_bank_checking_2075_balance') | float(none) is not none
+             and states('sensor.bills_due_next_30_days') | float(none) is not none }}
+
+  - binary_sensor:
+      - name: "Bills covered"
+        unique_id: bills_covered
+        state: >
+          {% set coverage = states('sensor.bills_coverage_amount') | float(none) %}
+          {% set age_ts = as_timestamp(states('sensor.west_gate_bank_checking_2075_data_age'), none) %}
+          {% set fresh = age_ts is not none and now().timestamp() - age_ts < 172800 %}
+          {% set problem = states('binary_sensor.west_gate_bank_checking_2075_possible_error') %}
+          {{ coverage is not none and coverage >= 0 and fresh and problem == 'off' }}
