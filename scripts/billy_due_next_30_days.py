@@ -24,19 +24,30 @@ def add_months(d, months):
 
 
 def recurring_occurrences(rule, today, horizon):
-    """Yield due dates in [today, horizon] for one recurring rule."""
+    """Yield due dates in [today, horizon] for one recurring rule.
+
+    Mirrors Billy's scheduler: dates are anchored to the original start day
+    (index-based, so clamped months don't drift), and an auto-renewing rule's
+    end_date only ends reimbursement tracking — billing continues past it.
+    Occurrences before today are skipped: past recurring charges are typically
+    autopays that already debited the account, and Billy stores no per-
+    occurrence paid flag to tell them apart.
+    """
     if not rule.get("active", True) or not rule.get("start_date"):
         return
     start = date.fromisoformat(rule["start_date"])
-    end = date.fromisoformat(rule["end_date"]) if rule.get("end_date") else None
+    end = None
+    if rule.get("end_date") and not rule.get("auto_renew", False):
+        end = date.fromisoformat(rule["end_date"])
     interval = int(rule.get("interval_months") or 1)
-    due = start
-    while due < today:
-        due = add_months(due, interval)
-    while due <= horizon:
-        if end is None or due <= end:
+    k = 0
+    while True:
+        due = add_months(start, k * interval)
+        if due > horizon or (end is not None and due > end):
+            break
+        if due >= today:
             yield due
-        due = add_months(due, interval)
+        k += 1
 
 
 def main():

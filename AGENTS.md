@@ -259,5 +259,5 @@ There is no automated deployment to the live Home Assistant instance; deploy man
 - Always prefer minimal, targeted edits.
 - Verify YAML changes with Home Assistant's configuration validation before restarting. Use the local Node.js in `.tools/node/` or the Python fallback for syntax checks.
 - If you add a new custom integration, include a valid `manifest.json` and follow the Home Assistant integration platform pattern used by the existing components.
-- Dashboards can be UI-managed (stored in `.storage/lovelace.*`) or YAML-managed (registered in `configuration.yaml`). No YAML-managed Lovelace dashboards are currently registered; the AI dashboard is file-based under `www/ai-dashboard/`.
+- Dashboards can be UI-managed (stored in `.storage/lovelace.*`) or YAML-managed (registered in `configuration.yaml`). `budget-dashboard.yaml` is the one YAML-managed dashboard (registered under `lovelace: dashboards:`); the AI dashboard is file-based under `www/ai-dashboard/`.
 - For new features or significant changes, use the Superpowers skill workflow: brainstorm → design spec → implementation plan → subagent-driven execution. Keep specs in `docs/superpowers/specs/` and plans in `docs/superpowers/plans/`.
