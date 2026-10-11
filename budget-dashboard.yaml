@@ -44,3 +44,17 @@ views:
           - type: tile
             entity: sensor.west_gate_bank_checking_2075_balance
             name: Checking balance
+      - type: grid
+        cards:
+          - type: tile
+            entity: sensor.next_payday
+            name: Next payday
+          - type: tile
+            entity: sensor.days_until_payday
+            name: Days until payday
+          - type: tile
+            entity: sensor.bills_due_before_payday
+            name: Due before payday
+          - type: tile
+            entity: sensor.safe_to_spend_until_payday
+            name: Safe to spend

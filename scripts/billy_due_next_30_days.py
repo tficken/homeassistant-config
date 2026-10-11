@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Print the total of bills and recurring charges due in the next 30 days.
+"""Print JSON: total of bills due in the next 30 days plus per-item breakdown.
 
 Reads Billy's storage file read-only. Unpaid bills with a due_date on or
 before today+30d count (overdue included); bills without a due_date are
 excluded. Active recurring rules contribute their computed occurrences in
 [today, today+30d] — Billy only materializes occurrences up to today, so
 future occurrences are derived from each rule's cadence.
+
+Output: {"total_30d": <float>, "items": [{"name", "amount", "due_date"}]}
+The command_line sensor uses total_30d as state and items as an attribute,
+which the payday templates filter by due date.
 """
 import json
 import sys
@@ -59,16 +63,27 @@ def main():
         print("bill_tracker storage has no 'data' object — schema changed?", file=sys.stderr)
         sys.exit(2)
     horizon = today + timedelta(days=WINDOW_DAYS)
-    total = 0.0
+    items = []
     for bill in data.get("expenses", []):
         if bill.get("paid") or not bill.get("due_date"):
             continue
         if date.fromisoformat(bill["due_date"]) <= horizon:
-            total += float(bill.get("amount") or 0)
+            items.append({
+                "name": bill.get("provider") or bill.get("category_id") or "Bill",
+                "amount": round(float(bill.get("amount") or 0), 2),
+                "due_date": bill["due_date"],
+            })
     for rule in data.get("recurring_expenses", []):
-        count = sum(1 for _ in recurring_occurrences(rule, today, horizon))
-        total += count * float(rule.get("amount") or 0)
-    print(round(total, 2))
+        amount = round(float(rule.get("amount") or 0), 2)
+        for due in recurring_occurrences(rule, today, horizon):
+            items.append({
+                "name": rule.get("name") or "Recurring",
+                "amount": amount,
+                "due_date": due.isoformat(),
+            })
+    items.sort(key=lambda x: x["due_date"])
+    total = round(sum(i["amount"] for i in items), 2)
+    print(json.dumps({"total_30d": total, "items": items}))
 
 
 if __name__ == "__main__":

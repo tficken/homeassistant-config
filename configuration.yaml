@@ -108,13 +108,17 @@ command_line:
       value_template: "{{ value | float(9999) }}"
       scan_interval: 3600
   # Sum of Billy bills + recurring charges due in the next 30 days — backs the
-  # bills-coverage binary sensor and the AI dashboard shortfall banner.
+  # bills-coverage binary sensor and the AI dashboard shortfall banner. The
+  # per-item breakdown rides along as the `items` attribute for the payday
+  # templates below.
   - sensor:
       name: "Bills due next 30 days"
       unique_id: bills_due_next_30_days
       command: "python3 /config/scripts/billy_due_next_30_days.py"
       unit_of_measurement: "$"
-      value_template: "{{ value | float }}"
+      value_template: "{{ value_json.total_30d }}"
+      json_attributes:
+        - items
       scan_interval: 3600
 
 # True live view for the backyard Ring cam: ring-mqtt (add-on) bridges the
@@ -159,6 +163,16 @@ input_number:
     max: 1
     step: 0.01
     initial: 0.4
+
+# Anchor date for the biweekly payday cycle — the next (or any recent) payday.
+# Paydays recur every 14 days from this date; the template sensors below
+# project it forward. Update here if the schedule ever shifts.
+input_datetime:
+  payday_anchor:
+    name: Payday anchor
+    has_date: true
+    has_time: false
+    initial: 2026-10-16
 
 # Remove backups older than 14 days via the Supervisor API.
 # The backup.remove service used by the previous automation does not exist.
@@ -268,3 +282,54 @@ template:
           {% set fresh = age_ts is not none and now().timestamp() - age_ts < 172800 %}
           {% set problem = states('binary_sensor.west_gate_bank_checking_2075_possible_error') %}
           {{ coverage is not none and coverage >= 0 and fresh and problem == 'off' }}
+
+  # Payday cycle: biweekly, anchored at input_datetime.payday_anchor (any one
+  # payday — the template projects forward in 14-day steps).
+  - sensor:
+      - name: "Next payday"
+        unique_id: next_payday
+        device_class: date
+        state: >
+          {% set a = strptime(states('input_datetime.payday_anchor'), '%Y-%m-%d') %}
+          {% set t = now().replace(hour=0, minute=0, second=0, microsecond=0) %}
+          {% set diff = (a - t).days %}
+          {% if diff >= 0 %}
+            {{ a.date() }}
+          {% else %}
+            {% set k = ((-diff) / 14) | round(0, 'ceil') | int %}
+            {{ (a + timedelta(days=14 * k)).date() }}
+          {% endif %}
+        availability: >
+          {{ states('input_datetime.payday_anchor') not in ('unknown', 'unavailable', '') }}
+
+      - name: "Days until payday"
+        unique_id: days_until_payday
+        unit_of_measurement: "days"
+        state: >
+          {{ (strptime(states('sensor.next_payday'), '%Y-%m-%d').date() - today()).days }}
+        availability: >
+          {{ states('sensor.next_payday') not in ('unknown', 'unavailable', '') }}
+
+      # Sum of unpaid bills + recurring charges due on/before the next payday
+      # (the per-item list comes from the bills_due_next_30_days sensor's
+      # `items` attribute; ISO date strings compare lexicographically).
+      - name: "Bills due before payday"
+        unique_id: bills_due_before_payday
+        unit_of_measurement: "$"
+        state: >
+          {% set payday = states('sensor.next_payday') %}
+          {% set items = state_attr('sensor.bills_due_next_30_days', 'items') %}
+          {{ items | selectattr('due_date', 'le', payday) | map(attribute='amount') | sum | round(2) }}
+        availability: >
+          {{ states('sensor.next_payday') not in ('unknown', 'unavailable', '')
+             and state_attr('sensor.bills_due_next_30_days', 'items') is not none }}
+
+      - name: "Safe to spend until payday"
+        unique_id: safe_to_spend_until_payday
+        unit_of_measurement: "$"
+        state: >
+          {{ (states('sensor.west_gate_bank_checking_2075_balance') | float(0)
+              - states('sensor.bills_due_before_payday') | float(0)) | round(2) }}
+        availability: >
+          {{ states('sensor.west_gate_bank_checking_2075_balance') | float(none) is not none
+             and states('sensor.bills_due_before_payday') | float(none) is not none }}

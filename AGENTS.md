@@ -131,7 +131,7 @@ Common device families in this instance (entity IDs follow these prefixes):
 - **Weather**: `weather.forecast_home`
 - **Network**: `sensor.exos_router_*`, `binary_sensor.exos_router_wan_status`
 - **Host / add-on diagnostics**: `sensor.home_assistant_core_*`, `sensor.home_assistant_host_*`, `sensor.home_assistant_supervisor_*`, `sensor.*_cpu_percent`, `sensor.*_memory_percent`, `sensor.ha_disk_usage`, `sensor.ha_last_backup_age`
-- **Finance**: `sensor.bills_due_next_30_days` (command_line, from `scripts/billy_due_next_30_days.py`), `sensor.bills_coverage_amount`, `binary_sensor.bills_covered`, `sensor.billy_total_bills` (Billy), SimpleFIN checking: `sensor.west_gate_bank_checking_2075_balance` / `sensor.west_gate_bank_checking_2075_data_age` / `binary_sensor.west_gate_bank_checking_2075_possible_error`
+- **Finance**: `sensor.bills_due_next_30_days` (command_line, from `scripts/billy_due_next_30_days.py`; per-bill list in its `items` attribute), `sensor.bills_coverage_amount`, `binary_sensor.bills_covered`, payday sensors `sensor.next_payday` / `sensor.days_until_payday` / `sensor.bills_due_before_payday` / `sensor.safe_to_spend_until_payday` (biweekly cycle anchored at `input_datetime.payday_anchor`), `sensor.billy_total_bills` (Billy), SimpleFIN checking: `sensor.west_gate_bank_checking_2075_balance` / `sensor.west_gate_bank_checking_2075_data_age` / `binary_sensor.west_gate_bank_checking_2075_possible_error`
 
 For the full current entity list, parse `.storage/core.entity_registry`.
 
