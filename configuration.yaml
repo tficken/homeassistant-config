@@ -290,14 +290,13 @@ template:
         unique_id: next_payday
         device_class: date
         state: >
-          {% set a = strptime(states('input_datetime.payday_anchor'), '%Y-%m-%d') %}
-          {% set t = now().replace(hour=0, minute=0, second=0, microsecond=0) %}
-          {% set diff = (a - t).days %}
+          {% set a = strptime(states('input_datetime.payday_anchor'), '%Y-%m-%d').date() %}
+          {% set diff = (a - now().date()).days %}
           {% if diff >= 0 %}
-            {{ a.date() }}
+            {{ a.isoformat() }}
           {% else %}
             {% set k = ((-diff) / 14) | round(0, 'ceil') | int %}
-            {{ (a + timedelta(days=14 * k)).date() }}
+            {{ (a + timedelta(days=14 * k)).isoformat() }}
           {% endif %}
         availability: >
           {{ states('input_datetime.payday_anchor') not in ('unknown', 'unavailable', '') }}
@@ -306,7 +305,7 @@ template:
         unique_id: days_until_payday
         unit_of_measurement: "days"
         state: >
-          {{ (strptime(states('sensor.next_payday'), '%Y-%m-%d').date() - today()).days }}
+          {{ (strptime(states('sensor.next_payday'), '%Y-%m-%d').date() - now().date()).days }}
         availability: >
           {{ states('sensor.next_payday') not in ('unknown', 'unavailable', '') }}
 

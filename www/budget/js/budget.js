@@ -126,14 +126,24 @@ function renderRunway(items, balance, paydayIso) {
         `<text x="${x(pd)}" y="14" fill="#60a5fa" font-size="11" text-anchor="middle">payday</text>`;
     }
   }
-  // bill markers
-  for (const m of marks) {
-    if (m.day < -0.5 || m.day > 30) continue;
+  // bill markers — amount labels only when a row has clearance; the tooltip
+  // (<title>) always carries name/amount/date regardless
+  const visible = marks.filter((m) => m.day >= -0.5 && m.day <= 30)
+    .sort((a, b) => a.day - b.day);
+  const lastRowX = [-Infinity, -Infinity];
+  for (const m of visible) {
     const color = m.covered ? '#34d399' : '#f87171';
     const cx = x(Math.max(0, m.day));
+    let labelRow = -1;
+    for (let row = 0; row < 2; row++) {
+      if (cx - lastRowX[row] >= 55) { labelRow = row; break; }
+    }
     svg += `<circle cx="${cx}" cy="${Y}" r="${r(m.amount)}" fill="${color}" fill-opacity="0.25" stroke="${color}" stroke-width="2">` +
-      `<title>${m.name} — ${money(m.amount)} — ${m.due_date}</title></circle>` +
-      `<text x="${cx}" y="${Y + 38}" fill="#8b96ab" font-size="10" text-anchor="middle">${money(m.amount)}</text>`;
+      `<title>${m.name} — ${money(m.amount)} — ${m.due_date}</title></circle>`;
+    if (labelRow >= 0) {
+      lastRowX[labelRow] = cx;
+      svg += `<text x="${cx}" y="${Y + 38 + labelRow * 13}" fill="#8b96ab" font-size="10" text-anchor="middle">${money(m.amount)}</text>`;
+    }
   }
   svg += '</svg>';
   el.innerHTML = svg;
