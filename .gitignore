@@ -42,3 +42,10 @@ config.code-workspace
 
 # Scratch / working files
 /tmp/
+
+# Billy parser data: keep locally-authored custom parsers in git, ignore
+# downloaded catalog parsers and any runtime state
+/billy/*
+!/billy/parsers/
+/billy/parsers/*
+!/billy/parsers/custom/
