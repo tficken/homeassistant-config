@@ -49,3 +49,6 @@ config.code-workspace
 !/billy/parsers/
 /billy/parsers/*
 !/billy/parsers/custom/
+
+# Budget statement history contains personal financial data (repo is public)
+/budget/history.json
