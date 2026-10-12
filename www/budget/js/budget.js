@@ -1,6 +1,7 @@
 // Budget page: live HA state over the proxy WebSocket, no token needed.
 import { buildOutlookModel, buildOutlookSvg } from './outlook.js';
 import { buildHistoryModel, buildHistorySvg } from './history.js';
+import { buildSpendingModel, categoryBarsHtml, spendingTilesHtml } from './spending.js';
 
 const ENTITIES = {
   balance: 'sensor.west_gate_bank_checking_2075_balance',
@@ -462,7 +463,23 @@ function initStatementBanner() {
 
 // Statement history card: load stored history, render the chart, and wire
 // the statement PDF upload (button + drag-and-drop on the card).
+let spendingModel = { latest: null, previous: null };
+
+function renderSpending(history) {
+  spendingModel = buildSpendingModel(history?.months || {});
+  const card = document.getElementById('spending-card');
+  if (!spendingModel.latest) {
+    card.hidden = true;
+    return;
+  }
+  document.getElementById('spending-month').textContent = spendingModel.latest.label;
+  document.getElementById('kpi-tiles').innerHTML = spendingTilesHtml(spendingModel);
+  document.getElementById('category-bars').innerHTML = categoryBarsHtml(spendingModel);
+  card.hidden = false;
+}
+
 function renderHistory(history) {
+  renderSpending(history);
   const model = buildHistoryModel(history?.months || {});
   const el = document.getElementById('history');
   const legend = document.getElementById('history-legend');
