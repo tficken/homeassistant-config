@@ -61,7 +61,7 @@ export function categoryBarsHtml(model) {
   const max = Math.max(...cats.map((c) => c.total), 1);
   const label = (name) => name.replace(/_/g, ' ');
   return cats.map((c) =>
-    `<div class="cat-row">` +
+    `<div class="cat-row" data-cat="${c.name}">` +
     `<span class="cat-name">${label(c.name)}</span>` +
     `<span class="cat-bar"><span class="cat-fill${c.name === 'bills_transfers' ? ' muted-fill' : ''}" style="width:${(c.total / max * 100).toFixed(1)}%"></span></span>` +
     `<span class="cat-count">${c.count}×</span>` +

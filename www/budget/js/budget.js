@@ -3,6 +3,7 @@ import { buildOutlookModel, buildOutlookSvg } from './outlook.js';
 import { buildHistoryModel, buildHistorySvg } from './history.js';
 import { buildSpendingModel, categoryBarsHtml, spendingTilesHtml } from './spending.js';
 import { buildTrendsModel, chipsHtml, trendsSvg } from './trends.js';
+import { RULE_CATEGORIES, aggregateUnmatched, rulesRowsHtml, unmatchedRowsHtml } from './rules.js';
 
 const ENTITIES = {
   balance: 'sensor.west_gate_bank_checking_2075_balance',
@@ -500,6 +501,7 @@ function initStatementBanner() {
 // Statement history card: load stored history, render the chart, and wire
 // the statement PDF upload (button + drag-and-drop on the card).
 let spendingModel = { latest: null, previous: null };
+let lastHistory = null;
 
 function renderSpending(history) {
   spendingModel = buildSpendingModel(history?.months || {});
@@ -572,8 +574,98 @@ function initTrendsControls() {
   });
 }
 
+// Drill-down: clicking a category row in the breakdown toggles the list of
+// that category's transactions for the displayed (latest) month.
+function initDrilldown() {
+  document.getElementById('category-bars').addEventListener('click', (ev) => {
+    const row = ev.target.closest('.cat-row');
+    if (!row || !lastHistory || !spendingModel.latest) return;
+    const existing = row.nextElementSibling;
+    if (existing && existing.classList.contains('tx-list')) {
+      existing.remove();
+      return;
+    }
+    document.querySelectorAll('.tx-list').forEach((el) => el.remove());
+    const cat = row.dataset.cat;
+    const txs = (lastHistory.months[spendingModel.latest.key]?.transactions || [])
+      .filter((t) => t.direction === 'debit' && t.category === cat)
+      .sort((a, b) => b.amount - a.amount);
+    const list = document.createElement('div');
+    list.className = 'tx-list';
+    list.innerHTML = txs.map((t) =>
+      `<div class="tx-row"><span class="tx-date">${t.date.slice(5)}</span>` +
+      `<span class="tx-merchant">${t.merchant}</span>` +
+      `<span class="tx-amount">${money(t.amount)}</span></div>`
+    ).join('') || '<div class="tx-row">no transactions</div>';
+    row.after(list);
+  });
+}
+
+// Settings card: manage merchant->category rules. Rules apply retroactively
+// because the history endpoint re-categorizes on every read.
+function rulesStatus(text, tone) {
+  const el = document.getElementById('rules-status');
+  el.textContent = text;
+  el.className = 'history-status' + (tone ? ' ' + tone : '');
+  el.hidden = !text;
+}
+
+async function postRule(payload) {
+  const res = await fetch('/budget/api/category_rules', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data.rules;
+}
+
+async function refreshRulesAndHistory(statusText) {
+  const res = await fetch('/budget/api/category_rules');
+  const data = res.ok ? await res.json() : { rules: {} };
+  document.getElementById('rules-list').innerHTML = rulesRowsHtml(data.rules);
+  const res2 = await fetch('/budget/api/history');
+  if (res2.ok) {
+    const h = await res2.json();
+    renderHistory(h);
+    render();
+    document.getElementById('unmatched-list').innerHTML =
+      unmatchedRowsHtml(aggregateUnmatched(h.months), RULE_CATEGORIES);
+  }
+  if (statusText) rulesStatus(statusText, 'good');
+}
+
+function initSettings() {
+  document.getElementById('settings-card').hidden = false;
+  refreshRulesAndHistory().catch(() => rulesStatus('Could not load category rules', 'bad'));
+  document.getElementById('unmatched-list').addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('.rule-add');
+    if (!btn) return;
+    const merchant = btn.dataset.merchant;
+    const select = document.querySelector(`.rule-select[data-merchant="${CSS.escape(merchant)}"]`);
+    try {
+      await postRule({ action: 'add', keyword: merchant, category: select.value });
+      await refreshRulesAndHistory(`${merchant} → ${select.value.replace(/_/g, ' ')} — applied to all months`);
+    } catch (err) {
+      rulesStatus(err.message, 'bad');
+    }
+  });
+  document.getElementById('rules-list').addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('.rule-delete');
+    if (!btn) return;
+    try {
+      await postRule({ action: 'delete', keyword: btn.dataset.kw, category: '' });
+      await refreshRulesAndHistory(`Rule for ${btn.dataset.kw} removed`);
+    } catch (err) {
+      rulesStatus(err.message, 'bad');
+    }
+  });
+}
+
 function renderHistory(history) {
   renderSpending(history);
+  lastHistory = history;
   const model = buildHistoryModel(history?.months || {});
   const el = document.getElementById('history');
   const legend = document.getElementById('history-legend');
@@ -670,5 +762,7 @@ function initTabs() {
 initTabs();
 initHistory();
 initTrendsControls();
+initDrilldown();
+initSettings();
 initStatementBanner();
 connect();

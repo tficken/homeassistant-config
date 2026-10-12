@@ -311,6 +311,62 @@ main { display: flex; flex-direction: column; gap: 16px; flex: 1; }
 .trends-sliders { display: flex; gap: 12px; margin-top: 10px; }
 .trends-sliders input { flex: 1; accent-color: var(--blue); }
 
+/* Settings card (category rules) */
+.settings-lede { margin-bottom: 14px; }
+.settings-sub {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 18px 0 8px;
+}
+.rule-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px;
+  border-bottom: 1px solid rgba(31, 42, 63, 0.6);
+  font-size: 14px;
+}
+.rule-row:last-child { border-bottom: none; }
+.rule-keyword { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rule-arrow { color: var(--faint); }
+.rule-category { color: var(--blue); text-transform: capitalize; font-weight: 600; }
+.rule-total { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
+.rule-select {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+  font-size: 13px;
+  padding: 4px 8px;
+  text-transform: capitalize;
+}
+.rule-delete, .rule-add {
+  background: none;
+  border: 1px solid var(--card-border);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.rule-delete { color: var(--red); }
+.rule-delete:hover { border-color: var(--red); }
+.rule-add { color: var(--blue); }
+.rule-add:hover { border-color: var(--blue); }
+
+/* Drill-down transaction lists */
+.cat-row { cursor: pointer; }
+.cat-row:hover .cat-name { color: var(--blue); }
+.tx-list { padding: 2px 0 8px 120px; font-size: 13px; color: var(--muted); }
+.tx-row { display: flex; gap: 10px; padding: 2px 0; }
+.tx-date { min-width: 76px; color: var(--faint); }
+.tx-merchant { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tx-amount { font-variant-numeric: tabular-nums; }
+
 /* Spending breakdown */
 .kpi-tiles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 16px; }
 .kpi-tile { background: rgba(139, 150, 171, 0.07); border: 1px solid var(--card-border); border-radius: 12px; padding: 12px 14px; }
