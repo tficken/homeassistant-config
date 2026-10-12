@@ -263,7 +263,7 @@ KNOWN_CATEGORIES = (
 )
 
 
-def _category_of(tx: dict, rules: dict | None = None) -> str:
+def category_of(tx: dict, rules: dict | None = None) -> str:
     if rules:
         merchant_upper = tx["merchant"].upper()
         for keyword in sorted(rules, key=len, reverse=True):
@@ -296,7 +296,7 @@ def categorize(transactions: list[dict], rules: dict | None = None) -> dict:
     for tx in transactions:
         if tx["direction"] != "debit":
             continue
-        category = _category_of(tx, rules)
+        category = category_of(tx, rules)
         bucket = categories.setdefault(category, {"total": 0.0, "count": 0})
         bucket["total"] = round(bucket["total"] + tx["amount"], 2)
         bucket["count"] += 1

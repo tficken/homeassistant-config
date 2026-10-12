@@ -25,11 +25,13 @@ from homeassistant.helpers.entity_registry import async_get as async_get_entity_
 from homeassistant.helpers.json import json_dumps
 from homeassistant.util import dt as dt_util
 
-from .history_store import load_history, save_month
+from .history_store import load_history, load_rules, save_month, save_rules
 from .statement_parser import (
+    KNOWN_CATEGORIES,
     MAX_PDF_BYTES,
     StatementParseError,
     categorize,
+    category_of,
     extract_pdf_text,
     parse_statement,
 )
@@ -223,8 +225,13 @@ async def budget_history_handler(request: web.Request) -> web.Response:
 
     def _load_enriched() -> dict:
         history = load_history(hass.config.config_dir)
+        rules = load_rules(hass.config.config_dir)
         for month in history["months"].values():
-            breakdown = categorize(month.get("transactions", []))
+            transactions = month.get("transactions", [])
+            breakdown = categorize(transactions, rules)
+            for tx in transactions:
+                if tx.get("direction") == "debit":
+                    tx["category"] = category_of(tx, rules)
             month["categories"] = breakdown["categories"]
             month["kpis"] = breakdown["kpis"]
             month["unmatched"] = breakdown["unmatched"]
@@ -232,6 +239,61 @@ async def budget_history_handler(request: web.Request) -> web.Response:
 
     history = await hass.async_add_executor_job(_load_enriched)
     return web.json_response(history)
+
+
+async def budget_rules_handler(request: web.Request) -> web.Response:
+    """Return the user's merchant->category rules."""
+    secret = request.app.get("ai_dashboard_secret")
+    if not _is_authorized(request, secret):
+        return web.Response(status=401, text="Unauthorized")
+    hass: HomeAssistant = request.app["hass"]
+    rules = await hass.async_add_executor_job(load_rules, hass.config.config_dir)
+    return web.json_response({"rules": rules})
+
+
+async def budget_rules_update_handler(request: web.Request) -> web.Response:
+    """Add or delete a merchant->category rule.
+
+    Body: {"action": "add"|"delete", "keyword": str, "category": str}.
+    """
+    secret = request.app.get("ai_dashboard_secret")
+    if not _is_authorized(request, secret):
+        return web.Response(status=401, text="Unauthorized")
+    hass: HomeAssistant = request.app["hass"]
+    if request.content_length and request.content_length > 65536:
+        return web.json_response({"ok": False, "error": "body too large"}, status=400)
+    try:
+        data = await request.json()
+    except ValueError:
+        return web.json_response({"ok": False, "error": "invalid JSON body"}, status=400)
+    action = str(data.get("action") or "")
+    keyword = str(data.get("keyword") or "").strip().upper()
+    category = str(data.get("category") or "")
+    if action not in ("add", "delete"):
+        return web.json_response(
+            {"ok": False, "error": "action must be 'add' or 'delete'"}, status=400
+        )
+    if not (2 <= len(keyword) <= 80):
+        return web.json_response(
+            {"ok": False, "error": "keyword must be 2-80 characters"}, status=400
+        )
+    if action == "add" and category not in KNOWN_CATEGORIES:
+        return web.json_response(
+            {"ok": False, "error": f"unknown category '{category}'"}, status=400
+        )
+
+    def _mutate() -> dict:
+        rules = load_rules(hass.config.config_dir)
+        if action == "add":
+            rules[keyword] = category
+        else:
+            rules.pop(keyword, None)
+        save_rules(hass.config.config_dir, rules)
+        return rules
+
+    rules = await hass.async_add_executor_job(_mutate)
+    _LOGGER.info("Budget category rule %s: %s -> %s", action, keyword, category or "(removed)")
+    return web.json_response({"ok": True, "rules": rules})
 
 
 async def budget_statement_upload_handler(request: web.Request) -> web.Response:
@@ -733,5 +795,7 @@ async def async_setup_http(hass: HomeAssistant, secret: str | None) -> None:
     app.router.add_get("/budget/ws", websocket_handler)
     app.router.add_post("/budget/api/statement", budget_statement_upload_handler)
     app.router.add_get("/budget/api/history", budget_history_handler)
+    app.router.add_get("/budget/api/category_rules", budget_rules_handler)
+    app.router.add_post("/budget/api/category_rules", budget_rules_update_handler)
     app.router.add_get("/budget", budget_handler)
     app.router.add_get("/budget/{path:.*}", budget_handler)
