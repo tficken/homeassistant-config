@@ -76,7 +76,7 @@ The intended reader of this file is an AI coding agent that has no prior context
 
 ### Automations and Scripts
 
-- `automations.yaml`: User automations (e.g., PagerDuty high-urgency Echo alerts, `ring_snapshot_archive_*` Ring motion/ding clip archiving, `ring_live_stream_failsafe`, low-battery notifications, weekly backup + pruning + `stale_backup_alert`, disk space alert, `away_mode` / `welcome_home` presence routines, `printer_chamber_light_auto_off`).
+- `automations.yaml`: User automations (e.g., PagerDuty high-urgency Echo alerts, `ring_snapshot_archive_*` Ring motion/ding clip archiving, `ring_live_stream_failsafe`, low-battery notifications, weekly backup + pruning + `stale_backup_alert`, disk space alert, `away_mode` / `welcome_home` presence routines, `printer_chamber_light_auto_off`, `monthly_statement_reminder` — phone notification on the 2nd of each month to download the previous month's bank statement and upload it to Billy for bill history).
 - `scripts.yaml`: Lighting/media presets and HA actions (e.g., `all_lights_off`, `goodnight`, `movie_mode`, `living_room_movie_mode`).
 - **Scenes were retired** (`scenes.yaml` removed): every scene duplicated a same-named script, which created ambiguous Alexa names and divergent behavior. Scripts are the single mechanism for presets now; anything scene-only was folded into the script versions.
 
@@ -91,7 +91,7 @@ The intended reader of this file is an AI coding agent that has no prior context
 - **`www/ai-dashboard/`**: Custom retro-terminal wall dashboard served at `/ai-dashboard/` — the primary wall-tablet UI. **See `www/ai-dashboard/AGENTS.md` for architecture, the Settings editor, layout model, proxy endpoints, and its dev workflow.**
 - **Original UI dashboard**: Backed up as `dashboard-backup-*.json` from `.storage/lovelace.dashboard_dashboard`.
 - **Budget dashboard**: YAML-managed `budget-dashboard.yaml` (registered in `configuration.yaml` under `lovelace: dashboards:`) — Billy widget cards plus bill-coverage tiles.
-- **Budget page**: `www/budget/` — standalone modern-finance page at `/budget/` (safe-to-spend hero, payday countdown, 30-day money-runway, upcoming bills list). Served by `ai_dashboard_proxy` alongside the AI dashboard; read-only, live via `/budget/ws`. **Any Python change to the proxy requires a Home Assistant restart.**
+- **Budget page**: `www/budget/` — standalone modern-finance page at `/budget/` (safe-to-spend hero with pay-cycle progress and daily allowance, rule-based "This cycle" advice card, 30-day balance projection chart with paycheck deposits from `input_number.paycheck_amount`, 6-month outlook card driven by `sensor.billy_bill_forecast`, grouped upcoming-bills list with running balance, monthly statement-upload banner during the first week of the month). Served by `ai_dashboard_proxy` alongside the AI dashboard; read-only, live via `/budget/ws`. **Any Python change to the proxy requires a Home Assistant restart.**
 - **Retired**: the YAML-managed `ipad-wall-panel.yaml` Lovelace dashboard was removed in favor of the AI dashboard (recoverable from git history if ever needed).
 
 ### Lovelace Conventions (for any Lovelace work)
@@ -132,7 +132,7 @@ Common device families in this instance (entity IDs follow these prefixes):
 - **Weather**: `weather.forecast_home`
 - **Network**: `sensor.exos_router_*`, `binary_sensor.exos_router_wan_status`
 - **Host / add-on diagnostics**: `sensor.home_assistant_core_*`, `sensor.home_assistant_host_*`, `sensor.home_assistant_supervisor_*`, `sensor.*_cpu_percent`, `sensor.*_memory_percent`, `sensor.ha_disk_usage`, `sensor.ha_last_backup_age`
-- **Finance**: `sensor.bills_due_next_30_days` (command_line, from `scripts/billy_due_next_30_days.py`; per-bill list in its `items` attribute), `sensor.bills_coverage_amount`, `binary_sensor.bills_covered`, payday sensors `sensor.next_payday` / `sensor.days_until_payday` / `sensor.bills_due_before_payday` / `sensor.safe_to_spend_until_payday` (biweekly cycle anchored at `input_datetime.payday_anchor`), `sensor.billy_total_bills` (Billy), SimpleFIN checking: `sensor.west_gate_bank_checking_2075_balance` / `sensor.west_gate_bank_checking_2075_data_age` / `binary_sensor.west_gate_bank_checking_2075_possible_error`
+- **Finance**: `sensor.bills_due_next_30_days` (command_line, from `scripts/billy_due_next_30_days.py`; per-bill list in its `items` attribute), `sensor.billy_bill_forecast` (command_line, from `scripts/billy_bill_forecast.py`; state = typical monthly bill total, 6-month forward bill calendar in its `months` attribute — actuals where Billy has them, recurring-rule occurrences, monthly estimates otherwise), `sensor.bills_coverage_amount`, `binary_sensor.bills_covered`, payday sensors `sensor.next_payday` / `sensor.days_until_payday` / `sensor.bills_due_before_payday` / `sensor.safe_to_spend_until_payday` (biweekly cycle anchored at `input_datetime.payday_anchor`), `input_number.paycheck_amount` (take-home pay per cycle; the budget page models it as deposits in its 30-day balance projection), `sensor.bill_tracker_bill_tracker_total` (Billy monthly bills total), SimpleFIN checking: `sensor.west_gate_bank_checking_2075_balance` / `sensor.west_gate_bank_checking_2075_data_age` / `binary_sensor.west_gate_bank_checking_2075_possible_error`
 
 For the full current entity list, parse `.storage/core.entity_registry`.
 

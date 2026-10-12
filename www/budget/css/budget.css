@@ -1,9 +1,10 @@
 :root {
-  --bg: #0d1117;
-  --card: #161d2b;
-  --card-border: #232d42;
-  --text: #e6ebf4;
+  --bg: #0b0f16;
+  --card: #131a28;
+  --card-border: #1f2a3f;
+  --text: #e8edf5;
   --muted: #8b96ab;
+  --faint: #5c6780;
   --green: #34d399;
   --red: #f87171;
   --amber: #fbbf24;
@@ -13,12 +14,14 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  background: var(--bg);
+  background:
+    radial-gradient(1200px 500px at 50% -10%, rgba(96, 165, 250, 0.06), transparent 60%),
+    var(--bg);
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Inter, sans-serif;
-  max-width: 900px;
+  max-width: 920px;
   margin: 0 auto;
-  padding: 16px;
+  padding: 20px 16px 24px;
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -28,7 +31,7 @@ body {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding: 8px 4px 16px;
+  padding: 4px 4px 18px;
 }
 .topbar h1 { font-size: 22px; font-weight: 700; letter-spacing: 0.5px; }
 .freshness { font-size: 13px; color: var(--muted); }
@@ -39,36 +42,199 @@ main { display: flex; flex-direction: column; gap: 16px; flex: 1; }
 .card {
   background: var(--card);
   border: 1px solid var(--card-border);
-  border-radius: 14px;
-  padding: 20px;
+  border-radius: 16px;
+  padding: 22px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
 }
-.card h2 { font-size: 15px; font-weight: 600; color: var(--muted); margin-bottom: 12px; }
-.hint { font-weight: 400; font-size: 12px; }
+.card h2 {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 14px;
+}
+.hint { font-weight: 400; font-size: 12px; text-transform: none; letter-spacing: 0; }
 
-.hero { text-align: center; padding: 28px 20px; }
-.hero-label { font-size: 14px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
-.hero-amount { font-size: 56px; font-weight: 800; font-variant-numeric: tabular-nums; margin: 8px 0 4px; }
+/* Hero */
+.hero { text-align: center; padding: 30px 24px 24px; }
+.hero-label {
+  font-size: 13px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+}
+.hero-amount {
+  font-size: 64px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin: 10px 0 6px;
+}
 .hero-amount.ok { color: var(--green); }
 .hero-amount.bad { color: var(--red); }
 .hero-sub { font-size: 15px; color: var(--muted); }
-.hero-sub strong { color: var(--text); }
+.hero-sub strong { color: var(--text); font-weight: 600; }
 
-.runway svg { width: 100%; height: auto; display: block; }
-.runway-legend { font-size: 12px; color: var(--muted); margin-top: 8px; display: flex; gap: 16px; flex-wrap: wrap; }
+/* Pay-cycle progress */
+.cycle { max-width: 420px; margin: 18px auto 0; }
+.cycle-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(139, 150, 171, 0.18);
+  overflow: hidden;
+}
+.cycle-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 999px;
+  background: var(--blue);
+  transition: width 0.6s ease;
+}
+.cycle-label { font-size: 12px; color: var(--faint); margin-top: 6px; }
+
+/* Stat row */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--card-border);
+}
+.stat-label {
+  font-size: 11px;
+  color: var(--faint);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+}
+.stat-value {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.stat-value.bad { color: var(--red); }
+
+/* Statement reminder banner */
+.statement-banner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 18px;
+  border-radius: 12px;
+  background: rgba(96, 165, 250, 0.10);
+  border: 1px solid rgba(96, 165, 250, 0.35);
+  font-size: 14px;
+  color: var(--text);
+}
+.statement-banner[hidden] { display: none; }
+.statement-banner a { color: var(--blue); }
+.banner-text { flex: 1; min-width: 0; }
+.banner-dismiss {
+  background: none;
+  border: 1px solid rgba(96, 165, 250, 0.45);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.banner-dismiss:hover { background: rgba(96, 165, 250, 0.15); }
+
+/* Advice card */
+.advice { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.advice li {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.advice li::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--blue);
+  transform: translateY(-1px);
+}
+.advice li.warn::before { background: var(--amber); }
+.advice li.alert::before { background: var(--red); }
+.advice li.good::before { background: var(--green); }
+.advice li .muted { color: var(--muted); }
+.advice li a { color: var(--blue); }
+.advice-card[hidden] { display: none; }
+
+/* Projection chart + outlook */
+.runway svg, .outlook svg { width: 100%; height: auto; display: block; }
+.runway-legend {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 10px;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
 .runway-legend .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 5px; }
+.runway-legend .dash {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top: 2px dashed var(--blue);
+  margin-right: 6px;
+  vertical-align: middle;
+}
 
+/* Bills */
 .bills { display: flex; flex-direction: column; }
+.bill-group { margin-top: 4px; }
+.bill-group + .bill-group { margin-top: 16px; }
+.bill-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 4px 6px;
+  border-bottom: 1px solid var(--card-border);
+}
+.bill-group-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.bill-group-title.overdue { color: var(--red); }
+.bill-group-sub { font-size: 12px; color: var(--faint); font-variant-numeric: tabular-nums; }
+
 .bill-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 4px;
-  border-bottom: 1px solid var(--card-border);
+  padding: 11px 4px;
+  border-bottom: 1px solid rgba(31, 42, 63, 0.6);
 }
 .bill-row:last-child { border-bottom: none; }
-.bill-row .name { flex: 1; font-weight: 600; font-size: 15px; }
-.bill-row .when { font-size: 13px; color: var(--muted); min-width: 110px; text-align: right; }
-.bill-row .amount { font-weight: 700; font-variant-numeric: tabular-nums; min-width: 90px; text-align: right; }
+.bill-row .name { flex: 1; font-weight: 600; font-size: 15px; min-width: 0; }
+.bill-row .when { font-size: 13px; color: var(--muted); min-width: 104px; text-align: right; }
+.bill-row .left {
+  font-size: 13px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  min-width: 86px;
+  text-align: right;
+}
+.bill-row .left.neg { color: var(--red); }
+.bill-row .amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 84px;
+  text-align: right;
+}
 .bill-row .pill {
   font-size: 11px;
   font-weight: 700;
@@ -76,13 +242,19 @@ main { display: flex; flex-direction: column; gap: 16px; flex: 1; }
   border-radius: 999px;
   text-transform: uppercase;
   letter-spacing: 0.5px;
+  white-space: nowrap;
 }
-.pill.payday { background: rgba(96, 165, 250, 0.15); color: var(--blue); }
 .pill.overdue { background: rgba(248, 113, 113, 0.15); color: var(--red); }
 .pill.uncovered { background: rgba(251, 191, 36, 0.15); color: var(--amber); }
-.bill-row.covered-by-balance .amount { color: var(--green); }
+.bill-row.covered .amount { color: var(--green); }
 .bill-row.not-covered .amount { color: var(--red); }
 
-.foot { padding: 16px 4px 8px; font-size: 12px; color: var(--muted); text-align: center; }
-
+.foot { padding: 18px 4px 4px; font-size: 12px; color: var(--faint); text-align: center; }
 .empty { color: var(--muted); padding: 12px 4px; font-size: 14px; }
+
+@media (max-width: 640px) {
+  .hero-amount { font-size: 48px; }
+  .stat-value { font-size: 17px; }
+  .bill-row .left { display: none; }
+  .bill-row .when { min-width: 88px; }
+}

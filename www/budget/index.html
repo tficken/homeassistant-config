@@ -13,16 +13,55 @@
 </header>
 
 <main>
+  <div id="statement-banner" class="statement-banner" hidden>
+    <span class="banner-text">
+      <strong>Statement time</strong> — download last month's bank statement and
+      <a href="/billy">upload it to Billy</a> to keep bill history current.
+    </span>
+    <button id="banner-dismiss" class="banner-dismiss" type="button" aria-label="Dismiss statement reminder">Dismiss</button>
+  </div>
+
   <section class="hero card">
     <div class="hero-label">Safe to spend until payday</div>
     <div id="safe-amount" class="hero-amount">—</div>
     <div id="payday-line" class="hero-sub">—</div>
+
+    <div class="cycle">
+      <div class="cycle-bar"><div id="cycle-fill" class="cycle-fill"></div></div>
+      <div id="cycle-label" class="cycle-label">—</div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat">
+        <div class="stat-label">Checking</div>
+        <div id="stat-balance" class="stat-value">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Due before payday</div>
+        <div id="stat-due" class="stat-value">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Daily allowance</div>
+        <div id="stat-daily" class="stat-value">—</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card advice-card" hidden>
+    <h2>This cycle</h2>
+    <ul id="advice" class="advice"></ul>
   </section>
 
   <section class="card">
-    <h2>Money runway <span class="hint">next 30 days</span></h2>
+    <h2>Balance projection <span class="hint">next 30 days</span></h2>
     <div id="runway" class="runway"></div>
     <div id="runway-legend" class="runway-legend"></div>
+  </section>
+
+  <section class="card outlook-card" hidden>
+    <h2>6-month outlook <span class="hint" id="outlook-hint"></span></h2>
+    <div id="outlook" class="outlook"></div>
+    <div id="outlook-legend" class="runway-legend"></div>
   </section>
 
   <section class="card">

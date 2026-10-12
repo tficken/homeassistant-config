@@ -538,3 +538,21 @@
              else 'light.travis_office_p1s_uno_chamber_light' }}
       continue_on_error: true
   mode: single
+
+- id: monthly_statement_reminder
+  alias: Monthly statement reminder
+  description: Remind on the 2nd of each month to download last month's bank statement and upload it to Billy for bill history
+  triggers:
+    - trigger: time
+      at: "10:00:00"
+  conditions:
+    - condition: template
+      value_template: "{{ now().day == 2 }}"
+  actions:
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: Statement time
+        message: "Download last month's bank statement and upload it to Billy for bill history."
+        data:
+          url: /billy
+  mode: single
