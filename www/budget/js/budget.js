@@ -164,6 +164,40 @@ function renderAdvice(balance, safe, daysLeft, items, paydayIso, paycheck) {
     tips.push({ tone: 'alert', html: `${overdue.length} bill${overdue.length === 1 ? ' is' : 's are'} <strong>overdue</strong> (${money(total)}) — pay or update ${overdue.length === 1 ? 'it' : 'them'} in <a href="/billy">Billy</a>.` });
   }
 
+  // Statement-history-driven spending rules (latest vs previous month).
+  const lm = spendingModel.latest;
+  const pm = spendingModel.previous;
+  if (lm) {
+    const fd = lm.kpis.food_delivery || { total: 0, count: 0 };
+    const atm = lm.kpis.atm_cash || { total: 0, count: 0 };
+    const dine = lm.kpis.dining_out || { total: 0, count: 0 };
+    if (fd.total > 150) {
+      const weekly = fd.total / 4.3;
+      tips.push({
+        tone: fd.total > 300 ? 'warn' : '',
+        html: `Food delivery was <strong>${money(fd.total)}</strong> in ${lm.label} across ${fd.count} orders (~${money(weekly)}/week) — cutting two orders a week saves ~${money(weekly * 2)}/month.`,
+      });
+    }
+    if (atm.count >= 4) {
+      tips.push({ tone: 'warn', html: `${atm.count} ATM withdrawals totaling <strong>${money(atm.total)}</strong> in ${lm.label} — cash is your least-tracked spending.` });
+    }
+    if (pm) {
+      let spike = null;
+      for (const [name, c] of Object.entries(lm.categories)) {
+        const prev = pm.categories[name]?.total;
+        if (!prev || prev < 50) continue;
+        const pct = (c.total - prev) / prev * 100;
+        if (pct > 25 && (!spike || pct > spike.pct)) spike = { name, pct, from: prev, to: c.total };
+      }
+      if (spike) {
+        tips.push({ tone: 'warn', html: `<strong>${spike.name.replace(/_/g, ' ')}</strong> jumped from ${money(spike.from)} to ${money(spike.to)} (+${Math.round(spike.pct)}%) vs ${pm.label}.` });
+      }
+    }
+    if (fd.total + dine.total > 400) {
+      tips.push({ tone: '', html: `Dining + delivery together hit <strong>${money(fd.total + dine.total)}</strong> in ${lm.label} — that's the biggest discretionary lever this month.` });
+    }
+  }
+
   if (safe !== null) {
     if (safe < 0) {
       tips.push({ tone: 'alert', html: `You're <strong>${money(-safe)} short</strong> of covering the bills due before payday — hold discretionary spending or move money from savings.` });
@@ -520,7 +554,10 @@ async function uploadStatement(file) {
       r.warnings && r.warnings.length ? 'warn' : 'good',
     );
     const res2 = await fetch('/budget/api/history');
-    if (res2.ok) renderHistory(await res2.json());
+    if (res2.ok) {
+      renderHistory(await res2.json());
+      render();
+    }
   } catch {
     historyStatus('Upload failed — check the connection and try again', 'bad');
   }
@@ -529,7 +566,7 @@ async function uploadStatement(file) {
 function initHistory() {
   fetch('/budget/api/history')
     .then((r) => (r.ok ? r.json() : null))
-    .then((h) => { if (h) renderHistory(h); })
+    .then((h) => { if (h) { renderHistory(h); render(); } })
     .catch(() => {});
   const btn = document.getElementById('history-upload-btn');
   const input = document.getElementById('history-file');
