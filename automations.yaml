@@ -541,7 +541,7 @@
 
 - id: monthly_statement_reminder
   alias: Monthly statement reminder
-  description: Remind on the 2nd of each month to download last month's bank statement and upload it to Billy for bill history
+  description: Remind on the 2nd of each month to download last month's bank statement and upload it on the budget page for spending history
   triggers:
     - trigger: time
       at: "10:00:00"
@@ -552,7 +552,7 @@
     - action: notify.mobile_app_traviss_iphone
       data:
         title: Statement time
-        message: "Download last month's bank statement and upload it to Billy for bill history."
+        message: "Download last month's bank statement and upload it on the budget page."
         data:
-          url: /billy
+          url: /budget/
   mode: single
