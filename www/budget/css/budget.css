@@ -37,6 +37,22 @@ body {
 .freshness { font-size: 13px; color: var(--muted); }
 .freshness.stale { color: var(--amber); }
 
+/* Tabs */
+.tabs { display: flex; gap: 8px; padding: 0 4px 16px; }
+.tab {
+  background: none;
+  border: 1px solid var(--card-border);
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 18px;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.tab:hover { color: var(--text); }
+.tab.active { background: rgba(96, 165, 250, 0.12); border-color: var(--blue); color: var(--blue); }
+[data-tab].tab-hidden { display: none; }
+
 main { display: flex; flex-direction: column; gap: 16px; flex: 1; }
 
 .card {

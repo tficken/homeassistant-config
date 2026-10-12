@@ -12,16 +12,22 @@
   <div id="freshness" class="freshness">connecting…</div>
 </header>
 
+<nav class="tabs">
+  <button class="tab active" data-tab-target="overview" type="button">Overview</button>
+  <button class="tab" data-tab-target="spending" type="button">Spending</button>
+  <button class="tab" data-tab-target="settings" type="button">Settings</button>
+</nav>
+
 <main>
-  <div id="statement-banner" class="statement-banner" hidden>
+  <div id="statement-banner" class="statement-banner" data-tab="overview" hidden>
     <span class="banner-text">
       <strong>Statement time</strong> — download last month's bank statement and
-      drop it on the <a href="#history-card">History card</a> below to keep spending history current.
+      drop it on the <a href="#spending">History card</a> (Spending tab) to keep spending history current.
     </span>
     <button id="banner-dismiss" class="banner-dismiss" type="button" aria-label="Dismiss statement reminder">Dismiss</button>
   </div>
 
-  <section class="hero card">
+  <section class="hero card" data-tab="overview">
     <div class="hero-label">Safe to spend until payday</div>
     <div id="safe-amount" class="hero-amount">—</div>
     <div id="payday-line" class="hero-sub">—</div>
@@ -47,24 +53,29 @@
     </div>
   </section>
 
-  <section class="card advice-card" hidden>
+  <section class="card advice-card" data-tab="overview" hidden>
     <h2>This cycle</h2>
     <ul id="advice" class="advice"></ul>
   </section>
 
-  <section class="card">
+  <section class="card" data-tab="overview">
     <h2>Balance projection <span class="hint">next 30 days</span></h2>
     <div id="runway" class="runway"></div>
     <div id="runway-legend" class="runway-legend"></div>
   </section>
 
-  <section class="card outlook-card" hidden>
+  <section class="card outlook-card" data-tab="overview" hidden>
     <h2>6-month outlook <span class="hint" id="outlook-hint"></span></h2>
     <div id="outlook" class="outlook"></div>
     <div id="outlook-legend" class="runway-legend"></div>
   </section>
 
-  <section class="card history-card" id="history-card">
+  <section class="card" data-tab="overview">
+    <h2>Upcoming bills</h2>
+    <div id="bills" class="bills"></div>
+  </section>
+
+  <section class="card history-card" id="history-card" data-tab="spending">
     <h2>History <span class="hint">drag a statement PDF here, or</span>
       <button id="history-upload-btn" class="history-upload-btn" type="button">Upload statement</button>
     </h2>
@@ -74,17 +85,16 @@
     <div id="history-legend" class="runway-legend"></div>
   </section>
 
-  <section class="card spending-card" id="spending-card" hidden>
+  <section class="card spending-card" id="spending-card" data-tab="spending" hidden>
     <h2>Spending breakdown <span class="hint" id="spending-month"></span></h2>
     <div id="kpi-tiles" class="kpi-tiles"></div>
     <div id="category-bars" class="category-bars"></div>
-    <div class="hint spending-note">bills &amp; transfers includes obligations also listed in Upcoming bills below</div>
+    <div class="hint spending-note">bills &amp; transfers includes obligations also listed in Upcoming bills (Overview tab)</div>
   </section>
 
-  <section class="card">
-    <h2>Upcoming bills</h2>
-    <div id="bills" class="bills"></div>
-  </section>
+  <section class="card trends-card" id="trends-card" data-tab="spending" hidden></section>
+
+  <section class="card settings-card" id="settings-card" data-tab="settings" hidden></section>
 </main>
 
 <footer id="foot" class="foot">—</footer>

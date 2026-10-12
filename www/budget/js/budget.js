@@ -590,6 +590,25 @@ function initHistory() {
   });
 }
 
+// Tabbed page organization: Overview / Spending / Settings, state kept in
+// the URL hash so refresh and deep links land on the same tab.
+function initTabs() {
+  const VALID = ['overview', 'spending', 'settings'];
+  const activate = (name) => {
+    if (!VALID.includes(name)) name = 'overview';
+    document.querySelectorAll('.tab').forEach((t) =>
+      t.classList.toggle('active', t.dataset.tabTarget === name));
+    document.querySelectorAll('[data-tab]').forEach((s) =>
+      s.classList.toggle('tab-hidden', s.dataset.tab !== name));
+    if (location.hash !== '#' + name) history.replaceState(null, '', '#' + name);
+  };
+  document.querySelectorAll('.tab').forEach((t) =>
+    t.addEventListener('click', () => activate(t.dataset.tabTarget)));
+  window.addEventListener('hashchange', () => activate(location.hash.slice(1)));
+  activate(location.hash.slice(1) || 'overview');
+}
+
+initTabs();
 initHistory();
 initStatementBanner();
 connect();
