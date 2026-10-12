@@ -82,6 +82,56 @@ def _short_date(raw: str) -> date:
     return date(2000 + year, month, day)
 
 
+_TX_LINE = re.compile(
+    r"^\s*(\d{1,2}/\d{1,2})\s+(.*?)\s{2,}([\d,]+\.\d{2})(-?)\s+([\d,]+\.\d{2})\s*$"
+)
+_ACH_CHANNEL = re.compile(r"^(WEB|EFT|PPD\b|TEL\b)", re.IGNORECASE)
+_SKIP_CONTINUATION = re.compile(
+    r"^(Date\b|Member FDIC|Activity in Date Order|P\.O\.|Page\b)", re.IGNORECASE
+)
+
+
+def extract_transactions(text: str, period_start: date, period_end: date) -> list[dict]:
+    """Pull every activity line out of a West Gate Bank statement.
+
+    Card-type entries carry their merchant on the first continuation line;
+    ACH-style entries carry it in the main line (continuations are channel
+    markers like WEB/EFT/PPD).
+    """
+    lines = text.split("\n")
+    txs: list[dict] = []
+    for i, line in enumerate(lines):
+        m = _TX_LINE.match(line)
+        if not m:
+            continue
+        tx_month, tx_day = (int(p) for p in m.group(1).split("/"))
+        year = period_start.year if tx_month == period_start.month else period_end.year
+        detail = m.group(2).strip()
+        merchant = ""
+        for j in range(i + 1, min(i + 4, len(lines))):
+            cand = lines[j].strip()
+            if not cand or _TX_LINE.match(lines[j]) or _SKIP_CONTINUATION.match(cand):
+                if _TX_LINE.match(lines[j]):
+                    break
+                continue
+            if _ACH_CHANNEL.match(cand):
+                break
+            merchant = cand
+            break
+        tx_type = detail.split("  ")[0].strip()
+        if not merchant:
+            # ACH-style: the name rides in the detail after the type prefix.
+            merchant = re.sub(r"^(STUDENT LN|PAYROLL|PAYMENTS|WEB|EFT|TEL)\s*", "", detail).strip()
+        txs.append({
+            "date": date(year, tx_month, tx_day).isoformat(),
+            "type": tx_type,
+            "merchant": merchant,
+            "amount": _money(m.group(3)),
+            "direction": "debit" if m.group(4) == "-" else "credit",
+        })
+    return txs
+
+
 def _westgate_matches(text: str) -> bool:
     return "westgate.bank" in text or "West Gate Bank" in text
 
@@ -123,6 +173,25 @@ def _westgate_parse(text: str) -> dict:
             f"checksum mismatch: beginning + deposits - withdrawals = {expected:.2f} "
             f"but statement shows {values['ending']:.2f}"
         )
+    transactions = extract_transactions(text, period_start, period_end)
+    count_checks = (
+        (r"(\d+)\s+Deposits/Credits", "credit", values["deposits"]),
+        (r"(\d+)\s+Checks/Debits", "debit", values["withdrawals"]),
+    )
+    for pattern, direction, expected_sum in count_checks:
+        found = re.search(pattern, text)
+        if not found:
+            continue
+        subset = [t for t in transactions if t["direction"] == direction]
+        if len(subset) != int(found.group(1)):
+            warnings.append(
+                f"transaction extraction: found {len(subset)} {direction}s "
+                f"but statement reports {found.group(1)} — layout may have changed"
+            )
+        elif abs(sum(t["amount"] for t in subset) - expected_sum) > 0.01:
+            warnings.append(
+                f"transaction extraction: {direction} sums diverge from the statement summary"
+            )
     return {
         "month": period_end.isoformat()[:7],
         "period_start": period_start.isoformat(),
@@ -133,6 +202,7 @@ def _westgate_parse(text: str) -> dict:
         "ending": values["ending"],
         "parser": "westgate_checking",
         "warnings": warnings,
+        "transactions": transactions,
     }
 
 
