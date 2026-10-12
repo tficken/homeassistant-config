@@ -219,3 +219,82 @@ def parse_statement(text: str) -> dict:
     raise UnrecognizedStatementError(
         "Unrecognized statement format — only West Gate Bank checking statements are supported"
     )
+
+
+_CATEGORY_RULES: list[tuple[str, str]] = [
+    ("DOORDASH", "food_delivery"), ("GRUBHUB", "food_delivery"),
+    ("UBER EATS", "food_delivery"), ("UBER*EATS", "food_delivery"),
+    ("SLICE", "food_delivery"),
+    ("CASEYS", "gas_fuel"), ("CASEY S", "gas_fuel"), ("U-STOP", "gas_fuel"),
+    ("AMOCO", "gas_fuel"), ("GULF", "gas_fuel"), ("KWIK", "gas_fuel"),
+    ("SPEEDWAY", "gas_fuel"), ("SHELL", "gas_fuel"), ("EXXON", "gas_fuel"),
+    ("PHILLIPS", "gas_fuel"), ("CENEX", "gas_fuel"),
+    ("WENDY", "dining_out"), ("PANDA", "dining_out"), ("CHICK-FIL-A", "dining_out"),
+    ("CULVERS", "dining_out"), ("TOPPERS", "dining_out"), ("TST*", "dining_out"),
+    ("MCDONALD", "dining_out"), ("TACO", "dining_out"), ("PIZZA", "dining_out"),
+    ("SUBWAY", "dining_out"), ("STARBUCKS", "dining_out"), ("DUNKIN", "dining_out"),
+    ("BURGER", "dining_out"), ("QDOBA", "dining_out"), ("CHIPOTLE", "dining_out"),
+    ("DOMINO", "dining_out"), ("JIMMY JOHN", "dining_out"), ("POPEYE", "dining_out"),
+    ("SONIC", "dining_out"), ("ARBY", "dining_out"), ("HIRO", "dining_out"),
+    ("RESTAURANT", "dining_out"), ("GRILL", "dining_out"), ("CAFE", "dining_out"),
+    ("COSTCO", "groceries"), ("HY-VEE", "groceries"), ("HYVEE", "groceries"),
+    ("ALDI", "groceries"), ("SAMS", "groceries"), ("WALMART", "groceries"),
+    ("TARGET", "groceries"), ("FAREWAY", "groceries"), ("BAKERS", "groceries"),
+    ("AMAZON", "shopping"), ("EBAY", "shopping"), ("STEAM", "shopping"),
+    ("BEST BUY", "shopping"), ("CHEWY", "shopping"),
+    ("HULU", "subscriptions"), ("NETFLIX", "subscriptions"), ("SPOTIFY", "subscriptions"),
+    ("APPLE.COM/BILL", "subscriptions"), ("DOTA", "subscriptions"),
+    ("PATREON", "subscriptions"), ("MOONSHOT", "subscriptions"),
+    ("HEALTH", "health"), ("WALGREENS", "health"), ("CVS", "health"),
+    ("PHARMACY", "health"), ("DENTAL", "health"), ("VISION", "health"),
+    ("PETCO", "pets"), ("PETSMART", "pets"), ("VET", "pets"),
+    ("SUPER 8", "travel"), ("HOTEL", "travel"), ("MOTEL", "travel"),
+    ("AIRLINES", "travel"), ("STUBHUB", "travel"), ("AIRBNB", "travel"),
+    ("SMOKAHA", "tobacco"), ("TOBACCO", "tobacco"), ("VAPE", "tobacco"),
+    ("CIGAR", "tobacco"),
+    ("STUDENT LN", "bills_transfers"), ("DEPT EDUCATION", "bills_transfers"),
+]
+_KPI_KEYS = ("food_delivery", "gas_fuel", "atm_cash", "dining_out")
+
+
+def _category_of(tx: dict) -> str:
+    if tx["type"].startswith("ATM W/D"):
+        return "atm_cash"
+    merchant = tx["merchant"].upper()
+    for keyword, category in _CATEGORY_RULES:
+        if keyword in merchant:
+            return category
+    if tx["type"] in ("STUDENT LN", "PAYROLL", "PAYMENTS", "WEB", "EFT", "TEL"):
+        return "bills_transfers"
+    return "other"
+
+
+def categorize(transactions: list[dict]) -> dict:
+    """Bucket debit transactions into spending categories + KPI totals."""
+    categories: dict[str, dict] = {}
+    unmatched: dict[str, int] = {}
+    kpis = {k: {"total": 0.0, "count": 0} for k in _KPI_KEYS}
+    kpis["food_delivery"].update(
+        {"doordash_total": 0.0, "doordash_count": 0,
+         "grubhub_total": 0.0, "grubhub_count": 0}
+    )
+    for tx in transactions:
+        if tx["direction"] != "debit":
+            continue
+        category = _category_of(tx)
+        bucket = categories.setdefault(category, {"total": 0.0, "count": 0})
+        bucket["total"] = round(bucket["total"] + tx["amount"], 2)
+        bucket["count"] += 1
+        if category == "other":
+            unmatched[tx["merchant"]] = unmatched.get(tx["merchant"], 0) + 1
+        if category in _KPI_KEYS:
+            kpis[category]["total"] = round(kpis[category]["total"] + tx["amount"], 2)
+            kpis[category]["count"] += 1
+        if category == "food_delivery":
+            merchant = tx["merchant"].upper()
+            key = "doordash" if "DOORDASH" in merchant else "grubhub" if "GRUBHUB" in merchant else None
+            if key:
+                kpis["food_delivery"][f"{key}_total"] = round(
+                    kpis["food_delivery"][f"{key}_total"] + tx["amount"], 2)
+                kpis["food_delivery"][f"{key}_count"] += 1
+    return {"categories": categories, "kpis": kpis, "unmatched": unmatched}
