@@ -256,8 +256,19 @@ _CATEGORY_RULES: list[tuple[str, str]] = [
 ]
 _KPI_KEYS = ("food_delivery", "gas_fuel", "atm_cash", "dining_out")
 
+KNOWN_CATEGORIES = (
+    "atm_cash", "food_delivery", "gas_fuel", "dining_out", "groceries",
+    "shopping", "subscriptions", "health", "pets", "travel", "tobacco",
+    "bills_transfers", "other",
+)
 
-def _category_of(tx: dict) -> str:
+
+def _category_of(tx: dict, rules: dict | None = None) -> str:
+    if rules:
+        merchant_upper = tx["merchant"].upper()
+        for keyword in sorted(rules, key=len, reverse=True):
+            if keyword in merchant_upper:
+                return rules[keyword]
     if tx["type"].startswith("ATM W/D"):
         return "atm_cash"
     merchant = tx["merchant"].upper()
@@ -269,8 +280,12 @@ def _category_of(tx: dict) -> str:
     return "other"
 
 
-def categorize(transactions: list[dict]) -> dict:
-    """Bucket debit transactions into spending categories + KPI totals."""
+def categorize(transactions: list[dict], rules: dict | None = None) -> dict:
+    """Bucket debit transactions into spending categories + KPI totals.
+
+    User rules (merchant substring -> category) win over the built-in
+    ruleset, longest keyword first for determinism.
+    """
     categories: dict[str, dict] = {}
     unmatched: dict[str, int] = {}
     kpis = {k: {"total": 0.0, "count": 0} for k in _KPI_KEYS}
@@ -281,12 +296,14 @@ def categorize(transactions: list[dict]) -> dict:
     for tx in transactions:
         if tx["direction"] != "debit":
             continue
-        category = _category_of(tx)
+        category = _category_of(tx, rules)
         bucket = categories.setdefault(category, {"total": 0.0, "count": 0})
         bucket["total"] = round(bucket["total"] + tx["amount"], 2)
         bucket["count"] += 1
         if category == "other":
-            unmatched[tx["merchant"]] = unmatched.get(tx["merchant"], 0) + 1
+            entry = unmatched.setdefault(tx["merchant"], {"total": 0.0, "count": 0})
+            entry["total"] = round(entry["total"] + tx["amount"], 2)
+            entry["count"] += 1
         if category in _KPI_KEYS:
             kpis[category]["total"] = round(kpis[category]["total"] + tx["amount"], 2)
             kpis[category]["count"] += 1

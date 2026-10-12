@@ -13,10 +13,15 @@ from datetime import datetime
 
 DIRNAME = "budget"
 FILENAME = "history.json"
+RULES_FILENAME = "category_rules.json"
 
 
 def _path(config_dir: str) -> str:
     return os.path.join(config_dir, DIRNAME, FILENAME)
+
+
+def _rules_path(config_dir: str) -> str:
+    return os.path.join(config_dir, DIRNAME, RULES_FILENAME)
 
 
 def load_history(config_dir: str) -> dict:
@@ -70,3 +75,19 @@ def save_month(config_dir: str, record: dict, filename: str = "") -> tuple[dict,
     history["months"][record["month"]] = stored
     _write_atomic(_path(config_dir), history)
     return history, stored
+
+
+def load_rules(config_dir: str) -> dict:
+    """Load user merchant->category rules, empty on any read/parse failure."""
+    try:
+        with open(_rules_path(config_dir), encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, ValueError):
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    return {str(k).upper(): str(v) for k, v in data.items()}
+
+
+def save_rules(config_dir: str, rules: dict) -> None:
+    _write_atomic(_rules_path(config_dir), rules)
