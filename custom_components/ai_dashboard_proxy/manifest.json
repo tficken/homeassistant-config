@@ -6,6 +6,6 @@
   "dependencies": ["http"],
   "documentation": "https://github.com/woteg/homeassistant-config",
   "iot_class": "local_push",
-  "requirements": [],
+  "requirements": ["pypdf==6.16.1"],
   "version": "1.0.0"
 }

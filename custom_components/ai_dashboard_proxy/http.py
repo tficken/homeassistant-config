@@ -25,6 +25,14 @@ from homeassistant.helpers.entity_registry import async_get as async_get_entity_
 from homeassistant.helpers.json import json_dumps
 from homeassistant.util import dt as dt_util
 
+from .history_store import load_history, save_month
+from .statement_parser import (
+    MAX_PDF_BYTES,
+    StatementParseError,
+    extract_pdf_text,
+    parse_statement,
+)
+
 _LOGGER = logging.getLogger(__name__)
 
 SNAPSHOT_MAX_AGE_DAYS = 14
@@ -198,6 +206,69 @@ async def dashboard_handler(request: web.Request) -> web.StreamResponse:
 async def budget_handler(request: web.Request) -> web.StreamResponse:
     """Serve the standalone budget page (no injections needed)."""
     return await _serve_static(request, "budget", inject=False)
+
+
+async def budget_history_handler(request: web.Request) -> web.Response:
+    """Return the stored statement history JSON (same auth as the page)."""
+    secret = request.app.get("ai_dashboard_secret")
+    if not _is_authorized(request, secret):
+        return web.Response(status=401, text="Unauthorized")
+    hass: HomeAssistant = request.app["hass"]
+    history = await hass.async_add_executor_job(load_history, hass.config.config_dir)
+    return web.json_response(history)
+
+
+async def budget_statement_upload_handler(request: web.Request) -> web.Response:
+    """Accept a statement PDF, parse it, and upsert it into the history store.
+
+    Accepts multipart/form-data with a `file` field (browser upload) or a
+    raw application/pdf body with an optional X-Filename header (scripts).
+    """
+    secret = request.app.get("ai_dashboard_secret")
+    if not _is_authorized(request, secret):
+        return web.Response(status=401, text="Unauthorized")
+    hass: HomeAssistant = request.app["hass"]
+
+    filename = request.headers.get("X-Filename", "")
+    if request.content_type == "multipart/form-data":
+        form = await request.post()
+        upload = form.get("file")
+        if upload is None or not hasattr(upload, "file"):
+            return web.json_response(
+                {"ok": False, "error": "multipart form is missing a 'file' field"},
+                status=400,
+            )
+        filename = filename or getattr(upload, "filename", "") or ""
+        content = upload.file.read(MAX_PDF_BYTES + 1)
+    else:
+        content = await request.content.read(MAX_PDF_BYTES + 1)
+    if not content:
+        return web.json_response({"ok": False, "error": "empty upload"}, status=400)
+    if len(content) > MAX_PDF_BYTES:
+        return web.json_response(
+            {"ok": False, "error": "file is too large (12 MB max)"}, status=400
+        )
+
+    def _process() -> tuple[dict, dict]:
+        text = extract_pdf_text(content)
+        record = parse_statement(text)
+        return save_month(hass.config.config_dir, record, filename=filename)
+
+    try:
+        _history, stored = await hass.async_add_executor_job(_process)
+    except StatementParseError as err:
+        return web.json_response({"ok": False, "error": str(err)}, status=422)
+    except Exception:
+        _LOGGER.exception("Statement upload failed")
+        return web.json_response(
+            {"ok": False, "error": "internal error while processing the statement"},
+            status=500,
+        )
+    _LOGGER.info(
+        "Budget statement stored: %s (in %.2f / out %.2f)",
+        stored["month"], stored["deposits"], stored["withdrawals"],
+    )
+    return web.json_response({"ok": True, "record": stored})
 
 
 async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
@@ -622,6 +693,9 @@ async def async_setup_http(hass: HomeAssistant, secret: str | None) -> None:
     app.router.add_get("/ai-dashboard/{path:.*}", dashboard_handler)
     # Standalone budget page: same LAN/secret auth, read-only use of the
     # shared WebSocket (states + events; service allowlist still applies).
+    # API routes must be registered before the {path:.*} catch-all.
     app.router.add_get("/budget/ws", websocket_handler)
+    app.router.add_post("/budget/api/statement", budget_statement_upload_handler)
+    app.router.add_get("/budget/api/history", budget_history_handler)
     app.router.add_get("/budget", budget_handler)
     app.router.add_get("/budget/{path:.*}", budget_handler)
