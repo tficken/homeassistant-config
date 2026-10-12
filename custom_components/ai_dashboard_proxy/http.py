@@ -29,6 +29,7 @@ from .history_store import load_history, save_month
 from .statement_parser import (
     MAX_PDF_BYTES,
     StatementParseError,
+    categorize,
     extract_pdf_text,
     parse_statement,
 )
@@ -210,12 +211,26 @@ async def budget_handler(request: web.Request) -> web.StreamResponse:
 
 
 async def budget_history_handler(request: web.Request) -> web.Response:
-    """Return the stored statement history JSON (same auth as the page)."""
+    """Return the stored statement history JSON (same auth as the page).
+
+    Categories/KPIs are computed at read time from the stored raw
+    transactions, so ruleset tweaks apply to all months without re-upload.
+    """
     secret = request.app.get("ai_dashboard_secret")
     if not _is_authorized(request, secret):
         return web.Response(status=401, text="Unauthorized")
     hass: HomeAssistant = request.app["hass"]
-    history = await hass.async_add_executor_job(load_history, hass.config.config_dir)
+
+    def _load_enriched() -> dict:
+        history = load_history(hass.config.config_dir)
+        for month in history["months"].values():
+            breakdown = categorize(month.get("transactions", []))
+            month["categories"] = breakdown["categories"]
+            month["kpis"] = breakdown["kpis"]
+            month["unmatched"] = breakdown["unmatched"]
+        return history
+
+    history = await hass.async_add_executor_job(_load_enriched)
     return web.json_response(history)
 
 
