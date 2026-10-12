@@ -266,6 +266,8 @@ async def budget_rules_update_handler(request: web.Request) -> web.Response:
         data = await request.json()
     except ValueError:
         return web.json_response({"ok": False, "error": "invalid JSON body"}, status=400)
+    if not isinstance(data, dict):
+        return web.json_response({"ok": False, "error": "invalid JSON body"}, status=400)
     action = str(data.get("action") or "")
     keyword = str(data.get("keyword") or "").strip().upper()
     category = str(data.get("category") or "")

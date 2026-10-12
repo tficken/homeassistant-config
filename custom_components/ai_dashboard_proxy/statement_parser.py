@@ -287,7 +287,7 @@ def categorize(transactions: list[dict], rules: dict | None = None) -> dict:
     ruleset, longest keyword first for determinism.
     """
     categories: dict[str, dict] = {}
-    unmatched: dict[str, int] = {}
+    unmatched: dict[str, dict] = {}
     kpis = {k: {"total": 0.0, "count": 0} for k in _KPI_KEYS}
     kpis["food_delivery"].update(
         {"doordash_total": 0.0, "doordash_count": 0,
