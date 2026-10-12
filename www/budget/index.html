@@ -92,7 +92,15 @@
     <div class="hint spending-note">bills &amp; transfers includes obligations also listed in Upcoming bills (Overview tab)</div>
   </section>
 
-  <section class="card trends-card" id="trends-card" data-tab="spending" hidden></section>
+  <section class="card trends-card" id="trends-card" data-tab="spending" hidden>
+    <h2>Spending trends <span class="hint" id="trends-window"></span></h2>
+    <div id="trends-chips" class="trends-chips"></div>
+    <div id="trends" class="trends"></div>
+    <div class="trends-sliders">
+      <input type="range" id="trends-start" min="0" value="0" aria-label="First month">
+      <input type="range" id="trends-end" min="0" value="0" aria-label="Last month">
+    </div>
+  </section>
 
   <section class="card settings-card" id="settings-card" data-tab="settings" hidden></section>
 </main>

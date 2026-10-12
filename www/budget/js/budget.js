@@ -2,6 +2,7 @@
 import { buildOutlookModel, buildOutlookSvg } from './outlook.js';
 import { buildHistoryModel, buildHistorySvg } from './history.js';
 import { buildSpendingModel, categoryBarsHtml, spendingTilesHtml } from './spending.js';
+import { buildTrendsModel, chipsHtml, trendsSvg } from './trends.js';
 
 const ENTITIES = {
   balance: 'sensor.west_gate_bank_checking_2075_balance',
@@ -505,12 +506,70 @@ function renderSpending(history) {
   const card = document.getElementById('spending-card');
   if (!spendingModel.latest) {
     card.hidden = true;
+  } else {
+    document.getElementById('spending-month').textContent = spendingModel.latest.label;
+    document.getElementById('kpi-tiles').innerHTML = spendingTilesHtml(spendingModel);
+    document.getElementById('category-bars').innerHTML = categoryBarsHtml(spendingModel);
+    card.hidden = false;
+  }
+  renderTrends(history);
+}
+
+// Trends card: per-category lines over all stored months. Chip/slider state
+// survives re-renders; defaults recompute only when the month count changes.
+const trendsState = { enabled: null, start: 0, end: 0, monthCount: 0 };
+let trendsModel = null;
+
+function renderTrends(history) {
+  const card = document.getElementById('trends-card');
+  trendsModel = buildTrendsModel(history?.months || {});
+  const count = trendsModel.monthKeys.length;
+  if (!count) {
+    card.hidden = true;
     return;
   }
-  document.getElementById('spending-month').textContent = spendingModel.latest.label;
-  document.getElementById('kpi-tiles').innerHTML = spendingTilesHtml(spendingModel);
-  document.getElementById('category-bars').innerHTML = categoryBarsHtml(spendingModel);
+  if (!trendsState.enabled || trendsState.monthCount !== count) {
+    trendsState.enabled = new Set(trendsModel.defaultEnabled);
+    trendsState.start = 0;
+    trendsState.end = count - 1;
+    trendsState.monthCount = count;
+  }
   card.hidden = false;
+  paintTrends();
+}
+
+function paintTrends() {
+  const count = trendsModel.monthKeys.length;
+  const startEl = document.getElementById('trends-start');
+  const endEl = document.getElementById('trends-end');
+  startEl.max = endEl.max = count - 1;
+  startEl.value = trendsState.start;
+  endEl.value = trendsState.end;
+  document.getElementById('trends-window').textContent =
+    `${trendsModel.fullLabels[Math.min(trendsState.start, trendsState.end)]} – ` +
+    `${trendsModel.fullLabels[Math.max(trendsState.start, trendsState.end)]}`;
+  document.getElementById('trends-chips').innerHTML = chipsHtml(trendsModel, trendsState.enabled);
+  document.getElementById('trends').innerHTML =
+    trendsSvg(trendsModel, trendsState.enabled, trendsState.start, trendsState.end);
+}
+
+function initTrendsControls() {
+  document.getElementById('trends-chips').addEventListener('click', (ev) => {
+    const chip = ev.target.closest('.trends-chip');
+    if (!chip || !trendsModel) return;
+    const cat = chip.dataset.cat;
+    if (trendsState.enabled.has(cat)) trendsState.enabled.delete(cat);
+    else trendsState.enabled.add(cat);
+    paintTrends();
+  });
+  document.getElementById('trends-start').addEventListener('input', (ev) => {
+    trendsState.start = Number(ev.target.value);
+    paintTrends();
+  });
+  document.getElementById('trends-end').addEventListener('input', (ev) => {
+    trendsState.end = Number(ev.target.value);
+    paintTrends();
+  });
 }
 
 function renderHistory(history) {
@@ -610,5 +669,6 @@ function initTabs() {
 
 initTabs();
 initHistory();
+initTrendsControls();
 initStatementBanner();
 connect();
