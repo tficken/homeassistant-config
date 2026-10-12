@@ -252,6 +252,27 @@ main { display: flex; flex-direction: column; gap: 16px; flex: 1; }
 .foot { padding: 18px 4px 4px; font-size: 12px; color: var(--faint); text-align: center; }
 .empty { color: var(--muted); padding: 12px 4px; font-size: 14px; }
 
+/* History card */
+.history-upload-btn {
+  background: none;
+  border: 1px solid var(--card-border);
+  color: var(--blue);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.history-upload-btn:hover { border-color: var(--blue); }
+.history-card.dragover { border-color: var(--blue); box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.25); }
+.history-status { font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+.history-status.good { color: var(--green); }
+.history-status.warn { color: var(--amber); }
+.history-status.bad { color: var(--red); }
+.history svg { width: 100%; height: auto; display: block; }
+
 @media (max-width: 640px) {
   .hero-amount { font-size: 48px; }
   .stat-value { font-size: 17px; }

@@ -1,5 +1,6 @@
 // Budget page: live HA state over the proxy WebSocket, no token needed.
 import { buildOutlookModel, buildOutlookSvg } from './outlook.js';
+import { buildHistoryModel, buildHistorySvg } from './history.js';
 
 const ENTITIES = {
   balance: 'sensor.west_gate_bank_checking_2075_balance',
@@ -459,5 +460,81 @@ function initStatementBanner() {
   });
 }
 
+// Statement history card: load stored history, render the chart, and wire
+// the statement PDF upload (button + drag-and-drop on the card).
+function renderHistory(history) {
+  const model = buildHistoryModel(history?.months || {});
+  const el = document.getElementById('history');
+  const legend = document.getElementById('history-legend');
+  if (!model.length) {
+    el.innerHTML = '<div class="empty">No history yet — upload your first statement.</div>';
+    legend.textContent = '';
+    return;
+  }
+  el.innerHTML = buildHistorySvg(model);
+  legend.innerHTML =
+    `<span><span class="dot" style="background:#34d399"></span>income</span>` +
+    `<span><span class="dot" style="background:#f87171"></span>spending</span>` +
+    `<span><span class="dot" style="background:#60a5fa"></span>ending balance</span>`;
+}
+
+function historyStatus(text, tone) {
+  const el = document.getElementById('history-status');
+  el.textContent = text;
+  el.className = 'history-status' + (tone ? ' ' + tone : '');
+  el.hidden = !text;
+}
+
+async function uploadStatement(file) {
+  historyStatus(`Parsing ${file.name}…`, '');
+  try {
+    const form = new FormData();
+    form.append('file', file, file.name);
+    const res = await fetch('/budget/api/statement', { method: 'POST', body: form });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.ok) {
+      historyStatus(data.error || `Upload failed (HTTP ${res.status})`, 'bad');
+      return;
+    }
+    const r = data.record;
+    const warn = r.warnings && r.warnings.length ? ` — ${r.warnings.join('; ')}` : '';
+    historyStatus(
+      `${r.month}: +${money(r.deposits)} in / −${money(r.withdrawals)} out saved${warn}`,
+      r.warnings && r.warnings.length ? 'warn' : 'good',
+    );
+    const res2 = await fetch('/budget/api/history');
+    if (res2.ok) renderHistory(await res2.json());
+  } catch {
+    historyStatus('Upload failed — check the connection and try again', 'bad');
+  }
+}
+
+function initHistory() {
+  fetch('/budget/api/history')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((h) => { if (h) renderHistory(h); })
+    .catch(() => {});
+  const btn = document.getElementById('history-upload-btn');
+  const input = document.getElementById('history-file');
+  const card = document.getElementById('history-card');
+  btn.addEventListener('click', () => input.click());
+  input.addEventListener('change', () => {
+    if (input.files[0]) uploadStatement(input.files[0]);
+    input.value = '';
+  });
+  card.addEventListener('dragover', (ev) => {
+    ev.preventDefault();
+    card.classList.add('dragover');
+  });
+  card.addEventListener('dragleave', () => card.classList.remove('dragover'));
+  card.addEventListener('drop', (ev) => {
+    ev.preventDefault();
+    card.classList.remove('dragover');
+    const file = ev.dataTransfer?.files?.[0];
+    if (file) uploadStatement(file);
+  });
+}
+
+initHistory();
 initStatementBanner();
 connect();
