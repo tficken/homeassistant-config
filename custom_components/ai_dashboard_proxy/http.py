@@ -37,6 +37,7 @@ _LOGGER = logging.getLogger(__name__)
 
 SNAPSHOT_MAX_AGE_DAYS = 14
 SNAPSHOT_MAX_FILES = 100
+MULTIPART_OVERHEAD = 64 * 1024
 
 
 def _is_local_ip(ip: str | None) -> bool:
@@ -231,15 +232,35 @@ async def budget_statement_upload_handler(request: web.Request) -> web.Response:
 
     filename = request.headers.get("X-Filename", "")
     if request.content_type == "multipart/form-data":
-        form = await request.post()
-        upload = form.get("file")
-        if upload is None or not hasattr(upload, "file"):
+        # Multipart framing adds boundary/headers around the file bytes.
+        if request.content_length and request.content_length > MAX_PDF_BYTES + MULTIPART_OVERHEAD:
+            return web.json_response(
+                {"ok": False, "error": "file is too large (12 MB max)"}, status=400
+            )
+        content = b""
+        reader = await request.multipart()
+        async for part in reader:
+            if part.name != "file":
+                await part.release()
+                continue
+            filename = filename or part.filename or ""
+            chunks: list[bytes] = []
+            size = 0
+            while True:
+                chunk = await part.read_chunk(65536)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                size += len(chunk)
+                if size > MAX_PDF_BYTES:
+                    break
+            content = b"".join(chunks)
+            break
+        if not content:
             return web.json_response(
                 {"ok": False, "error": "multipart form is missing a 'file' field"},
                 status=400,
             )
-        filename = filename or getattr(upload, "filename", "") or ""
-        content = upload.file.read(MAX_PDF_BYTES + 1)
     else:
         content = await request.content.read(MAX_PDF_BYTES + 1)
     if not content:

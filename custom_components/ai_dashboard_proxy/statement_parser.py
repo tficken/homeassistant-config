@@ -39,6 +39,17 @@ def extract_pdf_text(content: bytes) -> str:
         reader = PdfReader(BytesIO(content), strict=False)
     except Exception as err:
         raise StatementParseError("Unable to open PDF") from err
+    if reader.is_encrypted:
+        # Many banks owner-lock statements with an empty user password —
+        # decryptable and fine to read. Only a real password blocks us.
+        try:
+            decrypted = reader.decrypt("")
+        except Exception as err:
+            raise StatementParseError("Unable to open encrypted PDF") from err
+        if not decrypted:
+            raise StatementParseError(
+                "PDF is password-protected — download the unprotected statement and upload that"
+            )
     if len(reader.pages) > MAX_PAGES:
         raise StatementParseError("PDF has too many pages")
     chunks: list[str] = []
