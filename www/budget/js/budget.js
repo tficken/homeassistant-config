@@ -173,9 +173,10 @@ function renderAdvice(balance, safe, daysLeft, items, paydayIso, paycheck) {
     const dine = lm.kpis.dining_out || { total: 0, count: 0 };
     if (fd.total > 150) {
       const weekly = fd.total / 4.3;
+      const perOrder = fd.total / Math.max(1, fd.count);
       tips.push({
         tone: fd.total > 300 ? 'warn' : '',
-        html: `Food delivery was <strong>${money(fd.total)}</strong> in ${lm.label} across ${fd.count} orders (~${money(weekly)}/week) — cutting two orders a week saves ~${money(weekly * 2)}/month.`,
+        html: `Food delivery was <strong>${money(fd.total)}</strong> in ${lm.label} across ${fd.count} orders (~${money(weekly)}/week) — at ~${money(perOrder)}/order, cutting two orders a week saves ~${money(perOrder * 2 * 4.3)}/month.`,
       });
     }
     if (atm.count >= 4) {
