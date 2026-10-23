@@ -79,8 +79,9 @@ export function trendsSvg(model, enabled, startIdx, endIdx) {
     svg += `<line x1="${padL}" y1="${gy}" x2="${W - padR}" y2="${gy}" stroke="${gv === 0 ? '#3a4763' : '#232d42'}" stroke-width="${gv === 0 ? 1.5 : 1}"${gv === 0 ? '' : ' stroke-dasharray="2 4"'}/>` +
       `<text x="${padL - 8}" y="${gy + 4}" fill="#5c6780" font-size="11" text-anchor="end">${moneyShort(gv)}</text>`;
   }
+  const axisLabels = count > 12 ? model.fullLabels : model.labels;
   for (let i = start; i <= end; i++) {
-    svg += `<text x="${x(i)}" y="${H - padB + 18}" fill="#8b96ab" font-size="11" text-anchor="middle">${model.labels[i]}</text>`;
+    svg += `<text x="${x(i)}" y="${H - padB + 18}" fill="#8b96ab" font-size="11" text-anchor="middle">${axisLabels[i]}</text>`;
   }
   for (const cat of cats) {
     const pts = [];

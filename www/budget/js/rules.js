@@ -2,6 +2,10 @@
 
 const money = (n) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
 
+// Escape bank/user-derived strings before HTML interpolation.
+export const esc = (s) => String(s).replace(/[&<>"']/g,
+  (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
 export const RULE_CATEGORIES = [
   'food_delivery', 'dining_out', 'gas_fuel', 'groceries', 'shopping',
   'subscriptions', 'health', 'pets', 'travel', 'tobacco', 'bills_transfers',
@@ -32,10 +36,10 @@ export function rulesRowsHtml(rules) {
   }
   return entries.map(([keyword, category]) =>
     `<div class="rule-row">` +
-    `<span class="rule-keyword" title="${keyword}">${keyword}</span>` +
+    `<span class="rule-keyword" title="${esc(keyword)}">${esc(keyword)}</span>` +
     `<span class="rule-arrow">→</span>` +
     `<span class="rule-category">${label(category)}</span>` +
-    `<button type="button" class="rule-delete" data-kw="${keyword}">Delete</button>` +
+    `<button type="button" class="rule-delete" data-kw="${esc(keyword)}">Delete</button>` +
     `</div>`
   ).join('');
 }
@@ -47,10 +51,10 @@ export function unmatchedRowsHtml(agg, categories) {
   const options = categories.map((c) => `<option value="${c}">${label(c)}</option>`).join('');
   return agg.map(([merchant, info]) =>
     `<div class="rule-row unmatched-row">` +
-    `<span class="rule-keyword" title="${merchant}">${merchant}</span>` +
+    `<span class="rule-keyword" title="${esc(merchant)}">${esc(merchant)}</span>` +
     `<span class="rule-total">${money(info.total)} · ${info.count}×</span>` +
-    `<select class="rule-select" data-merchant="${merchant}">${options}</select>` +
-    `<button type="button" class="rule-add" data-merchant="${merchant}">Add rule</button>` +
+    `<select class="rule-select" data-merchant="${esc(merchant)}">${options}</select>` +
+    `<button type="button" class="rule-add" data-merchant="${esc(merchant)}">Add rule</button>` +
     `</div>`
   ).join('');
 }

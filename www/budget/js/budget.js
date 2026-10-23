@@ -3,7 +3,7 @@ import { buildOutlookModel, buildOutlookSvg } from './outlook.js';
 import { buildHistoryModel, buildHistorySvg } from './history.js';
 import { buildSpendingModel, categoryBarsHtml, spendingTilesHtml } from './spending.js';
 import { buildTrendsModel, chipsHtml, trendsSvg } from './trends.js';
-import { RULE_CATEGORIES, aggregateUnmatched, rulesRowsHtml, unmatchedRowsHtml } from './rules.js';
+import { RULE_CATEGORIES, aggregateUnmatched, esc, rulesRowsHtml, unmatchedRowsHtml } from './rules.js';
 
 const ENTITIES = {
   balance: 'sensor.west_gate_bank_checking_2075_balance',
@@ -188,8 +188,10 @@ function renderAdvice(balance, safe, daysLeft, items, paydayIso, paycheck) {
       let spike = null;
       for (const [name, c] of Object.entries(lm.categories)) {
         const prev = pm.categories[name]?.total;
-        if (!prev || prev < 50) continue;
-        const pct = (c.total - prev) / prev * 100;
+        if (!prev) continue;
+        const delta = c.total - prev;
+        if (delta < 50) continue;
+        const pct = delta / prev * 100;
         if (pct > 25 && (!spike || pct > spike.pct)) spike = { name, pct, from: prev, to: c.total };
       }
       if (spike) {
@@ -216,7 +218,7 @@ function renderAdvice(balance, safe, daysLeft, items, paydayIso, paycheck) {
       });
       if (beforePayday.length) {
         const biggest = beforePayday.reduce((a, b) => (a.amount >= b.amount ? a : b));
-        tips.push({ tone: '', html: `Largest bill this cycle is <strong>${biggest.name}</strong> (${money(biggest.amount)}, due ${fmtDay(parseDay(biggest.due_date))}) — an extra principal payment comes straight out of the surplus.` });
+        tips.push({ tone: '', html: `Largest bill this cycle is <strong>${esc(biggest.name)}</strong> (${money(biggest.amount)}, due ${fmtDay(parseDay(biggest.due_date))}) — an extra principal payment comes straight out of the surplus.` });
       }
     }
     if (daysLeft !== null && daysLeft > 0 && safe / daysLeft < 75 && safe >= 0) {
@@ -346,7 +348,7 @@ function renderRunway(items, balance, paydayIso, paycheck) {
     }
     const c = m.value >= 0 ? '#34d399' : '#f87171';
     svg += `<circle cx="${x(m.day)}" cy="${y(m.value)}" r="5" fill="${c}" fill-opacity="0.3" stroke="${c}" stroke-width="2">` +
-      `<title>${m.name} — ${money(m.amount)} due ${m.due} — balance after: ${money(m.value)}</title></circle>`;
+      `<title>${esc(m.name)} — ${money(m.amount)} due ${m.due} — balance after: ${money(m.value)}</title></circle>`;
   }
 
   // X axis
@@ -405,7 +407,7 @@ function renderBills(items, balance, paydayIso) {
     const left = r.left === null ? ''
       : `<span class="left${r.left < 0 ? ' neg' : ''}" title="projected balance after this bill">${money(r.left)}</span>`;
     return `<div class="bill-row ${covered ? 'covered' : 'not-covered'}">` +
-      `<span class="name">${r.name}</span>${pill}` +
+      `<span class="name">${esc(r.name)}</span>${pill}` +
       `<span class="when">${when}</span>${left}` +
       `<span class="amount">${money(r.amount)}</span></div>`;
   };
@@ -594,7 +596,7 @@ function initDrilldown() {
     list.className = 'tx-list';
     list.innerHTML = txs.map((t) =>
       `<div class="tx-row"><span class="tx-date">${t.date.slice(5)}</span>` +
-      `<span class="tx-merchant">${t.merchant}</span>` +
+      `<span class="tx-merchant">${esc(t.merchant)}</span>` +
       `<span class="tx-amount">${money(t.amount)}</span></div>`
     ).join('') || '<div class="tx-row">no transactions</div>';
     row.after(list);
@@ -621,24 +623,27 @@ async function postRule(payload) {
   return data.rules;
 }
 
-async function refreshRulesAndHistory(statusText) {
+async function refreshRulesAndHistory(statusText, refetchHistory = true) {
   const res = await fetch('/budget/api/category_rules');
   const data = res.ok ? await res.json() : { rules: {} };
   document.getElementById('rules-list').innerHTML = rulesRowsHtml(data.rules);
-  const res2 = await fetch('/budget/api/history');
-  if (res2.ok) {
-    const h = await res2.json();
-    renderHistory(h);
-    render();
-    document.getElementById('unmatched-list').innerHTML =
-      unmatchedRowsHtml(aggregateUnmatched(h.months), RULE_CATEGORIES);
+  if (refetchHistory) {
+    const res2 = await fetch('/budget/api/history');
+    if (res2.ok) {
+      const h = await res2.json();
+      renderHistory(h);
+      render();
+    }
   }
   if (statusText) rulesStatus(statusText, 'good');
 }
 
 function initSettings() {
   document.getElementById('settings-card').hidden = false;
-  refreshRulesAndHistory().catch(() => rulesStatus('Could not load category rules', 'bad'));
+  // Rules list comes from its own endpoint; the unmatched list is populated
+  // by renderHistory from initHistory's fetch — no duplicate history read.
+  refreshRulesAndHistory(null, false)
+    .catch(() => rulesStatus('Could not load category rules', 'bad'));
   document.getElementById('unmatched-list').addEventListener('click', async (ev) => {
     const btn = ev.target.closest('.rule-add');
     if (!btn) return;
@@ -666,6 +671,8 @@ function initSettings() {
 function renderHistory(history) {
   renderSpending(history);
   lastHistory = history;
+  document.getElementById('unmatched-list').innerHTML =
+    unmatchedRowsHtml(aggregateUnmatched(history?.months || {}), RULE_CATEGORIES);
   const model = buildHistoryModel(history?.months || {});
   const el = document.getElementById('history');
   const legend = document.getElementById('history-legend');
@@ -701,8 +708,9 @@ async function uploadStatement(file) {
     }
     const r = data.record;
     const warn = r.warnings && r.warnings.length ? ` — ${r.warnings.join('; ')}` : '';
+    const monthLabel = parseDay(r.month + '-02').toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     historyStatus(
-      `${r.month}: +${money(r.deposits)} in / −${money(r.withdrawals)} out saved${warn}`,
+      `${monthLabel}: +${money(r.deposits)} in / −${money(r.withdrawals)} out saved${warn}`,
       r.warnings && r.warnings.length ? 'warn' : 'good',
     );
     const res2 = await fetch('/budget/api/history');

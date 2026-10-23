@@ -85,7 +85,7 @@ def _short_date(raw: str) -> date:
 _TX_LINE = re.compile(
     r"^\s*(\d{1,2}/\d{1,2})\s+(.*?)\s{2,}([\d,]+\.\d{2})(-?)\s+([\d,]+\.\d{2})\s*$"
 )
-_ACH_CHANNEL = re.compile(r"^(WEB|EFT|PPD\b|TEL\b)", re.IGNORECASE)
+_ACH_CHANNEL = re.compile(r"^(WEB\b|EFT\b|PPD\b|TEL\b)", re.IGNORECASE)
 _SKIP_CONTINUATION = re.compile(
     r"^(Date\b|Member FDIC|Activity in Date Order|P\.O\.|Page\b)", re.IGNORECASE
 )
