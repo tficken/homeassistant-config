@@ -43,3 +43,10 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
+
+      - id: pytest-ai-dashboard-proxy
+        name: pytest ai_dashboard_proxy tests
+        entry: bash -c "cd custom_components/ai_dashboard_proxy/tests && python -m pytest . -q"
+        language: system
+        pass_filenames: false
+        always_run: true

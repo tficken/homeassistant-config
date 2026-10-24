@@ -170,6 +170,7 @@ There is no top-level test harness. The `bambu_lab` integration previously conta
 
 - **Python syntax check**: `python -m compileall custom_components/ai_dashboard_proxy -q`
 - **Lint**: `flake8 custom_components/ai_dashboard_proxy --max-line-length=120 --extend-ignore=E501,W503`
+- **Unit tests**: `cd custom_components/ai_dashboard_proxy/tests && python -m pytest . -q` (requires `pip install pytest pypdf aiohttp`)
 
 ---
 
