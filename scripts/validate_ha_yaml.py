@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Validate Home Assistant YAML files, treating HA custom tags as no-ops."""
 
+import glob
 import sys
 from pathlib import Path
 
@@ -19,11 +20,17 @@ HA_TAGS = [
 for tag in HA_TAGS:
     yaml.SafeLoader.add_constructor(tag, lambda loader, node: None)
 
+# ESPHome and other files use arbitrary local tags (!lambda, ...).
+# Treat every local tag as a no-op so any of these files parse.
+yaml.SafeLoader.add_multi_constructor("!", lambda loader, suffix, node: None)
+
 YAML_FILES = [
     "configuration.yaml",
     "automations.yaml",
     "scripts.yaml",
-]
+    "budget-dashboard.yaml",
+    "esphome/crowpanel-hasp.yaml",
+] + sorted(glob.glob("blueprints/**/*.yaml", recursive=True))
 
 errors = []
 
