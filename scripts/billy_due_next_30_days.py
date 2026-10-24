@@ -63,13 +63,15 @@ def main():
         print("bill_tracker storage has no 'data' object — schema changed?", file=sys.stderr)
         sys.exit(2)
     horizon = today + timedelta(days=WINDOW_DAYS)
+    cat_names = {c.get("id"): c.get("name") for c in data.get("categories", [])}
     items = []
     for bill in data.get("expenses", []):
         if bill.get("paid") or not bill.get("due_date"):
             continue
         if date.fromisoformat(bill["due_date"]) <= horizon:
+            cat_id = bill.get("category_id")
             items.append({
-                "name": bill.get("provider") or bill.get("category_id") or "Bill",
+                "name": bill.get("provider") or cat_names.get(cat_id) or cat_id or "Bill",
                 "amount": round(float(bill.get("amount") or 0), 2),
                 "due_date": bill["due_date"],
             })

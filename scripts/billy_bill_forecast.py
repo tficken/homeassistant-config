@@ -34,8 +34,9 @@ def month_start(d):
     return date(d.year, d.month, 1)
 
 
-def bill_name(bill):
-    return bill.get("provider") or bill.get("category_id") or "Bill"
+def bill_name(bill, cat_names):
+    cat_id = bill.get("category_id")
+    return bill.get("provider") or cat_names.get(cat_id) or cat_id or "Bill"
 
 
 def rule_occurrences(rule, today, horizon):
@@ -86,6 +87,7 @@ def main():
             buckets[off][item["name"].casefold()] = item
 
     # 1) Actual unpaid expenses with due dates.
+    cat_names = {c.get("id"): c.get("name") for c in data.get("categories", [])}
     profile = {}  # name_key -> {"name", "amount", "day"}
     rule_names = {
         (r.get("name") or "").casefold()
@@ -95,7 +97,7 @@ def main():
         if bill.get("paid") or not bill.get("due_date"):
             continue
         due = date.fromisoformat(bill["due_date"])
-        name = bill_name(bill)
+        name = bill_name(bill, cat_names)
         amount = round(float(bill.get("amount") or 0), 2)
         if due >= today or offset_of(due) == 0:
             put(due, {"name": name, "amount": amount, "due_date": due.isoformat(), "estimated": False})
