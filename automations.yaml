@@ -586,3 +586,45 @@
         title: Bank feed stale
         message: "SimpleFIN data for West Gate checking is stale or erroring — safe-to-spend numbers may be wrong."
   mode: single
+
+- id: infrastructure_watchdog
+  alias: Infrastructure watchdog
+  description: Immediate alert when critical infrastructure fails (debounced so quick add-on restarts stay silent)
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.ring_mqtt_with_video_streaming_running
+      to: "off"
+      for: "00:10:00"
+      id: ring_mqtt
+    - trigger: state
+      entity_id: binary_sensor.mosquitto_broker_running
+      to: "off"
+      for: "00:05:00"
+      id: mqtt
+    - trigger: state
+      entity_id: binary_sensor.remote_ui
+      to: "off"
+      for: "00:15:00"
+      id: cloud
+    - trigger: state
+      entity_id: binary_sensor.raspberry_pi_power_status
+      to: "on"
+      id: power
+  conditions: []
+  actions:
+    - variables:
+        component: >
+          {{ {"ring_mqtt": "ring-mqtt add-on (camera recording is down)",
+              "mqtt": "Mosquitto MQTT broker (ring-mqtt and Bambu LAN control go down with it)",
+              "cloud": "Nabu Casa remote UI (remote access, Alexa exposure, cloud TTS)",
+              "power": "Raspberry Pi power problem (undervoltage — SD card corruption risk)"}[trigger.id] }}
+    - action: persistent_notification.create
+      data:
+        title: Infrastructure failure
+        message: "{{ component }} has failed."
+        notification_id: "infrastructure_{{ trigger.id }}"
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: Infrastructure failure
+        message: "{{ component }} has failed."
+  mode: parallel
