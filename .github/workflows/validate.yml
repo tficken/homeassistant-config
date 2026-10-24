@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-      - run: pip install pre-commit yamllint pyyaml flake8
+      - run: pip install pre-commit yamllint pyyaml flake8 pytest pypdf aiohttp
       - uses: pre-commit/action@v3.0.0
 
   validate-dashboard:
