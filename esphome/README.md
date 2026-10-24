@@ -19,7 +19,7 @@ This directory holds ESPHome device configurations and their associated assets.
   - Controlled through a `template` output that writes a single byte over the same `i2c_bus`
 - **Battery monitoring**: MAX17043 I2C fuel gauge on the back `I2C-OUT` header
   - SDA → GPIO15, SCL → GPIO16
-  - Provides `sensor.panel_battery_voltage` and `sensor.panel_battery` (%)
+  - Provides `sensor.living_room_crowpanel_hasp_panel_battery_voltage` and `sensor.living_room_crowpanel_hasp_panel_battery` (%)
   - A HA Template binary sensor (`binary_sensor.panel_charging`) infers charging when voltage is held above 4.15 V
 - **PSRAM**: 8 MB octal PSRAM at 80 MHz, used for fonts/images
 

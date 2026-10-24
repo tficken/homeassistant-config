@@ -279,7 +279,7 @@ template:
       - name: "Panel charging"
         unique_id: panel_charging
         state: >
-          {% set v = states('sensor.panel_battery_voltage') | float(none) %}
+          {% set v = states('sensor.living_room_crowpanel_hasp_panel_battery_voltage') | float(none) %}
           {{ v is not none and v > 4.15 }}
 
   # Bill coverage: does the checking account cover everything due in the next

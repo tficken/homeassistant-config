@@ -436,7 +436,7 @@ sensor:
   #
   # The MAX17043 is at I2C address 0x36 and provides both voltage and a
   # ModelGauge state-of-charge percentage. The existing Home Assistant
-  # `binary_sensor.panel_charging` continues to use `sensor.panel_battery_voltage`
+  # `binary_sensor.panel_charging` continues to use `sensor.living_room_crowpanel_hasp_panel_battery_voltage`
   # (voltage > 4.15 V) to infer USB charging.
   # ---------------------------------------------------------------------------
   - platform: max17043
