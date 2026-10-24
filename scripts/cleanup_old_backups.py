@@ -17,12 +17,21 @@ DAYS_TO_KEEP = 14
 MAX_BACKUPS = 10
 SUPERVISOR = os.environ.get("SUPERVISOR", "http://supervisor")
 TOKEN = os.environ.get("SUPERVISOR_TOKEN")
+def _read_token_file() -> str | None:
+    """Read a long-lived access token from /config/token.ha (git-ignored)."""
+    try:
+        with open("/config/token.ha", encoding="utf-8") as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
 # Optional long-lived access token for the Core API. shell_commands run in the
 # Core container, so HA_URL defaults to the local Core instance. The
 # homeassistant-role SUPERVISOR_TOKEN cannot call the Supervisor's /core/api
-# proxy (it accepts add-on tokens only), so set HA_TOKEN in the shell_command
-# environment if phone notifications are wanted.
-HA_TOKEN = os.environ.get("HA_TOKEN")
+# proxy (it accepts add-on tokens only), and shell_command cannot set env vars,
+# so fall back to the token file when HA_TOKEN is unset.
+HA_TOKEN = os.environ.get("HA_TOKEN") or _read_token_file()
 HA_URL = os.environ.get("HA_URL", "http://localhost:8123")
 LOG_FILE = "/config/scripts/cleanup_old_backups.log"
 LOG_MAX_LINES = 200
@@ -39,8 +48,11 @@ _remove_variants = list(REMOVE_VARIANTS)
 def log(msg: str) -> None:
     line = f"{datetime.now().isoformat()} {msg}"
     print(line)
-    with open(LOG_FILE, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
+    try:
+        with open(LOG_FILE, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except OSError as exc:
+        print(f"(log file write failed: {exc})")
 
 
 def truncate_log() -> None:
