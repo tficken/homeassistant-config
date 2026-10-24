@@ -31,7 +31,7 @@ The intended reader of this file is an AI coding agent that has no prior context
 - **Frontend/Theming**: Lovelace themes (`themes/`), community cards (`www/community/`), and frontend extensions (`custom_components/uix/`).
 - **Databases**: `home-assistant_v2.db*` (recorder/history), `zigbee.db*` (Zigbee coordinator).
 - **Secrets**: `secrets.yaml` stores sensitive placeholders. It must never be committed or shared.
-- **Backups**: Weekly full backups via `shell_command.create_weekly_backup` (automation `weekly_backup`), pruned past 14 days or beyond the newest 10 locally; off-site copies are handled by Nabu Casa cloud backup. `sensor.ha_last_backup_age` (command_line, from `scripts/last_backup_age.py`) tracks the newest backup's age and the `stale_backup_alert` automation notifies when it exceeds 8 days — this catches the backup never running, which `create_weekly_backup.py`'s own failure notification cannot.
+- **Backups**: Weekly full backups via `shell_command.create_weekly_backup` (automation `weekly_backup`), pruned past 14 days or beyond the newest 10 locally; off-site copies are handled by Nabu Casa cloud backup. `sensor.ha_last_backup_age` (command_line, from `scripts/last_backup_age.py`) tracks the newest backup's age — the newest of BOTH the weekly-script and native daily backups — and the `stale_backup_alert` automation notifies when it exceeds 8 days, catching staleness no matter which backup pipeline last produced a backup.
 
 ---
 

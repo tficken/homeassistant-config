@@ -306,7 +306,7 @@
 
 - id: stale_backup_alert
   alias: Stale backup alert
-  description: Notify when the newest backup is more than 8 days old. With native daily backups enabled this sensor tracks the newest of BOTH backup systems; weekly-script failures are covered by the scripts' own failure notifications (restored 2026-10-23 via /config/token.ha).
+  description: Notify when the newest backup is more than 8 days old. With native daily backups enabled this sensor tracks the newest of BOTH backup systems; weekly-script failures are covered by the scripts' own failure notifications (restored 2026-10-23).
   triggers:
     - trigger: time
       at: "09:00:00"

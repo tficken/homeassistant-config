@@ -1,5 +1,7 @@
 # CrowPanel visual upgrades plan
 
+> **STATUS: EXECUTED (2026-09).** Icon PNGs, pressed-style scale animations, `weather_bg.png`, and status indicator dots all shipped in `esphome/crowpanel-hasp.yaml`. Kept for historical reference.
+
 Apply four visual/user-experience improvements to the CrowPanel ESPHome
 LVGL dashboard (`esphome/crowpanel-hasp.yaml`):
 

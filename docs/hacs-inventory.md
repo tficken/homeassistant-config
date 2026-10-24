@@ -6,15 +6,15 @@ This file lists all HACS-managed integrations, Lovelace cards, and downloaded th
 
 | Name | Path | Repository | Installed Version |
 |------|------|------------|-------------------|
-| Alexa Media Player | `custom_components/alexa_media` | <https://github.com/alandtse/alexa_media_player> | v5.16.0 |
+| Alexa Media Player | `custom_components/alexa_media` | <https://github.com/alandtse/alexa_media_player> | v5.17.0 |
 | Bambu Lab | `custom_components/bambu_lab` | <https://github.com/greghesp/ha-bambulab> | v2.2.26 |
-| Billy | `custom_components/bill_tracker` | <https://github.com/robin994/billy> | v0.13.8 |
+| Billy | `custom_components/bill_tracker` | <https://github.com/robin994/billy> | v0.14.1 |
 | Extended OpenAI Conversation | `custom_components/extended_openai_conversation` | <https://github.com/jekalmin/extended_openai_conversation> | v2.0.2 |
 | HACS | `custom_components/hacs` | <https://github.com/hacs/integration> | v2.0.5 |
 | NWS Alerts | `custom_components/nws_alerts` | <https://github.com/finity69x2/nws_alerts> | v6.7.3 |
 | openHASP | `custom_components/openhasp` | <https://github.com/HASwitchPlate/openHASP-custom-component> | v0.7.2 |
 | PagerDuty | `custom_components/pagerduty` | <https://github.com/jdrozdnovak/ha_pagerduty> | v1.21.0 |
-| UI eXtension (UIX) | `custom_components/uix` | <https://github.com/Lint-Free-Technology/uix> | v8.2.0 |
+| UI eXtension (UIX) | `custom_components/uix` | <https://github.com/Lint-Free-Technology/uix> | v8.4.0 |
 
 ## Lovelace Cards
 
