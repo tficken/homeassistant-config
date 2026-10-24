@@ -1,5 +1,7 @@
 # Wall Panel Redesign: openHASP Control-First Dashboard
 
+> **STATUS: ABANDONED (2026-09-21, same day it was written).** Never implemented — the CrowPanel Advance's SC7277 display driver is not supported by openHASP. Superseded by `docs/superpowers/specs/2026-09-21-wall-panel-esphome-redesign.md` (executed; panel runs ESPHome + LVGL). Kept for historical reference only.
+
 ## Goal
 
 Redesign the 7" CrowPanel wall-mounted touch display from its current two-page weather/lights layout into a cleaner, more useful three-page control panel, then reflash it from ESPHome to openHASP so the existing `openhasp/wall_panel.yaml` and `pages.jsonl` configuration actually drives the screen.

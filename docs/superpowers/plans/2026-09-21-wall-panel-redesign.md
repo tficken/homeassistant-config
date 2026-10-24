@@ -1,5 +1,7 @@
 # Wall Panel Redesign Implementation Plan
 
+> **STATUS: ABANDONED (2026-09-21, same day it was written).** Never implemented. The openHASP approach was dropped because the CrowPanel Advance's SC7277 display driver is not supported by openHASP. Superseded by `docs/superpowers/plans/2026-09-21-wall-panel-esphome-redesign.md`, which was executed (panel now runs ESPHome + LVGL; see `esphome/crowpanel-hasp.yaml`). Kept for historical reference only.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Reflash the CrowPanel from ESPHome to openHASP, then deploy a new three-page control-first dashboard with battery, lights/scenes, and security camera snapshots.

@@ -27,6 +27,7 @@ config.code-workspace
 # HACS-managed integrations (reinstalled via HACS; see docs/hacs-inventory.md)
 /custom_components/alexa_media/
 /custom_components/bambu_lab/
+/custom_components/bill_tracker/
 /custom_components/extended_openai_conversation/
 /custom_components/hacs/
 /custom_components/nws_alerts/
