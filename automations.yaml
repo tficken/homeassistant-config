@@ -628,3 +628,40 @@
         title: Infrastructure failure
         message: "{{ component }} has failed."
   mode: parallel
+
+- id: daily_health_digest
+  alias: Daily health digest
+  description: 09:00 digest of soft issues — pending updates, voice add-ons down, wall panel offline. Sends nothing when all is well.
+  triggers:
+    - trigger: time
+      at: "09:00:00"
+  variables:
+    digest_body: >
+      {% set items = namespace(list=[]) %}
+      {% set updates = states.update | selectattr('state', 'eq', 'on') | map(attribute='name') | list %}
+      {% if updates | count > 0 %}
+        {% set items.list = items.list + [updates | count ~ ' update(s) pending: ' ~ updates | join(', ')] %}
+      {% endif %}
+      {% for e in ['binary_sensor.whisper_running', 'binary_sensor.piper_running'] %}
+        {% if is_state(e, 'off') %}
+          {% set items.list = items.list + [states[e].name ~ ' is not running (voice pipeline degraded)'] %}
+        {% endif %}
+      {% endfor %}
+      {% if is_state('light.crowpanel_hasp_display_backlight', 'unavailable') %}
+        {% set items.list = items.list + ['CrowPanel wall panel is offline'] %}
+      {% endif %}
+      {{ items.list | join('\n') }}
+  conditions:
+    - condition: template
+      value_template: "{{ digest_body | trim != '' }}"
+  actions:
+    - action: persistent_notification.create
+      data:
+        title: Daily health digest
+        message: "{{ digest_body }}"
+        notification_id: daily_health_digest
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: Daily health digest
+        message: "{{ digest_body }}"
+  mode: single
