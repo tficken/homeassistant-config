@@ -12,11 +12,11 @@ def test_history_store_upsert_and_continuity(tmp_path):
     print("missing file -> empty: OK")
 
     aug = {"month": "2026-08", "period_start": "2026-07-20", "period_end": "2026-08-23",
-           "beginning": 1317.69, "deposits": 6616.48, "withdrawals": 5408.79,
-           "ending": 2525.38, "parser": "westgate_checking", "warnings": []}
+           "beginning": 1000.00, "deposits": 2000.00, "withdrawals": 500.00,
+           "ending": 2500.00, "parser": "westgate_checking", "warnings": []}
     sep = {"month": "2026-09", "period_start": "2026-08-24", "period_end": "2026-09-20",
-           "beginning": 2525.38, "deposits": 5168.80, "withdrawals": 4969.71,
-           "ending": 2724.47, "parser": "westgate_checking", "warnings": []}
+           "beginning": 2500.00, "deposits": 1500.00, "withdrawals": 700.00,
+           "ending": 3300.00, "parser": "westgate_checking", "warnings": []}
 
     history, stored = save_month(config, aug, filename="August Statement.pdf")
     assert stored["filename"] == "August Statement.pdf"
