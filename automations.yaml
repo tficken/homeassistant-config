@@ -556,3 +556,33 @@
         data:
           url: /budget/
   mode: single
+
+- id: bank_feed_stale_alert
+  alias: Bank feed stale alert
+  description: Notify when the SimpleFIN bank feed stops updating — safe-to-spend numbers go stale silently otherwise
+  triggers:
+    - trigger: state
+      entity_id: binary_sensor.west_gate_bank_checking_2075_possible_error
+      to: "on"
+      id: error
+    - trigger: time
+      at: "09:00:00"
+      id: daily
+  conditions:
+    - condition: template
+      value_template: >
+        {% set age_ts = as_timestamp(states('sensor.west_gate_bank_checking_2075_data_age'), none) %}
+        {{ states('binary_sensor.west_gate_bank_checking_2075_possible_error') == 'on'
+           or age_ts is none
+           or now().timestamp() - age_ts > 172800 }}
+  actions:
+    - action: persistent_notification.create
+      data:
+        title: Bank feed stale
+        message: "SimpleFIN data for West Gate checking is stale or erroring (last update: {{ states('sensor.west_gate_bank_checking_2075_data_age') }}) — safe-to-spend numbers may be wrong."
+        notification_id: bank_feed_stale_alert
+    - action: notify.mobile_app_traviss_iphone
+      data:
+        title: Bank feed stale
+        message: "SimpleFIN data for West Gate checking is stale or erroring — safe-to-spend numbers may be wrong."
+  mode: single
