@@ -54,3 +54,4 @@ config.code-workspace
 # Budget statement history contains personal financial data (repo is public)
 /budget/history.json
 /budget/category_rules.json
+/budget/targets.json

@@ -39,9 +39,9 @@ function deltaHtml(current, previous) {
   return `<span class="delta ${up ? 'up' : 'down'}">${up ? '▲' : '▼'} ${Math.abs(Math.round(pct))}%</span>`;
 }
 
-export function spendingTilesHtml(model) {
+export function spendingTilesHtml(model, targets) {
   if (!model.latest) return '';
-  return KPI_DEFS.map((def) => {
+  const tiles = KPI_DEFS.map((def) => {
     const k = model.latest.kpis[def.key] || { total: 0, count: 0 };
     const prev = model.previous ? (model.previous.kpis[def.key] || {}).total : null;
     const sub = def.sub ? def.sub(k) : `${k.count} charge${k.count === 1 ? '' : 's'}`;
@@ -49,10 +49,20 @@ export function spendingTilesHtml(model) {
       `<div class="kpi-label">${def.label}</div>` +
       `<div class="kpi-value">${money(k.total)} ${deltaHtml(k.total, prev)}</div>` +
       `<div class="kpi-sub">${sub}</div></div>`;
-  }).join('');
+  });
+  if (targets && targets.overall) {
+    const total = Object.values(model.latest.categories)
+      .reduce((s, c) => s + c.total, 0);
+    const pct = Math.round(total / targets.overall * 100);
+    tiles.push(`<div class="kpi-tile">` +
+      `<div class="kpi-label">Month total</div>` +
+      `<div class="kpi-value${total > targets.overall ? ' over' : ''}">${money(total)}</div>` +
+      `<div class="kpi-sub">of ${money(targets.overall)} target · ${pct}%</div></div>`);
+  }
+  return tiles.join('');
 }
 
-export function categoryBarsHtml(model) {
+export function categoryBarsHtml(model, targets) {
   if (!model.latest) return '';
   const cats = Object.entries(model.latest.categories)
     .map(([name, c]) => ({ name, ...c, prev: model.previous?.categories?.[name]?.total ?? null }))
@@ -60,12 +70,21 @@ export function categoryBarsHtml(model) {
     .sort((a, b) => b.total - a.total);
   const max = Math.max(...cats.map((c) => c.total), 1);
   const label = (name) => name.replace(/_/g, ' ');
-  return cats.map((c) =>
-    `<div class="cat-row" data-cat="${c.name}">` +
-    `<span class="cat-name">${label(c.name)}</span>` +
-    `<span class="cat-bar"><span class="cat-fill${c.name === 'bills_transfers' ? ' muted-fill' : ''}" style="width:${(c.total / max * 100).toFixed(1)}%"></span></span>` +
-    `<span class="cat-count">${c.count}×</span>` +
-    `<span class="cat-amount">${money(c.total)} ${deltaHtml(c.total, c.prev)}</span>` +
-    `</div>`
-  ).join('');
+  return cats.map((c) => {
+    const t = targets?.categories?.[c.name];
+    const over = t !== undefined && c.total > t;
+    const marker = t !== undefined
+      ? `<span class="cat-target" style="left:${Math.min(100, t / max * 100).toFixed(1)}%"` +
+        ` title="target ${money(t)}"></span>`
+      : '';
+    const suffix = t !== undefined
+      ? ` <span class="cat-target-label">of ${money(t)}</span>`
+      : '';
+    return `<div class="cat-row" data-cat="${c.name}">` +
+      `<span class="cat-name">${label(c.name)}</span>` +
+      `<span class="cat-bar">${marker}<span class="cat-fill${c.name === 'bills_transfers' ? ' muted-fill' : ''}${over ? ' over' : ''}" style="width:${(c.total / max * 100).toFixed(1)}%"></span></span>` +
+      `<span class="cat-count">${c.count}×</span>` +
+      `<span class="cat-amount${over ? ' over' : ''}">${money(c.total)} ${deltaHtml(c.total, c.prev)}${suffix}</span>` +
+      `</div>`;
+  }).join('');
 }

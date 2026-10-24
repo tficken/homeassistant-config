@@ -4,6 +4,7 @@ import { buildHistoryModel, buildHistorySvg } from './history.js';
 import { buildSpendingModel, categoryBarsHtml, spendingTilesHtml } from './spending.js';
 import { buildTrendsModel, chipsHtml, trendsSvg } from './trends.js';
 import { RULE_CATEGORIES, aggregateUnmatched, esc, rulesRowsHtml, unmatchedRowsHtml } from './rules.js';
+import { targetFormHtml, targetsRowsHtml } from './targets.js';
 
 const ENTITIES = {
   balance: 'sensor.west_gate_bank_checking_2075_balance',
@@ -27,6 +28,9 @@ const CYCLE_DAYS = 14; // biweekly pay cycle
 const FALLBACK_PAYCHECK = 2156.40;
 
 const state = new Map(); // entity_id -> {state, attributes, last_updated}
+// Budget targets from /budget/api/targets; applied to the spending
+// breakdown bars/tiles and the advice rules.
+let targetsModel = { overall: null, categories: {} };
 let ws = null;
 let pingTimer = null;
 
@@ -200,6 +204,31 @@ function renderAdvice(balance, safe, daysLeft, items, paydayIso, paycheck) {
     }
     if (fd.total + dine.total > 400) {
       tips.push({ tone: '', html: `Dining + delivery together hit <strong>${money(fd.total + dine.total)}</strong> in ${lm.label} — that's the biggest discretionary lever this month.` });
+    }
+
+    // Budget targets: flag categories over (or nearly over) their monthly
+    // cap, and the month total against the overall target.
+    const catTargets = targetsModel.categories || {};
+    const overs = [];
+    for (const [name, c] of Object.entries(lm.categories)) {
+      const target = catTargets[name];
+      if (!target) continue;
+      const pct = c.total / target * 100;
+      if (pct > 100) {
+        overs.push({ name, total: c.total, target, over: pct - 100 });
+      } else if (pct >= 90) {
+        tips.push({ tone: '', html: `<strong>${name.replace(/_/g, ' ')}</strong> reached ${Math.round(pct)}% of its ${money(target)} target in ${lm.label}.` });
+      }
+    }
+    overs.sort((a, b) => b.over - a.over);
+    for (const o of overs.slice(0, 2)) {
+      tips.push({ tone: 'warn', html: `<strong>${o.name.replace(/_/g, ' ')}</strong> hit <strong>${money(o.total)}</strong> vs a ${money(o.target)} target in ${lm.label} — ${Math.round(o.over)}% over.` });
+    }
+    if (targetsModel.overall) {
+      const total = Object.values(lm.categories).reduce((s, c) => s + c.total, 0);
+      if (total > targetsModel.overall) {
+        tips.push({ tone: 'warn', html: `Total spending in ${lm.label} was <strong>${money(total)}</strong> vs your ${money(targetsModel.overall)} overall target — ${Math.round((total / targetsModel.overall - 1) * 100)}% over.` });
+      }
     }
   }
 
@@ -512,8 +541,8 @@ function renderSpending(history) {
     card.hidden = true;
   } else {
     document.getElementById('spending-month').textContent = spendingModel.latest.label;
-    document.getElementById('kpi-tiles').innerHTML = spendingTilesHtml(spendingModel);
-    document.getElementById('category-bars').innerHTML = categoryBarsHtml(spendingModel);
+    document.getElementById('kpi-tiles').innerHTML = spendingTilesHtml(spendingModel, targetsModel);
+    document.getElementById('category-bars').innerHTML = categoryBarsHtml(spendingModel, targetsModel);
     card.hidden = false;
   }
   renderTrends(history);
@@ -668,6 +697,66 @@ function initSettings() {
   });
 }
 
+// Targets card: manage overall + per-category monthly spending targets.
+// Targets apply to the latest statement month in the breakdown and advice.
+function targetsStatus(text, tone) {
+  const el = document.getElementById('targets-status');
+  el.textContent = text;
+  el.className = 'history-status' + (tone ? ' ' + tone : '');
+  el.hidden = !text;
+}
+
+async function postTarget(payload) {
+  const res = await fetch('/budget/api/targets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data.targets;
+}
+
+async function refreshTargets(statusText) {
+  const res = await fetch('/budget/api/targets');
+  const data = res.ok ? await res.json() : { targets: { overall: null, categories: {} } };
+  targetsModel = data.targets;
+  document.getElementById('targets-list').innerHTML = targetsRowsHtml(targetsModel);
+  if (lastHistory) renderSpending(lastHistory);
+  render();
+  if (statusText) targetsStatus(statusText, 'good');
+}
+
+function initTargets() {
+  document.getElementById('targets-card').hidden = false;
+  document.getElementById('target-form').innerHTML = targetFormHtml();
+  refreshTargets(null)
+    .catch(() => targetsStatus('Could not load budget targets', 'bad'));
+  document.getElementById('target-form').addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('.target-set');
+    if (!btn) return;
+    const category = document.getElementById('target-category').value;
+    const amount = parseFloat(document.getElementById('target-amount').value);
+    try {
+      await postTarget({ action: 'set', category, amount });
+      const labelText = category === 'overall' ? 'overall' : category.replace(/_/g, ' ');
+      await refreshTargets(`${labelText} target set to ${money(amount)}`);
+    } catch (err) {
+      targetsStatus(err.message, 'bad');
+    }
+  });
+  document.getElementById('targets-list').addEventListener('click', async (ev) => {
+    const btn = ev.target.closest('.target-delete');
+    if (!btn) return;
+    try {
+      await postTarget({ action: 'delete', category: btn.dataset.cat });
+      await refreshTargets(`Target for ${btn.dataset.cat.replace(/_/g, ' ')} removed`);
+    } catch (err) {
+      targetsStatus(err.message, 'bad');
+    }
+  });
+}
+
 function renderHistory(history) {
   renderSpending(history);
   lastHistory = history;
@@ -772,5 +861,6 @@ initHistory();
 initTrendsControls();
 initDrilldown();
 initSettings();
+initTargets();
 initStatementBanner();
 connect();
