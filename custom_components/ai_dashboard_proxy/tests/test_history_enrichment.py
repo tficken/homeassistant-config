@@ -1,7 +1,6 @@
 """Verify read-time category enrichment of the history endpoint payload."""
 import asyncio
 import json
-from pathlib import Path
 from unittest.mock import MagicMock
 
 from ha_stubs import install_ha_stubs
@@ -27,10 +26,31 @@ class FakeRequest:
         return default
 
 
-def test_enriched_history_payload():
-    # The original script ran from the repo root with config_dir="."; point
-    # at the repo root's real budget/history.json explicitly instead.
-    FakeHass.config.config_dir = str(Path(__file__).resolve().parents[3])
+def test_enriched_history_payload(tmp_path):
+    # Synthesized September fixture — 8 food-delivery debits totaling 423.37 —
+    # so the assertions below hold without the live budget/ data files.
+    cfg = str(tmp_path)
+    food = [
+        ("2026-09-01", "DOORDASH*A1", 52.92),
+        ("2026-09-02", "DOORDASH*B2", 52.93),
+        ("2026-09-03", "DOORDASH*C3", 52.90),
+        ("2026-09-05", "DOORDASH*D4", 53.00),
+        ("2026-09-08", "DOORDASH*E5", 52.90),
+        ("2026-09-10", "DOORDASH*F6", 52.92),
+        ("2026-09-12", "DOORDASH*G7", 52.90),
+        ("2026-09-15", "DOORDASH*H8", 52.90),
+    ]
+    save_month(cfg, {
+        "month": "2026-09", "period_start": "2026-08-24", "period_end": "2026-09-20",
+        "beginning": 1.0, "deposits": 1.0, "withdrawals": 1.0, "ending": 1.0,
+        "parser": "synthetic", "warnings": [],
+        "transactions": [
+            {"date": day, "type": "DBT CRD", "merchant": merchant,
+             "amount": amount, "direction": "debit"}
+            for day, merchant, amount in food
+        ],
+    })
+    FakeHass.config.config_dir = cfg
     res = asyncio.new_event_loop().run_until_complete(
         proxy_http.budget_history_handler(FakeRequest()))
     assert res.status == 200, res.status

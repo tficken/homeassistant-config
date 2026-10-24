@@ -2,6 +2,7 @@
 from ha_stubs import install_ha_stubs
 
 # Stub HA modules so http.py imports standalone.
+# NOTE: the aiohttp entries are a functional no-op under the conftest's real-aiohttp pin (kept for fidelity with the original script).
 install_ha_stubs(extra=["aiohttp", "aiohttp.web"])
 
 from ai_dashboard_proxy import http as proxy_http  # noqa: E402

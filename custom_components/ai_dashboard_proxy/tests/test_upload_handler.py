@@ -8,7 +8,6 @@ stays capped.
 import asyncio
 import json
 from io import BytesIO
-from pathlib import Path
 from unittest.mock import MagicMock
 
 from ha_stubs import install_ha_stubs
@@ -92,11 +91,6 @@ def run(coro):
     return asyncio.new_event_loop().run_until_complete(coro)
 
 
-# The original script read tmp/statement-2026-09.pdf relative to the repo
-# root; resolve it relative to this file so any pytest cwd works.
-PDF = (Path(__file__).resolve().parents[3] / "tmp" / "statement-2026-09.pdf").read_bytes()
-
-
 def test_oversized_multipart_rejected_before_any_read(tmp_path):
     # 1. Oversized multipart body is rejected before any read (400, no post()).
     config = str(tmp_path)
@@ -107,16 +101,30 @@ def test_oversized_multipart_rejected_before_any_read(tmp_path):
     print("oversized multipart rejected pre-read: OK")
 
 
-def test_multipart_upload_parses_and_stores(tmp_path):
-    # 2. Normal multipart upload parses and stores.
+def test_multipart_upload_parses_and_stores(tmp_path, monkeypatch):
+    # 2. Normal multipart upload parses and stores. The parser is patched so
+    # the test needs no real bank PDF/data — multipart handling and storage
+    # are what's under test here, not PDF decoding.
     config = str(tmp_path)
-    ok = FakeRequest(config, content_type="multipart/form-data", body=PDF,
-                     filename="september.pdf")
+
+    def fake_extract_pdf_text(content):
+        return "synthetic statement text"
+
+    def fake_parse_statement(text):
+        return {"month": "2026-09", "period_start": "2026-08-24", "period_end": "2026-09-20",
+                "beginning": 1000.00, "deposits": 1234.56, "withdrawals": 200.00,
+                "ending": 2034.56, "parser": "synthetic", "warnings": []}
+
+    monkeypatch.setattr(proxy_http, "extract_pdf_text", fake_extract_pdf_text)
+    monkeypatch.setattr(proxy_http, "parse_statement", fake_parse_statement)
+
+    ok = FakeRequest(config, content_type="multipart/form-data",
+                     body=b"synthetic statement bytes", filename="september.pdf")
     res = run(proxy_http.budget_statement_upload_handler(ok))
     assert res.status == 200, res.text
     payload = json.loads(res.text)
     assert payload["ok"] is True and payload["record"]["month"] == "2026-09", payload
-    assert payload["record"]["deposits"] == 5168.80, payload
+    assert payload["record"]["deposits"] == 1234.56, payload
     print("multipart upload stores month: OK")
 
 
