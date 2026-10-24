@@ -39,3 +39,11 @@ jobs:
           echo "Dashboard JS modules OK"
       - name: Validate AI dashboard HTML
         run: python -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/ai-dashboard/index.html', encoding='utf-8').read()); print('HTML parse OK')"
+      - name: Budget page JS syntax
+        run: |
+          for f in $(find www/budget/js -name '*.js'); do
+            node --input-type=module --check < "$f" || exit 1
+          done
+          echo "Budget JS modules OK"
+      - name: Validate budget page HTML
+        run: python -c "from html.parser import HTMLParser; HTMLParser().feed(open('www/budget/index.html', encoding='utf-8').read()); print('Budget HTML parse OK')"
