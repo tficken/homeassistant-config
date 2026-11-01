@@ -54,3 +54,7 @@ This file lists all HACS-managed integrations, Lovelace cards, and downloaded th
 - Run HACS updates through the Home Assistant UI as normal.
 - Because these directories are git-ignored, updates will not appear in `git status`.
 - Update this file when major versions change or when adding/removing HACS items.
+
+## Local Patches (re-apply after HACS updates)
+
+- **`custom_components/pagerduty/sensor.py`** — `calculate_assigned_incidents_attributes` carries a local patch that adds `"priority": (incident.get("priority") or {}).get("summary")` to each entry in the `assigned_incidents` attribute. The `PD New Incident announcement` automation uses it to only announce P1/P2 incidents. HACS updates of `ha_pagerduty` will wipe it; re-add the same line after `"urgency"` (marked with a `# Local patch` comment) and restart Home Assistant.

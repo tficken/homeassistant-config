@@ -290,12 +290,23 @@ echo_dot_announce:
       continue_on_error: true
     - delay:
         seconds: "{{ delay_seconds | int(8) }}"
-    - condition: template
-      value_template: "{{ prev_volume is not none }}"
     - action: media_player.volume_set
       target:
         entity_id: media_player.master_bedroom_echo_dot
       data:
-        volume_level: "{{ prev_volume }}"
+        volume_level: "{{ prev_volume | float(0.4) }}"
+      continue_on_error: true
+    - if:
+        - condition: template
+          value_template: >-
+            {% set target = prev_volume | float(0.4) %}
+            {% set actual = state_attr('media_player.master_bedroom_echo_dot', 'volume_level') | float(-1) %}
+            {{ actual >= 0 and (actual - target) | abs > 0.05 }}
+      then:
+        - action: persistent_notification.create
+          data:
+            title: Echo Dot announce
+            message: "Volume restore failed: expected {{ prev_volume | float(0.4) }}, got {{ state_attr('media_player.master_bedroom_echo_dot', 'volume_level') }}."
+            notification_id: echo_dot_announce_restore_failed
   mode: single
   icon: mdi:bullhorn

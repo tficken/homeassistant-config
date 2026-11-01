@@ -184,7 +184,7 @@
 
 - id: '1786780000002'
   alias: PD New Incident announcement
-  description: Flash the office ceiling fan red 3 times and announce over the master bedroom Echo Dot when a new high-urgency PagerDuty incident is assigned, restoring the prior light state and Echo volume afterwards
+  description: Flash the office ceiling fan red 3 times for any new high-urgency PagerDuty incident; announce over the master bedroom Echo Dot only for P1/P2 incidents (incidents with no priority fall back to the urgency filter), restoring the prior light state and Echo volume afterwards
   triggers:
   - trigger: state
     entity_id:
@@ -221,10 +221,23 @@
   - action: scene.turn_on
     target:
       entity_id: scene.pagerduty_flash_restore
-  - action: script.echo_dot_announce
-    data:
-      message: New PagerDuty Alert
-      volume: 0.8
+  - if:
+      - condition: template
+        value_template: >-
+          {% set incs = state_attr('sensor.pagerduty_p2wm8b3_pagerduty_assigned_incidents', 'assigned_incidents') or [] %}
+          {% set ns = namespace(fire=false) %}
+          {% for i in incs %}
+            {% if i.get('priority') in ['P1', 'P2'] or (i.get('priority') is none and i.urgency == 'high') %}
+              {% set ns.fire = true %}
+            {% endif %}
+          {% endfor %}
+          {{ ns.fire }}
+    then:
+      - action: script.echo_dot_announce
+        data:
+          message: New PagerDuty Alert
+          delay_seconds: 3
+          volume: 0.8
   mode: single
 
 - id: '1786780000001'
@@ -386,11 +399,16 @@
       continue_on_error: true
     - variables:
         prev_volume: "{{ state_attr('media_player.master_bedroom_echo_dot', 'volume_level') | float(0.4) }}"
-    - action: input_number.set_value
-      target:
-        entity_id: input_number.master_bedroom_echo_dot_volume
-      data:
-        value: "{{ prev_volume }}"
+    - if:
+        - condition: state
+          entity_id: script.echo_dot_announce
+          state: "off"
+      then:
+        - action: input_number.set_value
+          target:
+            entity_id: input_number.master_bedroom_echo_dot_volume
+          data:
+            value: "{{ prev_volume }}"
     - action: notify.alexa_media_master_bedroom_echo_dot
       data:
         message: "Away mode enabled. Lights off, motion detection on."
