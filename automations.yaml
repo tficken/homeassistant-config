@@ -184,7 +184,7 @@
 
 - id: '1786780000002'
   alias: PD New Incident announcement
-  description: Flash the office ceiling fan red 3 times for any new high-urgency PagerDuty incident; announce over the master bedroom Echo Dot only for P1/P2 incidents (incidents with no priority fall back to the urgency filter), restoring the prior light state and Echo volume afterwards
+  description: Flash the office ceiling fan red 3 times for any new high-urgency PagerDuty incident; announce over the master bedroom Echo Dot only for incidents with priority P0/P1/P2, restoring the prior light state and Echo volume afterwards
   triggers:
   - trigger: state
     entity_id:
@@ -225,13 +225,7 @@
       - condition: template
         value_template: >-
           {% set incs = state_attr('sensor.pagerduty_p2wm8b3_pagerduty_assigned_incidents', 'assigned_incidents') or [] %}
-          {% set ns = namespace(fire=false) %}
-          {% for i in incs %}
-            {% if i.get('priority') in ['P1', 'P2'] or (i.get('priority') is none and i.urgency == 'high') %}
-              {% set ns.fire = true %}
-            {% endif %}
-          {% endfor %}
-          {{ ns.fire }}
+          {{ incs | selectattr('priority', 'in', ['P0', 'P1', 'P2']) | list | count > 0 }}
     then:
       - action: script.echo_dot_announce
         data:
